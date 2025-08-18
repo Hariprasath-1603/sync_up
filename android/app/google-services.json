@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "732949162701",
+    "project_id": "sync-up-43399",
+    "storage_bucket": "sync-up-43399.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:732949162701:android:7d8d531eeac5cb43711784",
+        "android_client_info": {
+          "package_name": "com.example.sync_up"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBac3LBkSLHLKWjNRaK5oDRVqApSZ_UY2w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

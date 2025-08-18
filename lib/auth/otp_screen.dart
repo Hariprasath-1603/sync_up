@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class OtpScreen extends StatefulWidget {
   final String verificationType; // "Email" or "Mobile"
   final String contactInfo;      // The actual email or phone number
+  final String? verificationId;  // Required for phone auth
 
   const OtpScreen({
     super.key,
     required this.verificationType,
     required this.contactInfo,
+    this.verificationId,
   });
 
   @override
@@ -19,22 +22,39 @@ class _OtpScreenState extends State<OtpScreen> {
   final _formKey = GlobalKey<FormState>();
   final List<TextEditingController> _otpControllers =
   List.generate(6, (_) => TextEditingController());
+  bool _isLoading = false;
 
-  final String _defaultOtp = "123456"; // Default OTP for testing
-
-  void _verifyOtp() {
+  // This function now verifies the OTP with Firebase.
+  void _verifyOtp() async {
     if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
       String enteredOtp = _otpControllers.map((c) => c.text).join();
-      if (enteredOtp == _defaultOtp) {
-        // Return 'true' to indicate successful verification
-        Navigator.of(context).pop(true);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Invalid OTP!"),
-            backgroundColor: Colors.redAccent,
-          ),
+
+      try {
+        // Create the credential using the verificationId and the OTP code.
+        PhoneAuthCredential credential = PhoneAuthProvider.credential(
+          verificationId: widget.verificationId!,
+          smsCode: enteredOtp,
         );
+
+        // Sign in the user with the credential to verify the phone number.
+        await FirebaseAuth.instance.signInWithCredential(credential);
+
+        // If successful, pop the screen and return 'true'.
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
+
+      } on FirebaseAuthException catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.message ?? "Invalid OTP")),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }
@@ -116,7 +136,6 @@ class _OtpScreenState extends State<OtpScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // Display the contact info with an edit button
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -130,7 +149,6 @@ class _OtpScreenState extends State<OtpScreen> {
                       IconButton(
                         icon: const Icon(Icons.edit, size: 20, color: Colors.blue),
                         onPressed: () {
-                          // Go back to the previous screen (sign-up or forgot password)
                           Navigator.of(context).pop();
                         },
                       ),
@@ -142,7 +160,9 @@ class _OtpScreenState extends State<OtpScreen> {
                     children: List.generate(6, (index) => _buildOtpBox(index)),
                   ),
                   const SizedBox(height: 30),
-                  ElevatedButton(
+                  _isLoading
+                      ? const CircularProgressIndicator()
+                      : ElevatedButton(
                     onPressed: _verifyOtp,
                     style: ButtonStyle(
                       backgroundColor: MaterialStateProperty.all(Colors.blueAccent),
@@ -166,14 +186,7 @@ class _OtpScreenState extends State<OtpScreen> {
                   const SizedBox(height: 20),
                   TextButton(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: Colors.blueAccent,
-                          content: Text(
-                            "OTP resent to your ${widget.verificationType.toLowerCase()}",
-                          ),
-                        ),
-                      );
+                      // TODO: Implement resend OTP logic
                     },
                     child: const Text(
                       "Resend OTP",

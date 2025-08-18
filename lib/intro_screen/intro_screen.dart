@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:sync_up/auth/auth.dart';
+
 class IntroductionScreen extends StatefulWidget {
-  const IntroductionScreen({super.key});
+  final VoidCallback? onIntroComplete; // Added callback
+  const IntroductionScreen({super.key, this.onIntroComplete});
 
   @override
   State<IntroductionScreen> createState() => _IntroductionScreenState();
@@ -57,6 +59,7 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
   }
 
   void _onFinish() {
+    widget.onIntroComplete?.call(); // Call the callback
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -64,23 +67,6 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
       ),
     );
   }
-
-  // void _onFinish() {
-  //   Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const Scaffold(
-  //         body: Center(
-  //           child: Text(
-  //             "Home Screen",
-  //             style: TextStyle(
-  //               fontSize: 25,
-  //               fontWeight: FontWeight.bold,
-  //             ),
-  //           ),
-  //         ),
-  //       ),
-  //     ),
-  //   );
-  // }
-
 
   @override
   Widget build(BuildContext context) {

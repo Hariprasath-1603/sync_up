@@ -1,13 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:country_code_picker/country_code_picker.dart';
-import 'otp_screen.dart'; // Assuming otp_screen.dart is in the same directory
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'otp_screen.dart'; // Make sure you have this file in lib/auth/
+import '../home/home_screen.dart';
 
-// ---------- ENUMS FOR CUSTOM WIDGETS ----------
+// ---------- 1. SERVICES (Firebase Logic) ----------
+
+// Function to save user data to Firestore after sign-up.
+Future<void> saveUserData(User user, String username, String dob, String gender, String phone, String location) async {
+  DocumentReference userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
+  await userDoc.set({
+    'uid': user.uid,
+    'username': username,
+    'email': user.email,
+    'dob': dob,
+    'gender': gender,
+    'phone': phone,
+    'location': location,
+    'createdAt': FieldValue.serverTimestamp(),
+  });
+}
+
+// ---------- 2. REUSABLE WIDGETS ----------
+
+// An enum to define the different types of text fields.
 enum TextFieldType { text, password, phone }
-enum PasswordStrength { None, Weak, Normal, Strong }
 
-// ---------- UNIFIED REUSABLE TEXTFIELD WIDGET ----------
+// A unified, reusable text field widget for all authentication forms.
 class CustomTextField extends StatefulWidget {
   final TextEditingController? controller;
   final String hintText;
@@ -41,7 +63,6 @@ class _CustomTextFieldState extends State<CustomTextField> {
 
   @override
   Widget build(BuildContext context) {
-    // Build the phone field layout
     if (widget.fieldType == TextFieldType.phone) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
@@ -84,7 +105,6 @@ class _CustomTextFieldState extends State<CustomTextField> {
       );
     }
 
-    // Build the regular/password field layout
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
       child: TextFormField(
@@ -125,7 +145,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
   }
 }
 
-// ---------- CUSTOM DROPDOWN WIDGET FOR GENDER ----------
+// A custom dropdown widget that looks like a text field.
 class CustomDropdownField extends StatelessWidget {
   final String hintText;
   final IconData icon;
@@ -189,18 +209,33 @@ class CustomDropdownField extends StatelessWidget {
   }
 }
 
-// ---------- PASSWORD STRENGTH INDICATOR WIDGET ----------
+// An enum to represent the different levels of password strength.
+enum PasswordStrength { None, Weak, Normal, Strong }
+
+// A visual indicator for password strength.
 class PasswordStrengthIndicator extends StatelessWidget {
   final PasswordStrength strength;
 
   const PasswordStrengthIndicator({super.key, required this.strength});
+
+  Color _getColor() {
+    switch (strength) {
+      case PasswordStrength.Weak:
+        return Colors.red;
+      case PasswordStrength.Normal:
+        return Colors.orange;
+      case PasswordStrength.Strong:
+        return Colors.green;
+      default:
+        return Colors.transparent;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     if (strength == PasswordStrength.None) {
       return const SizedBox.shrink();
     }
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
       child: ClipRRect(
@@ -232,23 +267,39 @@ class PasswordStrengthIndicator extends StatelessWidget {
       ),
     );
   }
+}
 
-  Color _getColor() {
-    switch (strength) {
-      case PasswordStrength.Weak:
-        return Colors.red;
-      case PasswordStrength.Normal:
-        return Colors.orange;
-      case PasswordStrength.Strong:
-        return Colors.green;
-      default:
-        return Colors.transparent;
-    }
+// A reusable button for social media logins.
+class SocialLoginButton extends StatelessWidget {
+  final String assetPath;
+  final VoidCallback onTap;
+
+  const SocialLoginButton({
+    super.key,
+    required this.assetPath,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Image.asset(assetPath, height: 30, width: 30),
+      ),
+    );
   }
 }
 
+// ---------- 3. MAIN SCREENS ----------
 
-// ---------- MAIN AUTH SCREEN ----------
+// The main entry point for the authentication flow.
 class AuthScreen extends StatelessWidget {
   const AuthScreen({super.key});
 
@@ -261,11 +312,80 @@ class AuthScreen extends StatelessWidget {
   }
 }
 
-// ---------- LOGIN COMPONENT ----------
-class LoginComponent extends StatelessWidget {
+// The Login Screen widget.
+class LoginComponent extends StatefulWidget {
   const LoginComponent({super.key});
 
-  // --- Forgot Password Bottom Sheet ---
+  @override
+  State<LoginComponent> createState() => _LoginComponentState();
+}
+
+class _LoginComponentState extends State<LoginComponent> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+  bool _rememberMe = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signInWithEmail() async {
+    setState(() => _isLoading = true);
+    try {
+      await FirebaseAuth.instance.setPersistence(
+        _rememberMe ? Persistence.LOCAL : Persistence.SESSION,
+      );
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      // The StreamBuilder in main.dart will handle navigation
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message ?? "An error occurred")),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _signInWithGoogle(BuildContext context) async {
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return;
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+
+      if (userCredential.additionalUserInfo!.isNewUser) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const SignUpFlowScreen(isNewGoogleUser: true),
+          ),
+        );
+      }
+      // The StreamBuilder in main.dart will handle navigation for existing users
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to sign in with Google: $e")),
+      );
+    }
+  }
+
   void _showForgotPasswordSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -293,7 +413,7 @@ class LoginComponent extends StatelessWidget {
                 leading: const Icon(Icons.email_outlined, color: Colors.blue),
                 title: const Text("Reset with Email"),
                 onTap: () {
-                  Navigator.of(context).pop(); // Close the sheet
+                  Navigator.of(context).pop();
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -307,7 +427,7 @@ class LoginComponent extends StatelessWidget {
                 leading: const Icon(Icons.phone_outlined, color: Colors.blue),
                 title: const Text("Reset with Phone"),
                 onTap: () {
-                  Navigator.of(context).pop(); // Close the sheet
+                  Navigator.of(context).pop();
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -341,33 +461,43 @@ class LoginComponent extends StatelessWidget {
             style: TextStyle(fontSize: 16, color: Colors.grey),
           ),
           const SizedBox(height: 30),
-          const CustomTextField(hintText: "Email", icon: Icons.email_outlined),
-          const CustomTextField(
+          CustomTextField(controller: _emailController, hintText: "Email", icon: Icons.email_outlined),
+          CustomTextField(
+            controller: _passwordController,
             hintText: "Password",
             icon: Icons.lock_outline,
             fieldType: TextFieldType.password,
           ),
-          // Forgot Password Button
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 30.0),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => _showForgotPasswordSheet(context),
-                child: const Text("Forgot Password?"),
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      onChanged: (value) {
+                        setState(() {
+                          _rememberMe = value!;
+                        });
+                      },
+                    ),
+                    const Text("Remember me"),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () => _showForgotPasswordSheet(context),
+                  child: const Text("Forgot Password?"),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const OtpFlowScreen(verificationType: "Login", contactInfo: ""), // Placeholder
-                ),
-              );
-            },
+          _isLoading
+              ? const CircularProgressIndicator()
+              : ElevatedButton(
+            onPressed: _signInWithEmail,
             style: ButtonStyle(
               backgroundColor: MaterialStateProperty.all(Colors.blue),
               foregroundColor: MaterialStateProperty.all(Colors.white),
@@ -383,7 +513,6 @@ class LoginComponent extends StatelessWidget {
             child: const Text("Login", style: TextStyle(fontSize: 16)),
           ),
           const SizedBox(height: 20),
-          // --- Social Login Section ---
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 40.0, vertical: 10.0),
             child: Row(
@@ -402,15 +531,13 @@ class LoginComponent extends StatelessWidget {
             children: [
               SocialLoginButton(
                 assetPath: 'assets/logos/google.png',
-                onTap: () {
-                  // TODO: Implement Google Sign-In
-                },
+                onTap: () => _signInWithGoogle(context),
               ),
               const SizedBox(width: 20),
               SocialLoginButton(
-                assetPath: 'assets/logos/facebook.png',
+                assetPath: 'assets/logos/apple.png',
                 onTap: () {
-                  // TODO: Implement Facebook Sign-In
+                  // TODO: Implement Apple Sign-In
                 },
               ),
               const SizedBox(width: 20),
@@ -454,36 +581,70 @@ class LoginComponent extends StatelessWidget {
   }
 }
 
-// ---------- SOCIAL LOGIN BUTTON WIDGET ----------
-class SocialLoginButton extends StatelessWidget {
-  final String assetPath;
-  final VoidCallback onTap;
-
-  const SocialLoginButton({
-    super.key,
-    required this.assetPath,
-    required this.onTap,
-  });
+// The screen that confirms the password reset link has been sent.
+class EmailLinkSentScreen extends StatelessWidget {
+  const EmailLinkSentScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[300]!),
-          borderRadius: BorderRadius.circular(12),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'assets/lottie/email_sent.json', // Add a Lottie file for this
+                height: 250,
+                width: 250,
+              ),
+              const SizedBox(height: 30),
+              const Text(
+                "Check Your Inbox!",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "We've sent a password reset link to your email address.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 40),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AuthScreen()),
+                        (route) => false,
+                  );
+                },
+                style: ButtonStyle(
+                  backgroundColor: MaterialStateProperty.all(Colors.blue),
+                  foregroundColor: MaterialStateProperty.all(Colors.white),
+                  padding: MaterialStateProperty.all(
+                    const EdgeInsets.symmetric(horizontal: 80, vertical: 15),
+                  ),
+                  shape: MaterialStateProperty.all(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                child: const Text("Continue", style: TextStyle(fontSize: 16)),
+              ),
+            ],
+          ),
         ),
-        child: Image.asset(assetPath, height: 50, width: 50), // FIX: Increased size
       ),
     );
   }
 }
 
-
-// ---------- FORGOT PASSWORD SCREEN ----------
 class ForgotPasswordScreen extends StatefulWidget {
   final String verificationType;
   const ForgotPasswordScreen({super.key, required this.verificationType});
@@ -496,6 +657,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _contactController = TextEditingController();
   String _countryCode = "+91";
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -503,21 +665,73 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  void _sendOtp() {
+  void _sendVerification() async {
     if (_formKey.currentState!.validate()) {
-      String contactInfo = widget.verificationType == "Mobile"
-          ? _countryCode + _contactController.text
-          : _contactController.text;
+      setState(() => _isLoading = true);
+      String contactInfo = _contactController.text.trim();
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => OtpScreen(
-            verificationType: widget.verificationType,
-            contactInfo: contactInfo,
-          ),
-        ),
-      );
+      try {
+        if (widget.verificationType == "Email") {
+          var methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(contactInfo);
+          if (methods.isEmpty) {
+            throw FirebaseAuthException(code: 'user-not-found');
+          }
+          await FirebaseAuth.instance.sendPasswordResetEmail(email: contactInfo);
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const EmailLinkSentScreen(),
+              ),
+            );
+          }
+        } else { // Mobile verification
+          await FirebaseAuth.instance.verifyPhoneNumber(
+            phoneNumber: _countryCode + contactInfo,
+            verificationCompleted: (PhoneAuthCredential credential) async {},
+            verificationFailed: (FirebaseAuthException e) {
+              throw e;
+            },
+            codeSent: (String verificationId, int? resendToken) async {
+              if (mounted) {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => OtpScreen(
+                      verificationType: "Mobile",
+                      contactInfo: _countryCode + contactInfo,
+                      verificationId: verificationId,
+                    ),
+                  ),
+                );
+                if (result == true) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ResetPasswordScreen(),
+                    ),
+                  );
+                }
+              }
+            },
+            codeAutoRetrievalTimeout: (String verificationId) {},
+          );
+        }
+      } on FirebaseAuthException catch (e) {
+        if (mounted) {
+          String errorMessage = e.message ?? "An error occurred.";
+          if (e.code == 'user-not-found') {
+            errorMessage = "No account found with this email.";
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMessage)),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     }
   }
 
@@ -568,8 +782,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   },
                 ),
               const SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: _sendOtp,
+              _isLoading
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                onPressed: _sendVerification,
                 style: ButtonStyle(
                   backgroundColor: MaterialStateProperty.all(Colors.blue),
                   foregroundColor: MaterialStateProperty.all(Colors.white),
@@ -582,7 +798,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     ),
                   ),
                 ),
-                child: const Text("Send OTP", style: TextStyle(fontSize: 16)),
+                child: const Text("Send Link/OTP", style: TextStyle(fontSize: 16)),
               ),
             ],
           ),
@@ -592,12 +808,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 }
 
-
-// ---------- POST-LOGIN OTP FLOW ----------
 class OtpFlowScreen extends StatelessWidget {
   final String verificationType;
   final String contactInfo;
-  const OtpFlowScreen({super.key, required this.verificationType, required this.contactInfo});
+  final String? verificationId;
+  const OtpFlowScreen({super.key, required this.verificationType, required this.contactInfo, this.verificationId});
 
   @override
   Widget build(BuildContext context) {
@@ -605,16 +820,16 @@ class OtpFlowScreen extends StatelessWidget {
       body: PageView(
         physics: const NeverScrollableScrollPhysics(),
         children: [
-          OtpScreen(verificationType: verificationType, contactInfo: contactInfo),
+          OtpScreen(verificationType: verificationType, contactInfo: contactInfo, verificationId: verificationId),
         ],
       ),
     );
   }
 }
 
-// ---------- SIGNUP FLOW WITH TWO PAGES ----------
 class SignUpFlowScreen extends StatefulWidget {
-  const SignUpFlowScreen({super.key});
+  final bool isNewGoogleUser;
+  const SignUpFlowScreen({super.key, this.isNewGoogleUser = false});
 
   @override
   State<SignUpFlowScreen> createState() => _SignUpFlowScreenState();
@@ -625,13 +840,10 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
   final _formKey1 = GlobalKey<FormState>();
   final _formKey2 = GlobalKey<FormState>();
 
-  // Page 1 Controllers
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-
-  // Page 2 Controllers
   final _dobController = TextEditingController();
   final _locationController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -642,7 +854,6 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
   bool _isEmailVerified = false;
   bool _isPhoneVerified = false;
 
-  // --- Sample Location Data ---
   static const Map<String, List<String>> _locationSuggestions = {
     '+91': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Hyderabad','Coimbatore'],
     '+61': ['Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adelaide', 'Canberra'],
@@ -650,20 +861,27 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
     '+44': ['London', 'Manchester', 'Birmingham', 'Glasgow', 'Liverpool', 'Bristol'],
   };
 
-  // --- Phone Number Lengths by Country Code ---
   static const Map<String, int> _phoneLengthByCountry = {
-    '+1': 10,  // USA/Canada
-    '+44': 10, // UK
-    '+61': 9,  // Australia
-    '+81': 10, // Japan
-    '+86': 11, // China
-    '+91': 10, // India
+    '+1': 10,
+    '+44': 10,
+    '+61': 9,
+    '+81': 10,
+    '+86': 11,
+    '+91': 10,
   };
 
   @override
   void initState() {
     super.initState();
     _passwordController.addListener(_checkPasswordStrength);
+    if (widget.isNewGoogleUser) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        _nameController.text = user.displayName ?? "";
+        _emailController.text = user.email ?? "";
+        _isEmailVerified = true;
+      }
+    }
   }
 
   @override
@@ -687,11 +905,9 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
       setState(() => _passwordStrength = PasswordStrength.None);
       return;
     }
-
     bool hasLetters = password.contains(RegExp(r'[a-zA-Z]'));
     bool hasNumbers = password.contains(RegExp(r'[0-9]'));
     bool hasSpecialChars = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
-
     if (password.length < 8) {
       setState(() => _passwordStrength = PasswordStrength.Weak);
     } else if (hasLetters && hasNumbers && hasSpecialChars) {
@@ -703,7 +919,7 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
     }
   }
 
-  void _onSignUp() {
+  void _onSignUp() async {
     if (_formKey2.currentState!.validate()) {
       if (!_isEmailVerified || !_isPhoneVerified) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -711,7 +927,6 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
         );
         return;
       }
-
       if (_dobController.text.isNotEmpty) {
         final dob = DateTime.parse(_dobController.text);
         final eightYearsAgo = DateTime.now().subtract(const Duration(days: 365 * 8));
@@ -720,13 +935,41 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
           return;
         }
       }
-
-      // If all checks pass, navigate to the final success screen
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const SignUpSuccessScreen()),
-            (Route<dynamic> route) => false,
-      );
+      try {
+        User? user;
+        if (!widget.isNewGoogleUser) {
+          UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: _emailController.text,
+            password: _passwordController.text,
+          );
+          user = userCredential.user;
+        } else {
+          user = FirebaseAuth.instance.currentUser;
+        }
+        if (user != null) {
+          await saveUserData(
+            user,
+            _nameController.text,
+            _dobController.text,
+            _genderController.text,
+            _countryCode + _phoneController.text,
+            _locationController.text,
+          );
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const SignUpSuccessScreen()),
+                (Route<dynamic> route) => false,
+          );
+        }
+      } on FirebaseAuthException catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to create account: ${e.message}")),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("An unexpected error occurred: $e")),
+        );
+      }
     }
   }
 
@@ -757,7 +1000,6 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
     );
-
     if (picked != null) {
       final DateTime eightYearsAgo = DateTime.now().subtract(const Duration(days: 365 * 8));
       if (picked.isAfter(eightYearsAgo)) {
@@ -773,16 +1015,13 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
     }
   }
 
-  // --- Verification Methods ---
   Future<void> _verifyEmail() async {
-    // First, validate the email field
     if (_emailController.text.isEmpty || !RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(_emailController.text)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please enter a valid email before verifying.")),
       );
       return;
     }
-
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -800,7 +1039,6 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
   }
 
   Future<void> _verifyPhone() async {
-    // Validate phone number length
     int? expectedLength = _phoneLengthByCountry[_countryCode];
     if (expectedLength != null && _phoneController.text.length != expectedLength) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -808,7 +1046,6 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
       );
       return;
     }
-
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -871,60 +1108,63 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
               icon: Icons.person_outline,
               validator: (value) => value == null || value.isEmpty ? 'Please enter your username' : null,
             ),
-            // Email Field with Verification
             Column(
               children: [
                 CustomTextField(
                   controller: _emailController,
                   hintText: "Email",
                   icon: Icons.email_outlined,
+                  readOnly: widget.isNewGoogleUser,
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Please enter your email';
                     if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(value)) return 'Please enter a valid email';
                     return null;
                   },
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40.0),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: _isEmailVerified
-                        ? const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text("Verified", style: TextStyle(color: Colors.green)),
-                        Icon(Icons.check_circle, color: Colors.green, size: 16),
-                      ],
-                    )
-                        : TextButton(onPressed: _verifyEmail, child: const Text("Verify")),
+                if (!widget.isNewGoogleUser)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: _isEmailVerified
+                          ? const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text("Verified", style: TextStyle(color: Colors.green)),
+                          Icon(Icons.check_circle, color: Colors.green, size: 16),
+                        ],
+                      )
+                          : TextButton(onPressed: _verifyEmail, child: const Text("Verify")),
+                    ),
                   ),
-                ),
               ],
             ),
-            CustomTextField(
-              controller: _passwordController,
-              hintText: "Password",
-              icon: Icons.lock_outline,
-              fieldType: TextFieldType.password,
-              validator: (value) {
-                if (value == null || value.isEmpty) return 'Please enter a password';
-                if (_passwordStrength == PasswordStrength.Weak) return 'Password is too weak';
-                return null;
-              },
-            ),
-            PasswordStrengthIndicator(strength: _passwordStrength),
-            const SizedBox(height: 10),
-            CustomTextField(
-              controller: _confirmPasswordController,
-              hintText: "Confirm Password",
-              icon: Icons.lock_outline,
-              fieldType: TextFieldType.password,
-              validator: (value) {
-                if (value == null || value.isEmpty) return 'Please confirm your password';
-                if (value != _passwordController.text) return 'Passwords do not match';
-                return null;
-              },
-            ),
+            if (!widget.isNewGoogleUser) ...[
+              CustomTextField(
+                controller: _passwordController,
+                hintText: "Password",
+                icon: Icons.lock_outline,
+                fieldType: TextFieldType.password,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Please enter a password';
+                  if (_passwordStrength == PasswordStrength.Weak) return 'Password is too weak';
+                  return null;
+                },
+              ),
+              PasswordStrengthIndicator(strength: _passwordStrength),
+              const SizedBox(height: 10),
+              CustomTextField(
+                controller: _confirmPasswordController,
+                hintText: "Confirm Password",
+                icon: Icons.lock_outline,
+                fieldType: TextFieldType.password,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Please confirm your password';
+                  if (value != _passwordController.text) return 'Passwords do not match';
+                  return null;
+                },
+              ),
+            ],
             const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
@@ -989,7 +1229,6 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
               items: const ["Male", "Female", "Other", "Prefer not to say"],
               validator: (value) => value == null || value.isEmpty ? 'Please select your gender' : null,
             ),
-            // Phone Field with Verification
             Column(
               children: [
                 CustomTextField(
@@ -1038,7 +1277,7 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
                 },
                 fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
                   return TextFormField(
-                    controller: _locationController, // Use the main controller
+                    controller: _locationController,
                     focusNode: fieldFocusNode,
                     style: const TextStyle(color: Colors.black87),
                     validator: (value) => value == null || value.isEmpty ? 'Please enter your location' : null,
@@ -1108,7 +1347,6 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
   }
 }
 
-// ---------- SIGNUP SUCCESS SCREEN ----------
 class SignUpSuccessScreen extends StatefulWidget {
   const SignUpSuccessScreen({super.key});
 
@@ -1158,7 +1396,6 @@ class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
                           setSheetState(() {
                             _privacyPolicyAccepted = value!;
                           });
-                          // Also update the main screen's state
                           setState(() {
                             _privacyPolicyAccepted = value!;
                           });
@@ -1210,7 +1447,11 @@ class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
               ElevatedButton(
                 onPressed: () {
                   if (_privacyPolicyAccepted) {
-                    // TODO: Navigate to the main app screen
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HomeScreen()),
+                          (route) => false,
+                    );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text(
@@ -1272,3 +1513,193 @@ class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
     );
   }
 }
+
+// ---------- NEW: RESET PASSWORD SCREEN ----------
+class ResetPasswordScreen extends StatefulWidget {
+  const ResetPasswordScreen({super.key});
+
+  @override
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+}
+
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  PasswordStrength _passwordStrength = PasswordStrength.None;
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(_checkPasswordStrength);
+  }
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _checkPasswordStrength() {
+    String password = _passwordController.text;
+    if (password.isEmpty) {
+      setState(() => _passwordStrength = PasswordStrength.None);
+      return;
+    }
+    bool hasLetters = password.contains(RegExp(r'[a-zA-Z]'));
+    bool hasNumbers = password.contains(RegExp(r'[0-9]'));
+    bool hasSpecialChars = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+    if (password.length < 8) {
+      setState(() => _passwordStrength = PasswordStrength.Weak);
+    } else if (hasLetters && hasNumbers && hasSpecialChars) {
+      setState(() => _passwordStrength = PasswordStrength.Strong);
+    } else if (hasLetters && hasNumbers) {
+      setState(() => _passwordStrength = PasswordStrength.Normal);
+    } else {
+      setState(() => _passwordStrength = PasswordStrength.Weak);
+    }
+  }
+
+  void _resetPassword() {
+    if (_formKey.currentState!.validate()) {
+      // TODO: Implement Firebase password reset logic
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const ResetSuccessScreen()),
+            (route) => false,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text("Create New Password", style: TextStyle(color: Colors.black)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                const SizedBox(height: 50),
+                const Text(
+                  "Your new password must be different from previously used passwords.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+                const SizedBox(height: 30),
+                CustomTextField(
+                  controller: _passwordController,
+                  hintText: "New Password",
+                  icon: Icons.lock_outline,
+                  fieldType: TextFieldType.password,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Please enter a password';
+                    if (_passwordStrength == PasswordStrength.Weak) return 'Password is too weak';
+                    return null;
+                  },
+                ),
+                PasswordStrengthIndicator(strength: _passwordStrength),
+                const SizedBox(height: 10),
+                CustomTextField(
+                  controller: _confirmPasswordController,
+                  hintText: "Confirm New Password",
+                  icon: Icons.lock_outline,
+                  fieldType: TextFieldType.password,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Please confirm your password';
+                    if (value != _passwordController.text) return 'Passwords do not match';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 40),
+                ElevatedButton(
+                  onPressed: _resetPassword,
+                  style: ButtonStyle(
+                    backgroundColor: MaterialStateProperty.all(Colors.blue),
+                    foregroundColor: MaterialStateProperty.all(Colors.white),
+                    padding: MaterialStateProperty.all(
+                      const EdgeInsets.symmetric(horizontal: 80, vertical: 15),
+                    ),
+                    shape: MaterialStateProperty.all(
+                      RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  child: const Text("Reset Password", style: TextStyle(fontSize: 16)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------- NEW: RESET SUCCESS SCREEN ----------
+class ResetSuccessScreen extends StatelessWidget {
+  const ResetSuccessScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'assets/lottie/otp_success.json',
+                height: 300,
+                width: 300,
+                repeat: false,
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "Password Reset Successful!",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 40),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AuthScreen()),
+                        (route) => false,
+                  );
+                },
+                style: ButtonStyle(
+                  backgroundColor: MaterialStateProperty.all(Colors.blue),
+                  foregroundColor: MaterialStateProperty.all(Colors.white),
+                  padding: MaterialStateProperty.all(
+                    const EdgeInsets.symmetric(horizontal: 80, vertical: 15),
+                  ),
+                  shape: MaterialStateProperty.all(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                child: const Text("Continue", style: TextStyle(fontSize: 16)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  }
