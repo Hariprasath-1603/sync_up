@@ -1,17 +1,21 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class OtpScreen extends StatefulWidget {
-  final String verificationType; // "Email" or "Mobile"
-  final String contactInfo;      // The actual email or phone number
-  final String? verificationId;  // Required for phone auth
+  final String verificationType;
+  final String contactInfo;
+  final String? verificationId;
+  // UPDATE: Added resendToken to enable the resend functionality.
+  final int? resendToken;
 
   const OtpScreen({
     super.key,
     required this.verificationType,
     required this.contactInfo,
     this.verificationId,
+    this.resendToken, // UPDATE: Added to constructor
   });
 
   @override
@@ -24,23 +28,111 @@ class _OtpScreenState extends State<OtpScreen> {
   List.generate(6, (_) => TextEditingController());
   bool _isLoading = false;
 
-  // This function now verifies the OTP with Firebase.
+  // UPDATE: Added timer logic for resend button cooldown.
+  bool _canResend = false;
+  int _resendCooldown = 30;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startCooldownTimer();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    for (var controller in _otpControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _startCooldownTimer() {
+    _canResend = false;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_resendCooldown == 0) {
+        timer.cancel();
+        setState(() {
+          _canResend = true;
+          _resendCooldown = 30; // Reset for next time
+        });
+      } else {
+        setState(() {
+          _resendCooldown--;
+        });
+      }
+    });
+  }
+
+  // UPDATE: This function handles resending the OTP code.
+  void _resendCode() async {
+    if (!_canResend) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: widget.contactInfo,
+        forceResendingToken: widget.resendToken,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // This callback is usually for auto-retrieval, which we handle manually.
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(e.message ?? "Failed to resend code.")),
+            );
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          // A new code was sent. The user can now try again.
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("A new OTP has been sent.")),
+            );
+          }
+          _startCooldownTimer();
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {},
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+
   void _verifyOtp() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       String enteredOtp = _otpControllers.map((c) => c.text).join();
 
+      // This logic is only for phone verification. Email verification is handled differently.
+      if (widget.verificationType != "Mobile") {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("This screen is for mobile OTP only.")),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
       try {
-        // Create the credential using the verificationId and the OTP code.
         PhoneAuthCredential credential = PhoneAuthProvider.credential(
           verificationId: widget.verificationId!,
           smsCode: enteredOtp,
         );
 
-        // Sign in the user with the credential to verify the phone number.
+        // For sign-up, we just want to verify, not sign in yet.
+        // For password reset, this sign-in is necessary to authenticate the user.
         await FirebaseAuth.instance.signInWithCredential(credential);
 
-        // If successful, pop the screen and return 'true'.
         if (mounted) {
           Navigator.of(context).pop(true);
         }
@@ -185,14 +277,15 @@ class _OtpScreenState extends State<OtpScreen> {
                   ),
                   const SizedBox(height: 20),
                   TextButton(
-                    onPressed: () {
-                      // TODO: Implement resend OTP logic
-                    },
-                    child: const Text(
-                      "Resend OTP",
+                    // UPDATE: Wired up the resend OTP logic.
+                    onPressed: _canResend ? _resendCode : null,
+                    child: Text(
+                      _canResend
+                          ? "Resend OTP"
+                          : "Resend OTP in $_resendCooldown s",
                       style: TextStyle(
                         fontSize: 16,
-                        color: Colors.blueAccent,
+                        color: _canResend ? Colors.blueAccent : Colors.grey,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

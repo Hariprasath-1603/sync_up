@@ -4,12 +4,11 @@ import 'package:country_code_picker/country_code_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'otp_screen.dart'; // Make sure you have this file in lib/auth/
+import 'otp_screen.dart';
 import '../home/home_screen.dart';
 
 // ---------- 1. SERVICES (Firebase Logic) ----------
 
-// Function to save user data to Firestore after sign-up.
 Future<void> saveUserData(User user, String username, String dob, String gender, String phone, String location) async {
   DocumentReference userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
   await userDoc.set({
@@ -21,15 +20,14 @@ Future<void> saveUserData(User user, String username, String dob, String gender,
     'phone': phone,
     'location': location,
     'createdAt': FieldValue.serverTimestamp(),
+    'emailVerified': user.emailVerified,
   });
 }
 
 // ---------- 2. REUSABLE WIDGETS ----------
 
-// An enum to define the different types of text fields.
 enum TextFieldType { text, password, phone }
 
-// A unified, reusable text field widget for all authentication forms.
 class CustomTextField extends StatefulWidget {
   final TextEditingController? controller;
   final String hintText;
@@ -145,7 +143,6 @@ class _CustomTextFieldState extends State<CustomTextField> {
   }
 }
 
-// A custom dropdown widget that looks like a text field.
 class CustomDropdownField extends StatelessWidget {
   final String hintText;
   final IconData icon;
@@ -209,10 +206,8 @@ class CustomDropdownField extends StatelessWidget {
   }
 }
 
-// An enum to represent the different levels of password strength.
 enum PasswordStrength { None, Weak, Normal, Strong }
 
-// A visual indicator for password strength.
 class PasswordStrengthIndicator extends StatelessWidget {
   final PasswordStrength strength;
 
@@ -269,7 +264,6 @@ class PasswordStrengthIndicator extends StatelessWidget {
   }
 }
 
-// A reusable button for social media logins.
 class SocialLoginButton extends StatelessWidget {
   final String assetPath;
   final VoidCallback onTap;
@@ -299,7 +293,6 @@ class SocialLoginButton extends StatelessWidget {
 
 // ---------- 3. MAIN SCREENS ----------
 
-// The main entry point for the authentication flow.
 class AuthScreen extends StatelessWidget {
   const AuthScreen({super.key});
 
@@ -312,7 +305,6 @@ class AuthScreen extends StatelessWidget {
   }
 }
 
-// The Login Screen widget.
 class LoginComponent extends StatefulWidget {
   const LoginComponent({super.key});
 
@@ -324,7 +316,7 @@ class _LoginComponentState extends State<LoginComponent> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _rememberMe = false;
+  // bool _rememberMe = false; // REMOVED: This is not needed for mobile.
 
   @override
   void dispose() {
@@ -334,20 +326,47 @@ class _LoginComponentState extends State<LoginComponent> {
   }
 
   Future<void> _signInWithEmail() async {
+    if (_emailController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter both email and password.")),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      await FirebaseAuth.instance.setPersistence(
-        _rememberMe ? Persistence.LOCAL : Persistence.SESSION,
-      );
+      // FIX: The web-only setPersistence() line has been removed.
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      // The StreamBuilder in main.dart will handle navigation
+
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+                (route) => false
+        );
+      }
+
     } on FirebaseAuthException catch (e) {
+      String errorMessage = "An error occurred. Please try again.";
+      if (e.code == 'invalid-credential' || e.code == 'user-not-found' || e.code == 'wrong-password') {
+        errorMessage = "Incorrect email or password. Please try again.";
+      } else if (e.code == 'invalid-email') {
+        errorMessage = "The email address is badly formatted.";
+      } else if (e.code == 'too-many-requests') {
+        errorMessage = "Too many login attempts. Please try again later.";
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? "An error occurred")),
+          SnackBar(content: Text(errorMessage)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("An unexpected error occurred: $e")),
         );
       }
     } finally {
@@ -358,9 +377,13 @@ class _LoginComponentState extends State<LoginComponent> {
   }
 
   Future<void> _signInWithGoogle(BuildContext context) async {
+    setState(() => _isLoading = true);
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return;
+      if (googleUser == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
@@ -371,18 +394,32 @@ class _LoginComponentState extends State<LoginComponent> {
       final UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
 
       if (userCredential.additionalUserInfo!.isNewUser) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const SignUpFlowScreen(isNewGoogleUser: true),
-          ),
+        if(mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SignUpFlowScreen(isNewGoogleUser: true),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+                  (route) => false
+          );
+        }
+      }
+    } catch (e) {
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to sign in with Google: $e")),
         );
       }
-      // The StreamBuilder in main.dart will handle navigation for existing users
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to sign in with Google: $e")),
-      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -470,22 +507,10 @@ class _LoginComponentState extends State<LoginComponent> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 30.0),
+            // FIX: UI updated to remove the "Remember Me" checkbox.
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _rememberMe,
-                      onChanged: (value) {
-                        setState(() {
-                          _rememberMe = value!;
-                        });
-                      },
-                    ),
-                    const Text("Remember me"),
-                  ],
-                ),
                 TextButton(
                   onPressed: () => _showForgotPasswordSheet(context),
                   child: const Text("Forgot Password?"),
@@ -581,7 +606,8 @@ class _LoginComponentState extends State<LoginComponent> {
   }
 }
 
-// The screen that confirms the password reset link has been sent.
+// ... The rest of the file (SignUpFlowScreen, ResetPasswordScreen, etc.) remains unchanged.
+
 class EmailLinkSentScreen extends StatelessWidget {
   const EmailLinkSentScreen({super.key});
 
@@ -596,7 +622,7 @@ class EmailLinkSentScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Lottie.asset(
-                'assets/lottie/email_sent.json', // Add a Lottie file for this
+                'assets/lottie/email_sent.json',
                 height: 250,
                 width: 250,
               ),
@@ -678,14 +704,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           }
           await FirebaseAuth.instance.sendPasswordResetEmail(email: contactInfo);
           if (mounted) {
-            Navigator.push(
+            Navigator.pushReplacement(
               context,
               MaterialPageRoute(
                 builder: (context) => const EmailLinkSentScreen(),
               ),
             );
           }
-        } else { // Mobile verification
+        } else {
           await FirebaseAuth.instance.verifyPhoneNumber(
             phoneNumber: _countryCode + contactInfo,
             verificationCompleted: (PhoneAuthCredential credential) async {},
@@ -701,11 +727,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       verificationType: "Mobile",
                       contactInfo: _countryCode + contactInfo,
                       verificationId: verificationId,
+                      resendToken: resendToken,
                     ),
                   ),
                 );
                 if (result == true) {
-                  Navigator.push(
+                  Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const ResetPasswordScreen(),
@@ -808,25 +835,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 }
 
-class OtpFlowScreen extends StatelessWidget {
-  final String verificationType;
-  final String contactInfo;
-  final String? verificationId;
-  const OtpFlowScreen({super.key, required this.verificationType, required this.contactInfo, this.verificationId});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: PageView(
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          OtpScreen(verificationType: verificationType, contactInfo: contactInfo, verificationId: verificationId),
-        ],
-      ),
-    );
-  }
-}
-
 class SignUpFlowScreen extends StatefulWidget {
   final bool isNewGoogleUser;
   const SignUpFlowScreen({super.key, this.isNewGoogleUser = false});
@@ -853,6 +861,7 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
   PasswordStrength _passwordStrength = PasswordStrength.None;
   bool _isEmailVerified = false;
   bool _isPhoneVerified = false;
+  bool _isLoading = false;
 
   static const Map<String, List<String>> _locationSuggestions = {
     '+91': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Hyderabad','Coimbatore'],
@@ -921,9 +930,9 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
 
   void _onSignUp() async {
     if (_formKey2.currentState!.validate()) {
-      if (!_isEmailVerified || !_isPhoneVerified) {
+      if (!_isPhoneVerified) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Please verify both email and phone number.")),
+          const SnackBar(content: Text("Please verify your phone number.")),
         );
         return;
       }
@@ -935,40 +944,58 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
           return;
         }
       }
+
+      setState(() => _isLoading = true);
+
       try {
         User? user;
         if (!widget.isNewGoogleUser) {
           UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-            email: _emailController.text,
+            email: _emailController.text.trim(),
             password: _passwordController.text,
           );
           user = userCredential.user;
+
+          if (user != null && !user.emailVerified) {
+            await user.sendEmailVerification();
+          }
+
         } else {
           user = FirebaseAuth.instance.currentUser;
         }
         if (user != null) {
           await saveUserData(
             user,
-            _nameController.text,
+            _nameController.text.trim(),
             _dobController.text,
             _genderController.text,
-            _countryCode + _phoneController.text,
-            _locationController.text,
+            _countryCode + _phoneController.text.trim(),
+            _locationController.text.trim(),
           );
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const SignUpSuccessScreen()),
-                (Route<dynamic> route) => false,
-          );
+          if (mounted) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const SignUpSuccessScreen()),
+                  (Route<dynamic> route) => false,
+            );
+          }
         }
       } on FirebaseAuthException catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to create account: ${e.message}")),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to create account: ${e.message}")),
+          );
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("An unexpected error occurred: $e")),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("An unexpected error occurred: $e")),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }
@@ -1015,51 +1042,63 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
     }
   }
 
-  Future<void> _verifyEmail() async {
-    if (_emailController.text.isEmpty || !RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(_emailController.text)) {
+  Future<void> _verifyPhone() async {
+    final phone = _phoneController.text.trim();
+    int? expectedLength = _phoneLengthByCountry[_countryCode];
+
+    if (phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a valid email before verifying.")),
+        const SnackBar(content: Text("Please enter a phone number.")),
       );
       return;
     }
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => OtpScreen(
-          verificationType: "Email",
-          contactInfo: _emailController.text,
-        ),
-      ),
-    );
-    if (result == true) {
-      setState(() {
-        _isEmailVerified = true;
-      });
-    }
-  }
-
-  Future<void> _verifyPhone() async {
-    int? expectedLength = _phoneLengthByCountry[_countryCode];
-    if (expectedLength != null && _phoneController.text.length != expectedLength) {
+    if (expectedLength != null && phone.length != expectedLength) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Phone number for $_countryCode must be $expectedLength digits.")),
       );
       return;
     }
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => OtpScreen(
-          verificationType: "Mobile",
-          contactInfo: _countryCode + _phoneController.text,
-        ),
-      ),
+
+    setState(() => _isLoading = true);
+
+    await FirebaseAuth.instance.verifyPhoneNumber(
+      phoneNumber: _countryCode + phone,
+      verificationCompleted: (PhoneAuthCredential credential) {
+        setState(() {
+          _isLoading = false;
+          _isPhoneVerified = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Phone number verified automatically.")),
+        );
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Phone verification failed: ${e.message}")),
+        );
+      },
+      codeSent: (String verificationId, int? resendToken) async {
+        setState(() => _isLoading = false);
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OtpScreen(
+              verificationType: "Mobile",
+              contactInfo: _countryCode + phone,
+              verificationId: verificationId,
+              resendToken: resendToken,
+            ),
+          ),
+        );
+        if (result == true) {
+          setState(() {
+            _isPhoneVerified = true;
+          });
+        }
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {},
     );
-    if (result == true) {
-      setState(() {
-        _isPhoneVerified = true;
-      });
-    }
   }
 
   @override
@@ -1108,36 +1147,16 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
               icon: Icons.person_outline,
               validator: (value) => value == null || value.isEmpty ? 'Please enter your username' : null,
             ),
-            Column(
-              children: [
-                CustomTextField(
-                  controller: _emailController,
-                  hintText: "Email",
-                  icon: Icons.email_outlined,
-                  readOnly: widget.isNewGoogleUser,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Please enter your email';
-                    if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(value)) return 'Please enter a valid email';
-                    return null;
-                  },
-                ),
-                if (!widget.isNewGoogleUser)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40.0),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: _isEmailVerified
-                          ? const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text("Verified", style: TextStyle(color: Colors.green)),
-                          Icon(Icons.check_circle, color: Colors.green, size: 16),
-                        ],
-                      )
-                          : TextButton(onPressed: _verifyEmail, child: const Text("Verify")),
-                    ),
-                  ),
-              ],
+            CustomTextField(
+              controller: _emailController,
+              hintText: "Email",
+              icon: Icons.email_outlined,
+              readOnly: widget.isNewGoogleUser,
+              validator: (value) {
+                if (value == null || value.isEmpty) return 'Please enter your email';
+                if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(value)) return 'Please enter a valid email';
+                return null;
+              },
             ),
             if (!widget.isNewGoogleUser) ...[
               CustomTextField(
@@ -1169,16 +1188,10 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
             ElevatedButton(
               onPressed: () {
                 if (_formKey1.currentState!.validate()) {
-                  if (_isEmailVerified) {
-                    _pageController.nextPage(
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeInOut,
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Please verify your email first.")),
-                    );
-                  }
+                  _pageController.nextPage(
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeInOut,
+                  );
                 }
               },
               style: ButtonStyle(
@@ -1255,6 +1268,8 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
                         Icon(Icons.check_circle, color: Colors.green, size: 16),
                       ],
                     )
+                        : _isLoading
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                         : TextButton(onPressed: _verifyPhone, child: const Text("Verify")),
                   ),
                 ),
@@ -1276,9 +1291,15 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
                   _locationController.text = selection;
                 },
                 fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    fieldController.text = _locationController.text;
+                  });
                   return TextFormField(
-                    controller: _locationController,
+                    controller: fieldController,
                     focusNode: fieldFocusNode,
+                    onChanged: (String value) {
+                      _locationController.text = value;
+                    },
                     style: const TextStyle(color: Colors.black87),
                     validator: (value) => value == null || value.isEmpty ? 'Please enter your location' : null,
                     decoration: InputDecoration(
@@ -1324,7 +1345,9 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
               ),
             ),
             const SizedBox(height: 30),
-            ElevatedButton(
+            _isLoading
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
               onPressed: _onSignUp,
               style: ButtonStyle(
                 backgroundColor: MaterialStateProperty.all(Colors.blue),
@@ -1368,10 +1391,7 @@ class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setSheetState) {
             return Container(
-              height: MediaQuery
-                  .of(context)
-                  .size
-                  .height * 0.8,
+              height: MediaQuery.of(context).size.height * 0.8,
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
@@ -1381,8 +1401,7 @@ class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
                   Expanded(
                     child: SingleChildScrollView(
                       child: Text(
-                        "Here is the full text of the privacy policy for SyncUp..." *
-                            20, // Placeholder
+                        "Here is the full text of the privacy policy for SyncUp..." * 20, // Placeholder
                         style: const TextStyle(fontSize: 14),
                       ),
                     ),
@@ -1430,7 +1449,7 @@ class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Lottie.asset(
-                'assets/lottie/celebration.json', // New celebration Lottie
+                'assets/lottie/celebration.json',
                 height: 300,
                 width: 300,
                 repeat: false,
@@ -1442,6 +1461,12 @@ class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                 ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                "Please check your email to verify your account.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
               const SizedBox(height: 40),
               ElevatedButton(
@@ -1514,7 +1539,6 @@ class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
   }
 }
 
-// ---------- NEW: RESET PASSWORD SCREEN ----------
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
 
@@ -1527,6 +1551,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   PasswordStrength _passwordStrength = PasswordStrength.None;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -1561,14 +1586,29 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     }
   }
 
-  void _resetPassword() {
+  void _resetPassword() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: Implement Firebase password reset logic
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const ResetSuccessScreen()),
-            (route) => false,
-      );
+      setState(() => _isLoading = true);
+      try {
+        await FirebaseAuth.instance.currentUser?.updatePassword(_passwordController.text.trim());
+        if(mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const ResetSuccessScreen()),
+                (route) => false,
+          );
+        }
+      } on FirebaseAuthException catch (e) {
+        if(mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Error: ${e.message}")),
+          );
+        }
+      } finally {
+        if(mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     }
   }
 
@@ -1620,7 +1660,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   },
                 ),
                 const SizedBox(height: 40),
-                ElevatedButton(
+                _isLoading
+                    ? const CircularProgressIndicator()
+                    : ElevatedButton(
                   onPressed: _resetPassword,
                   style: ButtonStyle(
                     backgroundColor: MaterialStateProperty.all(Colors.blue),
@@ -1645,7 +1687,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 }
 
-// ---------- NEW: RESET SUCCESS SCREEN ----------
 class ResetSuccessScreen extends StatelessWidget {
   const ResetSuccessScreen({super.key});
 
@@ -1702,4 +1743,4 @@ class ResetSuccessScreen extends StatelessWidget {
       ),
     );
   }
-  }
+}

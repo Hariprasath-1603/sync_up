@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
-import 'package:sync_up/auth/auth.dart';
+import 'package:sync_up/auth/auth.dart'; // Assuming your project name is sync_up
 
 class IntroductionScreen extends StatefulWidget {
   final VoidCallback? onIntroComplete; // Added callback
