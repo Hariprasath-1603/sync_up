@@ -316,7 +316,6 @@ class _LoginComponentState extends State<LoginComponent> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  // bool _rememberMe = false; // REMOVED: This is not needed for mobile.
 
   @override
   void dispose() {
@@ -335,7 +334,6 @@ class _LoginComponentState extends State<LoginComponent> {
 
     setState(() => _isLoading = true);
     try {
-      // FIX: The web-only setPersistence() line has been removed.
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
@@ -507,7 +505,6 @@ class _LoginComponentState extends State<LoginComponent> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 30.0),
-            // FIX: UI updated to remove the "Remember Me" checkbox.
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -606,8 +603,6 @@ class _LoginComponentState extends State<LoginComponent> {
   }
 }
 
-// ... The rest of the file (SignUpFlowScreen, ResetPasswordScreen, etc.) remains unchanged.
-
 class EmailLinkSentScreen extends StatelessWidget {
   const EmailLinkSentScreen({super.key});
 
@@ -691,6 +686,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
+  // ##################################################################
+  // ##                                                              ##
+  // ##      THIS IS THE FUNCTION THAT HAS BEEN UPDATED              ##
+  // ##                                                              ##
+  // ##################################################################
   void _sendVerification() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
@@ -698,11 +698,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
       try {
         if (widget.verificationType == "Email") {
-          var methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(contactInfo);
-          if (methods.isEmpty) {
-            throw FirebaseAuthException(code: 'user-not-found');
-          }
+          // FIX: Removed the manual user check. Let Firebase handle it.
           await FirebaseAuth.instance.sendPasswordResetEmail(email: contactInfo);
+
           if (mounted) {
             Navigator.pushReplacement(
               context,
@@ -711,7 +709,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
             );
           }
-        } else {
+        } else { // Mobile verification logic remains the same
           await FirebaseAuth.instance.verifyPhoneNumber(
             phoneNumber: _countryCode + contactInfo,
             verificationCompleted: (PhoneAuthCredential credential) async {},
@@ -746,9 +744,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         }
       } on FirebaseAuthException catch (e) {
         if (mounted) {
-          String errorMessage = e.message ?? "An error occurred.";
+          String errorMessage = "An error occurred. Please try again.";
+          // FIX: This now correctly catches the error from sendPasswordResetEmail
           if (e.code == 'user-not-found') {
             errorMessage = "No account found with this email.";
+          } else if (e.code == 'invalid-email') {
+            errorMessage = "Please enter a valid email address.";
           }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(errorMessage)),
