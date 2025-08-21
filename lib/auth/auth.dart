@@ -1,15 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // Import for defaultTargetPlatform
 import 'package:lottie/lottie.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'otp_screen.dart';
 import '../home/home_screen.dart';
 
 // ---------- 1. SERVICES (Firebase Logic) ----------
 
-Future<void> saveUserData(User user, String username, String dob, String gender, String phone, String location) async {
+Future<void> saveUserData(User user, String username, String dob, String gender, String phone, String location, String? photoUrl) async {
   DocumentReference userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
   await userDoc.set({
     'uid': user.uid,
@@ -19,6 +22,7 @@ Future<void> saveUserData(User user, String username, String dob, String gender,
     'gender': gender,
     'phone': phone,
     'location': location,
+    'photoUrl': photoUrl,
     'createdAt': FieldValue.serverTimestamp(),
     'emailVerified': user.emailVerified,
   });
@@ -333,38 +337,59 @@ class _LoginComponentState extends State<LoginComponent> {
     }
 
     setState(() => _isLoading = true);
+
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-                (route) => false
-        );
+      final user = userCredential.user;
+      if (user != null) {
+        await user.reload();
+        final freshUser = FirebaseAuth.instance.currentUser;
+        if (freshUser != null && freshUser.emailVerified) {
+          if (mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const HomeScreen()),
+                    (route) => false
+            );
+          }
+        } else {
+          if (mounted) {
+            final snackBar = SnackBar(
+              content: const Text("Please verify your email to log in."),
+              action: SnackBarAction(
+                label: 'Resend',
+                onPressed: () async {
+                  await user.sendEmailVerification();
+                  if(mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Verification email sent! Check your inbox.")),
+                    );
+                  }
+                },
+              ),
+            );
+            ScaffoldMessenger.of(context).showSnackBar(snackBar);
+          }
+          await FirebaseAuth.instance.signOut();
+        }
       }
-
     } on FirebaseAuthException catch (e) {
       String errorMessage = "An error occurred. Please try again.";
       if (e.code == 'invalid-credential' || e.code == 'user-not-found' || e.code == 'wrong-password') {
         errorMessage = "Incorrect email or password. Please try again.";
       } else if (e.code == 'invalid-email') {
         errorMessage = "The email address is badly formatted.";
-      } else if (e.code == 'too-many-requests') {
-        errorMessage = "Too many login attempts. Please try again later.";
+      } else if (e.code == 'user-disabled') {
+        errorMessage = "This account has been disabled.";
+      } else if (e.code == 'network-request-failed') {
+        errorMessage = "Network error. Please check your internet connection.";
       }
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMessage)),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("An unexpected error occurred: $e")),
         );
       }
     } finally {
@@ -391,12 +416,14 @@ class _LoginComponentState extends State<LoginComponent> {
 
       final UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
 
+      final String? photoUrl = googleUser.photoUrl;
+
       if (userCredential.additionalUserInfo!.isNewUser) {
         if(mounted) {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const SignUpFlowScreen(isNewGoogleUser: true),
+              builder: (context) => SignUpFlowScreen(isNewGoogleUser: true, photoUrl: photoUrl),
             ),
           );
         }
@@ -408,11 +435,153 @@ class _LoginComponentState extends State<LoginComponent> {
           );
         }
       }
-    } catch (e) {
-      if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to sign in with Google: $e")),
-        );
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'account-exists-with-different-credential') {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text("Account Exists"),
+              content: const Text("An account already exists with this email address. Please sign in with your original method to link your Google account."),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text("OK"),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        if(mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to sign in with Google: ${e.message}")),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _signInWithApple(BuildContext context) async {
+    setState(() => _isLoading = true);
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final oauthCredential = OAuthProvider("apple.com").credential(
+        idToken: credential.identityToken,
+        accessToken: credential.authorizationCode,
+      );
+
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+
+      String? username = credential.givenName;
+
+      if (userCredential.additionalUserInfo!.isNewUser) {
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SignUpFlowScreen(isNewGoogleUser: true, username: username),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+                  (route) => false
+          );
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'account-exists-with-different-credential') {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text("Account Exists"),
+              content: const Text("An account already exists with this email address. Please sign in with your original method to link your Apple account."),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text("OK"),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to sign in with Apple: ${e.message}")),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _signInWithMicrosoft(BuildContext context) async {
+    setState(() => _isLoading = true);
+    try {
+      final microsoftProvider = OAuthProvider("microsoft.com");
+      final userCredential = await FirebaseAuth.instance.signInWithPopup(microsoftProvider);
+
+      final String? photoUrl = userCredential.user?.photoURL;
+      final String? username = userCredential.user?.displayName;
+
+      if (userCredential.additionalUserInfo!.isNewUser) {
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SignUpFlowScreen(isNewGoogleUser: true, photoUrl: photoUrl, username: username),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+                  (route) => false
+          );
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'account-exists-with-different-credential') {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text("Account Exists"),
+              content: const Text("An account already exists with this email address. Please sign in with your original method to link your Microsoft account."),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text("OK"),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to sign in with Microsoft: ${e.message}")),
+          );
+        }
       }
     } finally {
       if (mounted) {
@@ -480,6 +649,8 @@ class _LoginComponentState extends State<LoginComponent> {
 
   @override
   Widget build(BuildContext context) {
+    final isApplePlatform = defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS;
+
     return SingleChildScrollView(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -555,19 +726,17 @@ class _LoginComponentState extends State<LoginComponent> {
                 assetPath: 'assets/logos/google.png',
                 onTap: () => _signInWithGoogle(context),
               ),
-              const SizedBox(width: 20),
-              SocialLoginButton(
-                assetPath: 'assets/logos/apple.png',
-                onTap: () {
-                  // TODO: Implement Apple Sign-In
-                },
-              ),
+              if (isApplePlatform) ...[
+                const SizedBox(width: 20),
+                SocialLoginButton(
+                  assetPath: 'assets/logos/apple.png',
+                  onTap: () => _signInWithApple(context),
+                ),
+              ],
               const SizedBox(width: 20),
               SocialLoginButton(
                 assetPath: 'assets/logos/microsoft.png',
-                onTap: () {
-                  // TODO: Implement Microsoft Sign-In
-                },
+                onTap: () => _signInWithMicrosoft(context),
               ),
             ],
           ),
@@ -686,11 +855,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  // ##################################################################
-  // ##                                                              ##
-  // ##      THIS IS THE FUNCTION THAT HAS BEEN UPDATED              ##
-  // ##                                                              ##
-  // ##################################################################
   void _sendVerification() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
@@ -698,9 +862,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
       try {
         if (widget.verificationType == "Email") {
-          // FIX: Removed the manual user check. Let Firebase handle it.
           await FirebaseAuth.instance.sendPasswordResetEmail(email: contactInfo);
-
           if (mounted) {
             Navigator.pushReplacement(
               context,
@@ -709,12 +871,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
             );
           }
-        } else { // Mobile verification logic remains the same
+        } else { // Mobile verification uses Firebase SMS
           await FirebaseAuth.instance.verifyPhoneNumber(
             phoneNumber: _countryCode + contactInfo,
             verificationCompleted: (PhoneAuthCredential credential) async {},
             verificationFailed: (FirebaseAuthException e) {
-              throw e;
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Failed to send SMS: ${e.message}")),
+                );
+              }
             },
             codeSent: (String verificationId, int? resendToken) async {
               if (mounted) {
@@ -745,11 +911,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       } on FirebaseAuthException catch (e) {
         if (mounted) {
           String errorMessage = "An error occurred. Please try again.";
-          // FIX: This now correctly catches the error from sendPasswordResetEmail
           if (e.code == 'user-not-found') {
             errorMessage = "No account found with this email.";
-          } else if (e.code == 'invalid-email') {
-            errorMessage = "Please enter a valid email address.";
           }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(errorMessage)),
@@ -838,7 +1001,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
 class SignUpFlowScreen extends StatefulWidget {
   final bool isNewGoogleUser;
-  const SignUpFlowScreen({super.key, this.isNewGoogleUser = false});
+  final String? photoUrl;
+  final String? username;
+  const SignUpFlowScreen({super.key, this.isNewGoogleUser = false, this.photoUrl, this.username});
 
   @override
   State<SignUpFlowScreen> createState() => _SignUpFlowScreenState();
@@ -887,7 +1052,7 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
     if (widget.isNewGoogleUser) {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        _nameController.text = user.displayName ?? "";
+        _nameController.text = widget.username ?? user.displayName ?? "";
         _emailController.text = user.email ?? "";
         _isEmailVerified = true;
       }
@@ -972,20 +1137,40 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
             _genderController.text,
             _countryCode + _phoneController.text.trim(),
             _locationController.text.trim(),
+            widget.photoUrl,
           );
           if (mounted) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const SignUpSuccessScreen()),
-                  (Route<dynamic> route) => false,
-            );
+            // UPDATE: Changed navigation logic
+            if (widget.isNewGoogleUser) {
+              // For social sign-ups, go directly to the home screen.
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const HomeScreen()),
+                    (Route<dynamic> route) => false,
+              );
+            } else {
+              // For manual email/password sign-ups, go to the verification screen.
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const SignUpSuccessScreen()),
+                    (Route<dynamic> route) => false,
+              );
+            }
           }
         }
       } on FirebaseAuthException catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Failed to create account: ${e.message}")),
-          );
+        if (e.code == 'email-already-in-use') {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("An account already exists for that email.")),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("Failed to create account: ${e.message}")),
+            );
+          }
         }
       } catch (e) {
         if (mounted) {
@@ -1045,7 +1230,7 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
 
   Future<void> _verifyPhone() async {
     final phone = _phoneController.text.trim();
-    int? expectedLength = _phoneLengthByCountry[_countryCode];
+    final fullPhoneNumber = _countryCode + phone;
 
     if (phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1053,17 +1238,11 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
       );
       return;
     }
-    if (expectedLength != null && phone.length != expectedLength) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Phone number for $_countryCode must be $expectedLength digits.")),
-      );
-      return;
-    }
 
     setState(() => _isLoading = true);
 
     await FirebaseAuth.instance.verifyPhoneNumber(
-      phoneNumber: _countryCode + phone,
+      phoneNumber: fullPhoneNumber,
       verificationCompleted: (PhoneAuthCredential credential) {
         setState(() {
           _isLoading = false;
@@ -1086,7 +1265,7 @@ class _SignUpFlowScreenState extends State<SignUpFlowScreen> {
           MaterialPageRoute(
             builder: (context) => OtpScreen(
               verificationType: "Mobile",
-              contactInfo: _countryCode + phone,
+              contactInfo: fullPhoneNumber,
               verificationId: verificationId,
               resendToken: resendToken,
             ),
@@ -1379,64 +1558,61 @@ class SignUpSuccessScreen extends StatefulWidget {
 }
 
 class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
-  bool _privacyPolicyAccepted = false;
+  bool _isEmailVerified = false;
+  Timer? _timer;
 
-  void _showPrivacyPolicy(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setSheetState) {
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.8,
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  const Text("Privacy Policy", style: TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Text(
-                        "Here is the full text of the privacy policy for SyncUp..." * 20, // Placeholder
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: _privacyPolicyAccepted,
-                        onChanged: (bool? value) {
-                          setSheetState(() {
-                            _privacyPolicyAccepted = value!;
-                          });
-                          setState(() {
-                            _privacyPolicyAccepted = value!;
-                          });
-                        },
-                      ),
-                      const Expanded(
-                          child: Text("I have read and agree to the terms.")),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text("Close"),
-                  ),
-                ],
-              ),
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await user.reload();
+        if (user.emailVerified) {
+          timer.cancel();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Email verified! Please log in.")),
             );
-          },
-        );
-      },
+            _goToLoginScreen();
+          }
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _goToLoginScreen() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const AuthScreen()),
+          (route) => false,
     );
+  }
+
+  Future<void> _resendVerificationEmail() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await user.sendEmailVerification();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("A new verification email has been sent.")),
+          );
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.message}")),
+        );
+      }
+    }
   }
 
   @override
@@ -1457,7 +1633,7 @@ class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
               ),
               const SizedBox(height: 20),
               const Text(
-                "Ready to Go!",
+                "Account Created!",
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -1465,26 +1641,13 @@ class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
               ),
               const SizedBox(height: 10),
               const Text(
-                "Please check your email to verify your account.",
+                "Please check your email to verify your account. If you don't see it, check your spam folder.",
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
               const SizedBox(height: 40),
               ElevatedButton(
-                onPressed: () {
-                  if (_privacyPolicyAccepted) {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (context) => const HomeScreen()),
-                          (route) => false,
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text(
-                          "Please accept the privacy policy to continue.")),
-                    );
-                  }
-                },
+                onPressed: _goToLoginScreen,
                 style: ButtonStyle(
                   backgroundColor: MaterialStateProperty.all(Colors.blue),
                   foregroundColor: MaterialStateProperty.all(Colors.white),
@@ -1497,40 +1660,12 @@ class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
                     ),
                   ),
                 ),
-                child: const Text(
-                    "Let's Start", style: TextStyle(fontSize: 16)),
+                child: const Text("Go to Login", style: TextStyle(fontSize: 16)),
               ),
               const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Checkbox(
-                    value: _privacyPolicyAccepted,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        _privacyPolicyAccepted = value!;
-                      });
-                    },
-                  ),
-                  Flexible(
-                    child: GestureDetector(
-                      onTap: () => _showPrivacyPolicy(context),
-                      child: RichText(
-                        text: const TextSpan(
-                          style: TextStyle(fontSize: 12, color: Colors.black),
-                          children: [
-                            TextSpan(text: "I agree to the "),
-                            TextSpan(
-                              text: "Privacy Policy and Terms of Service.",
-                              style: TextStyle(color: Colors.blue,
-                                  decoration: TextDecoration.underline),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              TextButton(
+                onPressed: _resendVerificationEmail,
+                child: const Text("Resend Verification Email"),
               ),
             ],
           ),
@@ -1539,6 +1674,7 @@ class _SignUpSuccessScreenState extends State<SignUpSuccessScreen> {
     );
   }
 }
+
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
