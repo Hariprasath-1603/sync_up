@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "792629822847",
+    "project_id": "syncup-social-app-2025",
+    "storage_bucket": "syncup-social-app-2025.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:792629822847:android:94573d2c80018eafed864a",
+        "android_client_info": {
+          "package_name": "com.example.sync_up"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5j4AHJnHyBUjHMSXVNxPQb-eG2JaZ-cY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
