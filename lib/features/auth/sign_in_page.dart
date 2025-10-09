@@ -26,30 +26,32 @@ class _SignInPageState extends State<SignInPage> {
     super.dispose();
   }
 
-  // ## THIS METHOD IS UPDATED ##
   Future<void> _signIn() async {
-    // --- TEMPORARY SIGN-IN ---
-    // This will take you directly to the home screen.
-    context.go('/home');
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
-    // --- REAL FIREBASE SIGN-IN (Commented out for now) ---
-    /*
+    // ## HARDCODED LOGIN FOR TESTING ##
+    // If the specific email and password are used, log in instantly.
+    if (email == '1' && password == '1') {
+      if (mounted) context.go('/home');
+      return; // This bypasses the Firebase check
+    }
+
+    // --- Real Firebase Sign-In Logic ---
+    // This will run for any other email and password.
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
 
-      final user = await _authService.signInWithEmailAndPassword(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-      );
+      final user = await _authService.signInWithEmailAndPassword(email, password);
 
       setState(() {
         _isLoading = false;
       });
 
       if (user != null) {
-        context.go('/home');
+        if (mounted) context.go('/home');
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -61,12 +63,10 @@ class _SignInPageState extends State<SignInPage> {
         }
       }
     }
-    */
   }
 
   @override
   Widget build(BuildContext context) {
-    // ... the rest of your build method remains the same ...
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
 
@@ -81,18 +81,14 @@ class _SignInPageState extends State<SignInPage> {
               children: [
                 Lottie.asset('assets/lottie/login.json', height: 200),
                 const SizedBox(height: 24),
-
                 Text('Welcome Back!',
                     textAlign: TextAlign.center,
-                    style: textTheme.headlineMedium
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                    style: textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Text('Log in to your account',
                     textAlign: TextAlign.center,
-                    style: textTheme.bodyLarge
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    style: textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 32),
-
                 TextFormField(
                   controller: _emailController,
                   decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
@@ -104,7 +100,6 @@ class _SignInPageState extends State<SignInPage> {
                   },
                 ),
                 const SizedBox(height: 20),
-
                 TextFormField(
                   controller: _passwordController,
                   obscureText: !_isPasswordVisible,
@@ -119,13 +114,11 @@ class _SignInPageState extends State<SignInPage> {
                   validator: (value) => value == null || value.isEmpty ? 'Please enter your password' : null,
                 ),
                 const SizedBox(height: 12),
-
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(onPressed: () => context.go('/forgot-password'), child: const Text('Forgot Password?')),
                 ),
                 const SizedBox(height: 20),
-
                 FilledButton(
                   onPressed: _isLoading ? null : _signIn,
                   style: FilledButton.styleFrom(
@@ -135,7 +128,6 @@ class _SignInPageState extends State<SignInPage> {
                       ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
                       : const Text('Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
-
                 const SizedBox(height: 24),
                 Row(children: [ const Expanded(child: Divider()), Padding(padding: const EdgeInsets.symmetric(horizontal: 8.0), child: Text('Or continue with', style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant,))), const Expanded(child: Divider()),]),
                 const SizedBox(height: 24),

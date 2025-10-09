@@ -23,7 +23,9 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Syncup',
-      theme: buildAppTheme(), // Make sure this function name is correct
+      theme: buildAppTheme(),
+      darkTheme: buildDarkAppTheme(),
+      themeMode: ThemeMode.system,
       routerConfig: appRouter,
     );
   }

@@ -4,7 +4,7 @@ import 'models/story_model.dart';
 import 'widgets/custom_header.dart';
 import 'widgets/stories_section.dart';
 import 'widgets/post_card.dart';
-import 'widgets/custom_bottom_nav_bar.dart'; // Import the new floating bar
+// Removed floating overlay nav; global NavigationBar handles navigation
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -56,40 +56,100 @@ class _HomePageState extends State<HomePage> {
       comments: '88K',
       shares: '21K',
     ),
+    Post(
+      imageUrl: 'https://picsum.photos/seed/5/600/800',
+      userName: 'Brooklyn Simmons',
+      userHandle: '@brooklyn.sim007',
+      userAvatarUrl: 'https://picsum.photos/seed/e/150',
+      likes: '110K',
+      comments: '88K',
+      shares: '21K',
+    ),
+    Post(
+      imageUrl: 'https://picsum.photos/seed/5/600/800',
+      userName: 'Brooklyn Simmons',
+      userHandle: '@brooklyn.sim007',
+      userAvatarUrl: 'https://picsum.photos/seed/e/150',
+      likes: '110K',
+      comments: '88K',
+      shares: '21K',
+    ),
+    Post(
+      imageUrl: 'https://picsum.photos/seed/5/600/800',
+      userName: 'Brooklyn Simmons',
+      userHandle: '@brooklyn.sim007',
+      userAvatarUrl: 'https://picsum.photos/seed/e/150',
+      likes: '110K',
+      comments: '88K',
+      shares: '21K',
+    ),
+    Post(
+      imageUrl: 'https://picsum.photos/seed/5/600/800',
+      userName: 'Brooklyn Simmons',
+      userHandle: '@brooklyn.sim007',
+      userAvatarUrl: 'https://picsum.photos/seed/e/150',
+      likes: '110K',
+      comments: '88K',
+      shares: '21K',
+    ),
+    Post(
+      imageUrl: 'https://picsum.photos/seed/5/600/800',
+      userName: 'Brooklyn Simmons',
+      userHandle: '@brooklyn.sim007',
+      userAvatarUrl: 'https://picsum.photos/seed/e/150',
+      likes: '110K',
+      comments: '88K',
+      shares: '21K',
+    ),Post(
+      imageUrl: 'https://picsum.photos/seed/5/600/800',
+      userName: 'Brooklyn Simmons',
+      userHandle: '@brooklyn.sim007',
+      userAvatarUrl: 'https://picsum.photos/seed/e/150',
+      likes: '110K',
+      comments: '88K',
+      shares: '21K',
+    ),
+    Post(
+      imageUrl: 'https://picsum.photos/seed/5/600/800',
+      userName: 'Brooklyn Simmons',
+      userHandle: '@brooklyn.sim007',
+      userAvatarUrl: 'https://picsum.photos/seed/e/150',
+      likes: '110K',
+      comments: '88K',
+      shares: '21K',
+    ),
+    Post(
+      imageUrl: 'https://picsum.photos/seed/5/600/800',
+      userName: 'Brooklyn Simmons',
+      userHandle: '@brooklyn.sim007',
+      userAvatarUrl: 'https://picsum.photos/seed/e/150',
+      likes: '110K',
+      comments: '88K',
+      shares: '21K',
+    ),
+
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      // The body is now a Stack to layer the content and the nav bar
-      body: Stack(
+    return SafeArea(
+      child: ListView(
         children: [
-          // The main scrollable content
-          SafeArea(
-            child: ListView(
-              children: [
-                CustomHeader(
-                  selectedIndex: _selectedTabIndex,
-                  onTabSelected: (index) {
-                    setState(() {
-                      _selectedTabIndex = index;
-                    });
-                  },
-                ),
-                StoriesSection(stories: _stories),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text('Trending', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                ),
-                ..._posts.map((post) => PostCard(post: post)).toList(),
-                // Add padding at the bottom so content doesn't hide behind the nav bar
-                const SizedBox(height: 100),
-              ],
-            ),
+          CustomHeader(
+            selectedIndex: _selectedTabIndex,
+            onTabSelected: (index) {
+              setState(() {
+                _selectedTabIndex = index;
+              });
+            },
           ),
-          // The new floating navigation bar is placed here, on top of the ListView
-          const FloatingNavBar(),
+          StoriesSection(stories: _stories),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text('Trending', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          ),
+          ..._posts.map((post) => PostCard(post: post)).toList(),
+          const SizedBox(height: 16),
         ],
       ),
     );

@@ -27,17 +27,25 @@ class OnboardingBottomBar extends StatelessWidget {
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Row(
+        // 👇 This is the main change
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          TextButton(
-            onPressed: () => isLast ? onGetStarted() : onSkip(),
-            child: Text(isLast ? '  ' : 'Skip',
-              style: TextStyle(
-                color: theme.colorScheme.error,
-                fontWeight: FontWeight.w600,
+          // We use a SizedBox to ensure the TextButton takes up space
+          // even when the text is empty, preventing layout jumps.
+          SizedBox(
+            width: 70, // Adjust width as needed
+            child: TextButton(
+              onPressed: () => isLast ? onGetStarted() : onSkip(),
+              child: Text(
+                isLast ? '' : 'Skip', // Hide text instead of making it empty
+                style: TextStyle(
+                  color: theme.colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
-          const Spacer(),
+          // const Spacer(), // 👈 REMOVED
           SmoothPageIndicator(
             controller: controller,
             count: lastIndex + 1,
@@ -50,19 +58,22 @@ class OnboardingBottomBar extends StatelessWidget {
               activeDotColor: theme.colorScheme.primary,
             ),
           ),
-          const Spacer(),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+          // const Spacer(), // 👈 REMOVED
+          SizedBox(
+            width: 120, // Adjust width as needed for "Get Started"
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
               ),
-              elevation: 0,
-            ),
-            onPressed: () => isLast ? onGetStarted() : onNext(),
-            child: Text(
-              isLast ? 'Get Started' : 'Next',
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              onPressed: () => isLast ? onGetStarted() : onNext(),
+              child: Text(
+                isLast ? 'Get Started' : 'Next',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
           ),
         ],
