@@ -9,6 +9,8 @@ import '../features/home/home_page.dart';
 import '../features/onboarding/onboarding_page.dart';
 import '../features/profile/profile_page.dart';
 import '../features/explore/explore_page.dart';
+import '../features/reels/reels_page.dart';
+import '../features/chat/chat_page.dart';
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(
@@ -38,6 +40,11 @@ final appRouter = GoRouter(
       path: '/reset-email-sent',
       builder: (context, state) => const ResetConfirmationPage(),
     ),
+    // Chat page (standalone, no nav bar)
+    GoRoute(
+      path: '/chat',
+      builder: (context, state) => const ChatPage(),
+    ),
 
     // ShellRoute for all pages that HAVE the navigation bar
     ShellRoute(
@@ -53,9 +60,13 @@ final appRouter = GoRouter(
           path: '/profile',
           builder: (context, state) => const MyProfilePage(),
         ),
-        GoRoute( // <-- ADD THIS ROUTE
-          path: '/search', // Use '/search' as this is your new search/explore page
+        GoRoute(
+          path: '/search',
           builder: (context, state) => const ExplorePage(),
+        ),
+        GoRoute(
+          path: '/reels',
+          builder: (context, state) => const ReelsPage(),
         ),
       ],
     ),
