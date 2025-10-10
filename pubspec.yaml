@@ -60,6 +60,7 @@ dev_dependencies:
   firebase_core: ^2.27.0
   flutter_staggered_grid_view: ^0.7.0
   google_sign_in: ^6.2.1
+  image_picker: ^1.0.7
   # sign_in_with_apple: ^5.0.0  # Uncomment for iOS Apple Sign In
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

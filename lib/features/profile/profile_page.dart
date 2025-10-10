@@ -2,6 +2,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import 'edit_profile_page.dart';
+import 'stories_view_page.dart';
+import 'add_story_page.dart';
 
 class MyProfilePage extends StatefulWidget {
   const MyProfilePage({Key? key}) : super(key: key);
@@ -405,7 +407,14 @@ class _MyProfilePageState extends State<MyProfilePage>
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const StoriesViewPage(),
+                    ),
+                  );
+                },
                 child: Text(
                   'View all',
                   style: TextStyle(color: kPrimary, fontWeight: FontWeight.w600),
@@ -436,27 +445,37 @@ class _MyProfilePageState extends State<MyProfilePage>
       children: [
         if (story['url'] == null)
           // Add Story Button
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      kPrimary.withOpacity(0.6),
-                      kPrimary.withOpacity(0.3),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: kPrimary.withOpacity(0.3),
-                    width: 2,
-                  ),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AddStoryPage(),
                 ),
-                child: const Icon(Icons.add, color: Colors.white, size: 32),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        kPrimary.withOpacity(0.6),
+                        kPrimary.withOpacity(0.3),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: kPrimary.withOpacity(0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white, size: 32),
+                ),
               ),
             ),
           )
