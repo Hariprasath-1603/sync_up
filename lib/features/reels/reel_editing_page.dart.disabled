@@ -1,0 +1,681 @@
+import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
+import 'dart:io';
+import 'models/reel_creation_model.dart';
+
+class ReelEditingPage extends StatefulWidget {
+  final List<VideoSegment> segments;
+  final String? preselectedAudioId;
+
+  const ReelEditingPage({
+    super.key,
+    required this.segments,
+    this.preselectedAudioId,
+  });
+
+  @override
+  State<ReelEditingPage> createState() => _ReelEditingPageState();
+}
+
+class _ReelEditingPageState extends State<ReelEditingPage> with SingleTickerProviderStateMixin {
+  VideoPlayerController? _videoController;
+  late TabController _tabController;
+  bool _isPlaying = false;
+  
+  // Editing state
+  List<TextOverlay> _textOverlays = [];
+  List<StickerOverlay> _stickerOverlays = [];
+  AudioTrack? _selectedAudio;
+  String _selectedFilter = 'None';
+  List<String> _appliedEffects = [];
+  
+  final List<String> _filters = [
+    'None', 'Vivid', 'Dramatic', 'Mono', 'Noir', 'Vintage', 'Warm', 'Cool'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 5, vsync: this);
+    if (widget.segments.isNotEmpty && widget.segments.first.file != null) {
+      _initializeVideo();
+    }
+  }
+
+  Future<void> _initializeVideo() async {
+    _videoController = VideoPlayerController.file(widget.segments.first.file!);
+    await _videoController!.initialize();
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _togglePlayPause() {
+    if (_videoController == null) return;
+    
+    setState(() {
+      if (_isPlaying) {
+        _videoController!.pause();
+      } else {
+        _videoController!.play();
+      }
+      _isPlaying = !_isPlaying;
+    });
+  }
+
+  void _addText() {
+    setState(() {
+      _textOverlays.add(
+        TextOverlay(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          text: 'Tap to edit',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+          position: const Offset(0.5, 0.5),
+          startTime: 0,
+          endTime: (_videoController?.value.duration.inSeconds ?? 15).toDouble(),
+        ),
+      );
+    });
+  }
+
+  void _addSticker(String stickerUrl) {
+    setState(() {
+      _stickerOverlays.add(
+        StickerOverlay(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          stickerUrl: stickerUrl,
+          imageUrl: stickerUrl,
+          position: const Offset(0.5, 0.5),
+          size: 100,
+          rotation: 0,
+          startTime: 0,
+          endTime: (_videoController?.value.duration.inSeconds ?? 15).toDouble(),
+        ),
+      );
+    });
+  }
+
+  void _goToPreview() {
+    final reelModel = ReelCreationModel(
+      userId: 'current_user_id', // Replace with actual user ID
+      segments: widget.segments,
+      audioTrack: _selectedAudio,
+      textOverlays: _textOverlays,
+      stickerOverlays: _stickerOverlays,
+      effects: _appliedEffects,
+      editingState: EditingState.editing,
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReelPreviewPage(reelModel: reelModel),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0B0E13) : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top Bar
+            _buildTopBar(isDark),
+
+            // Video Preview
+            Expanded(
+              child: Stack(
+                children: [
+                  // Video Player
+                  if (_videoController != null && _videoController!.value.isInitialized)
+                    Center(
+                      child: AspectRatio(
+                        aspectRatio: 9 / 16,
+                        child: VideoPlayer(_videoController!),
+                      ),
+                    )
+                  else
+                    const Center(child: CircularProgressIndicator()),
+
+                  // Text Overlays
+                  ..._textOverlays.map((overlay) => _buildTextOverlay(overlay)),
+
+                  // Sticker Overlays
+                  ..._stickerOverlays.map((overlay) => _buildStickerOverlay(overlay)),
+
+                  // Play/Pause Button
+                  Center(
+                    child: IconButton(
+                      icon: Icon(
+                        _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                        size: 64,
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                      onPressed: _togglePlayPause,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Timeline
+            _buildTimeline(isDark),
+
+            // Editing Tools Tabs
+            _buildEditingTabs(isDark),
+
+            // Tab Content
+            SizedBox(
+              height: 200,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildAudioTab(isDark),
+                  _buildTextTab(isDark),
+                  _buildStickersTab(isDark),
+                  _buildFiltersTab(isDark),
+                  _buildEffectsTab(isDark),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: Icon(Icons.close, color: isDark ? Colors.white : Colors.black),
+            onPressed: () => Navigator.pop(context),
+          ),
+          Text(
+            'Edit Reel',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black,
+            ),
+          ),
+          TextButton(
+            onPressed: _goToPreview,
+            child: const Text(
+              'Next',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeline(bool isDark) {
+    return Container(
+      height: 80,
+      color: isDark ? const Color(0xFF1A1D24) : Colors.grey.shade100,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          // Video thumbnail timeline
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.segments.length,
+              itemBuilder: (context, index) {
+                return Container(
+                  width: 60,
+                  margin: const EdgeInsets.only(right: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Stack(
+                    children: [
+                      Center(
+                        child: Text(
+                          '${index + 1}',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      // Delete button
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              widget.segments.removeAt(index);
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close, size: 16, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditingTabs(bool isDark) {
+    return Container(
+      color: isDark ? const Color(0xFF1A1D24) : Colors.grey.shade100,
+      child: TabBar(
+        controller: _tabController,
+        labelColor: Colors.blue,
+        unselectedLabelColor: isDark ? Colors.grey : Colors.grey.shade600,
+        indicatorColor: Colors.blue,
+        tabs: const [
+          Tab(icon: Icon(Icons.music_note), text: 'Audio'),
+          Tab(icon: Icon(Icons.text_fields), text: 'Text'),
+          Tab(icon: Icon(Icons.emoji_emotions), text: 'Stickers'),
+          Tab(icon: Icon(Icons.filter), text: 'Filters'),
+          Tab(icon: Icon(Icons.auto_fix_high), text: 'Effects'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAudioTab(bool isDark) {
+    return Container(
+      color: isDark ? const Color(0xFF0B0E13) : Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Add Music',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ListView(
+              children: [
+                _buildAudioOption(
+                  'Original Sound',
+                  'Use original audio from video',
+                  Icons.mic,
+                  isDark,
+                ),
+                _buildAudioOption(
+                  'Add Music',
+                  'Browse trending tracks',
+                  Icons.library_music,
+                  isDark,
+                ),
+                _buildAudioOption(
+                  'Voice Over',
+                  'Record your voice',
+                  Icons.keyboard_voice,
+                  isDark,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAudioOption(String title, String subtitle, IconData icon, bool isDark) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.blue.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: Colors.blue),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(color: isDark ? Colors.grey : Colors.grey.shade600),
+      ),
+      trailing: Icon(Icons.chevron_right, color: isDark ? Colors.grey : Colors.grey.shade600),
+      onTap: () {
+        // Open audio picker
+      },
+    );
+  }
+
+  Widget _buildTextTab(bool isDark) {
+    return Container(
+      color: isDark ? const Color(0xFF0B0E13) : Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          ElevatedButton.icon(
+            onPressed: _addText,
+            icon: const Icon(Icons.add),
+            label: const Text('Add Text'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              minimumSize: const Size(double.infinity, 50),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (_textOverlays.isNotEmpty)
+            Expanded(
+              child: ListView.builder(
+                itemCount: _textOverlays.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(
+                      _textOverlays[index].text,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () {
+                        setState(() {
+                          _textOverlays.removeAt(index);
+                        });
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStickersTab(bool isDark) {
+    final stickers = [
+      '😀', '😂', '❤️', '🔥', '✨', '👍', '🎉', '💯',
+      '😍', '🤔', '👏', '🙌', '💪', '🎵', '⭐', '💫'
+    ];
+
+    return Container(
+      color: isDark ? const Color(0xFF0B0E13) : Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+        ),
+        itemCount: stickers.length,
+        itemBuilder: (context, index) {
+          return GestureDetector(
+            onTap: () => _addSticker(stickers[index]),
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1A1D24) : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(
+                  stickers[index],
+                  style: const TextStyle(fontSize: 32),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFiltersTab(bool isDark) {
+    return Container(
+      color: isDark ? const Color(0xFF0B0E13) : Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: _filters.length,
+        itemBuilder: (context, index) {
+          final filter = _filters[index];
+          final isSelected = _selectedFilter == filter;
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedFilter = filter;
+              });
+            },
+            child: Container(
+              width: 100,
+              margin: const EdgeInsets.only(right: 12),
+              child: Column(
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.grey,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? Colors.blue : Colors.transparent,
+                        width: 3,
+                      ),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.image, color: Colors.white, size: 32),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    filter,
+                    style: TextStyle(
+                      color: isSelected
+                          ? Colors.blue
+                          : (isDark ? Colors.white : Colors.black),
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEffectsTab(bool isDark) {
+    final effects = [
+      {'name': 'Green Screen', 'icon': Icons.landscape},
+      {'name': 'Beauty', 'icon': Icons.face_retouching_natural},
+      {'name': 'Zoom', 'icon': Icons.zoom_in},
+      {'name': 'Split', 'icon': Icons.splitscreen},
+      {'name': 'Time Warp', 'icon': Icons.fast_forward},
+      {'name': 'Transition', 'icon': Icons.compare},
+    ];
+
+    return Container(
+      color: isDark ? const Color(0xFF0B0E13) : Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.2,
+        ),
+        itemCount: effects.length,
+        itemBuilder: (context, index) {
+          final effect = effects[index];
+          final isApplied = _appliedEffects.contains(effect['name']);
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                if (isApplied) {
+                  _appliedEffects.remove(effect['name']);
+                } else {
+                  _appliedEffects.add(effect['name'] as String);
+                }
+              });
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1A1D24) : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isApplied ? Colors.blue : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    effect['icon'] as IconData,
+                    color: isApplied ? Colors.blue : (isDark ? Colors.white : Colors.black),
+                    size: 32,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    effect['name'] as String,
+                    style: TextStyle(
+                      color: isApplied ? Colors.blue : (isDark ? Colors.white : Colors.black),
+                      fontSize: 12,
+                      fontWeight: isApplied ? FontWeight.bold : FontWeight.normal,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTextOverlay(TextOverlay overlay) {
+    return Positioned(
+      left: MediaQuery.of(context).size.width * overlay.position.dx - 50,
+      top: MediaQuery.of(context).size.height * overlay.position.dy - 20,
+      child: GestureDetector(
+        onPanUpdate: (details) {
+          setState(() {
+            final newX = (overlay.position.dx * MediaQuery.of(context).size.width + details.delta.dx) / MediaQuery.of(context).size.width;
+            final newY = (overlay.position.dy * MediaQuery.of(context).size.height + details.delta.dy) / MediaQuery.of(context).size.height;
+            
+            final index = _textOverlays.indexOf(overlay);
+            _textOverlays[index] = TextOverlay(
+              id: overlay.id,
+              text: overlay.text,
+              style: overlay.style,
+              position: Offset(newX, newY),
+              startTime: overlay.startTime,
+              endTime: overlay.endTime,
+            );
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            overlay.text,
+            style: overlay.style,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStickerOverlay(StickerOverlay overlay) {
+    return Positioned(
+      left: MediaQuery.of(context).size.width * overlay.position.dx - overlay.size / 2,
+      top: MediaQuery.of(context).size.height * overlay.position.dy - overlay.size / 2,
+      child: GestureDetector(
+        onPanUpdate: (details) {
+          setState(() {
+            final newX = (overlay.position.dx * MediaQuery.of(context).size.width + details.delta.dx) / MediaQuery.of(context).size.width;
+            final newY = (overlay.position.dy * MediaQuery.of(context).size.height + details.delta.dy) / MediaQuery.of(context).size.height;
+            
+            final index = _stickerOverlays.indexOf(overlay);
+            _stickerOverlays[index] = StickerOverlay(
+              id: overlay.id,
+              stickerUrl: overlay.stickerUrl,
+              imageUrl: overlay.imageUrl,
+              position: Offset(newX, newY),
+              size: overlay.size,
+              rotation: overlay.rotation,
+              startTime: overlay.startTime,
+              endTime: overlay.endTime,
+            );
+          });
+        },
+        child: Transform.rotate(
+          angle: overlay.rotation,
+          child: SizedBox(
+            width: overlay.size,
+            height: overlay.size,
+            child: Center(
+              child: Text(
+                overlay.imageUrl,
+                style: TextStyle(fontSize: overlay.size * 0.8),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Placeholder for Preview Page
+class ReelPreviewPage extends StatelessWidget {
+  final ReelCreationModel reelModel;
+
+  const ReelPreviewPage({super.key, required this.reelModel});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Preview & Publish')),
+      body: const Center(child: Text('Preview Page - Coming Next')),
+    );
+  }
+}

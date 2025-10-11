@@ -1,0 +1,434 @@
+import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'dart:async';
+import 'dart:io';
+import 'models/reel_creation_model.dart';
+
+class ReelCameraPage extends StatefulWidget {
+  final String? preselectedAudioId;
+
+  const ReelCameraPage({super.key, this.preselectedAudioId});
+
+  @override
+  State<ReelCameraPage> createState() => _ReelCameraPageState();
+}
+
+class _ReelCameraPageState extends State<ReelCameraPage> {
+  CameraController? _cameraController;
+  List<CameraDescription>? _cameras;
+  bool _isRecording = false;
+  bool _isFlashOn = false;
+  bool _isFrontCamera = false;
+  double _recordingSpeed = 1.0;
+  Timer? _recordingTimer;
+  double _recordingProgress = 0.0;
+  final double _maxDuration = 90.0; // 90 seconds max
+  List<VideoSegment> _recordedSegments = [];
+  int _currentSegmentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeCamera();
+  }
+
+  Future<void> _initializeCamera() async {
+    _cameras = await availableCameras();
+    if (_cameras!.isNotEmpty) {
+      _setupCamera(_cameras!.first);
+    }
+  }
+
+  Future<void> _setupCamera(CameraDescription camera) async {
+    _cameraController = CameraController(
+      camera,
+      ResolutionPreset.high,
+      enableAudio: true,
+    );
+
+    await _cameraController!.initialize();
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _cameraController?.dispose();
+    _recordingTimer?.cancel();
+    super.dispose();
+  }
+
+  void _toggleRecording() async {
+    if (_isRecording) {
+      // Stop recording
+      _stopRecording();
+    } else {
+      // Start recording
+      _startRecording();
+    }
+  }
+
+  void _startRecording() async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      return;
+    }
+
+    await _cameraController!.startVideoRecording();
+    
+    setState(() {
+      _isRecording = true;
+    });
+
+    _recordingTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      setState(() {
+        _recordingProgress += 0.1 / _maxDuration;
+        if (_recordingProgress >= 1.0) {
+          _stopRecording();
+        }
+      });
+    });
+  }
+
+  void _stopRecording() async {
+    if (_cameraController == null || !_cameraController!.value.isRecordingVideo) {
+      return;
+    }
+
+    final video = await _cameraController!.stopVideoRecording();
+    _recordingTimer?.cancel();
+    
+    setState(() {
+      _isRecording = false;
+      _recordedSegments.add(VideoSegment(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        file: video.path as File?,
+        duration: _recordingProgress * _maxDuration,
+        orderIndex: _currentSegmentIndex++,
+        speed: _recordingSpeed,
+      ));
+    });
+
+    // Navigate to editing page
+    if (_recordedSegments.isNotEmpty) {
+      _goToEditingPage();
+    }
+  }
+
+  void _toggleCamera() async {
+    if (_cameras == null || _cameras!.length < 2) return;
+
+    setState(() {
+      _isFrontCamera = !_isFrontCamera;
+    });
+
+    final camera = _isFrontCamera ? _cameras!.last : _cameras!.first;
+    await _setupCamera(camera);
+  }
+
+  void _toggleFlash() {
+    setState(() {
+      _isFlashOn = !_isFlashOn;
+    });
+    _cameraController?.setFlashMode(_isFlashOn ? FlashMode.torch : FlashMode.off);
+  }
+
+  void _setSpeed(double speed) {
+    setState(() {
+      _recordingSpeed = speed;
+    });
+  }
+
+  void _goToEditingPage() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReelEditingPage(
+          segments: _recordedSegments,
+          preselectedAudioId: widget.preselectedAudioId,
+        ),
+      ),
+    );
+  }
+
+  void _pickFromGallery() async {
+    // Implement image_picker to select video from gallery
+    // Then navigate to editing page
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Camera Preview
+          Center(
+            child: AspectRatio(
+              aspectRatio: 9 / 16,
+              child: CameraPreview(_cameraController!),
+            ),
+          ),
+
+          // Top Bar Controls
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            _isFlashOn ? Icons.flash_on : Icons.flash_off,
+                            color: Colors.white,
+                          ),
+                          onPressed: _toggleFlash,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.music_note, color: Colors.white),
+                          onPressed: () {
+                            // Open music picker
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Recording Progress Bar
+          Positioned(
+            top: 80,
+            left: 16,
+            right: 16,
+            child: SafeArea(
+              child: Row(
+                children: _buildProgressSegments(),
+              ),
+            ),
+          ),
+
+          // Speed Controls
+          Positioned(
+            right: 16,
+            top: MediaQuery.of(context).size.height / 2 - 100,
+            child: Column(
+              children: [
+                _buildSpeedButton(0.5),
+                const SizedBox(height: 16),
+                _buildSpeedButton(1.0),
+                const SizedBox(height: 16),
+                _buildSpeedButton(2.0),
+                const SizedBox(height: 16),
+                _buildSpeedButton(4.0),
+              ],
+            ),
+          ),
+
+          // Bottom Controls
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    // Gallery
+                    GestureDetector(
+                      onTap: _pickFromGallery,
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.photo_library, color: Colors.white),
+                      ),
+                    ),
+
+                    // Record Button
+                    GestureDetector(
+                      onTap: _toggleRecording,
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 4),
+                        ),
+                        child: Center(
+                          child: Container(
+                            width: _isRecording ? 30 : 60,
+                            height: _isRecording ? 30 : 60,
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(_isRecording ? 8 : 30),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Flip Camera
+                    GestureDetector(
+                      onTap: _toggleCamera,
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.flip_camera_ios, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Timer Display
+          if (_isRecording)
+            Positioned(
+              top: 120,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _formatDuration(_recordingProgress * _maxDuration),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpeedButton(double speed) {
+    final isSelected = _recordingSpeed == speed;
+    return GestureDetector(
+      onTap: () => _setSpeed(speed),
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.white.withOpacity(0.3),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Text(
+            '${speed}x',
+            style: TextStyle(
+              color: isSelected ? Colors.black : Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildProgressSegments() {
+    return List.generate(
+      _recordedSegments.length + 1,
+      (index) {
+        if (index < _recordedSegments.length) {
+          return Expanded(
+            child: Container(
+              height: 4,
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          );
+        } else {
+          return Expanded(
+            child: Container(
+              height: 4,
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: _recordingProgress,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  String _formatDuration(double seconds) {
+    final mins = (seconds / 60).floor();
+    final secs = (seconds % 60).floor();
+    return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+}
+
+// Placeholder for editing page
+class ReelEditingPage extends StatelessWidget {
+  final List<VideoSegment> segments;
+  final String? preselectedAudioId;
+
+  const ReelEditingPage({
+    super.key,
+    required this.segments,
+    this.preselectedAudioId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Edit Reel')),
+      body: const Center(child: Text('Editing Page - Coming Next')),
+    );
+  }
+}

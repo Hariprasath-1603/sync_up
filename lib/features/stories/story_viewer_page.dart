@@ -109,6 +109,7 @@ class _StoryViewerPageState extends State<StoryViewerPage>
   }
 
   void _nextStory() async {
+    if (_isTransitioning) return; // Prevent multiple transitions
     if (_currentStoryIndex < widget.stories.length - 1) {
       setState(() {
         _isTransitioning = true;
@@ -142,6 +143,7 @@ class _StoryViewerPageState extends State<StoryViewerPage>
   }
 
   void _previousStory() async {
+    if (_isTransitioning) return; // Prevent multiple transitions
     if (_currentStoryIndex > 0) {
       setState(() {
         _isTransitioning = true;
