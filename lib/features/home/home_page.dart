@@ -16,25 +16,40 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedTabIndex = 1; // 0 = Following, 1 = For You
 
-  // Stories for both tabs
+  // Stories data
   final List<Story> _stories = [
     Story(
-        imageUrl: 'https://picsum.photos/seed/1/300/400',
-        userName: 'Guy Hawkins',
-        userAvatarUrl: 'https://picsum.photos/seed/a/150',
-        tag: 'Live',
-        viewers: '20.5K'),
+      imageUrl: 'https://picsum.photos/seed/1/300/300',
+      userName: 'Guy Hawkins',
+      userAvatarUrl: 'https://picsum.photos/seed/a/150',
+      tag: 'Live',
+      viewers: '20.5K',
+    ),
     Story(
-        imageUrl: 'https://picsum.photos/seed/2/300/400',
-        userName: 'Robert Fox',
-        userAvatarUrl: 'https://picsum.photos/seed/b/150',
-        tag: 'Premiere'),
+      imageUrl: 'https://picsum.photos/seed/2/300/300',
+      userName: 'Robert Fox',
+      userAvatarUrl: 'https://picsum.photos/seed/b/150',
+      tag: 'Premiere',
+    ),
     Story(
-        imageUrl: 'https://picsum.photos/seed/3/300/400',
-        userName: 'Bessie Cooper',
-        userAvatarUrl: 'https://picsum.photos/seed/c/150',
-        tag: 'Live',
-        viewers: '34.6K'),
+      imageUrl: 'https://picsum.photos/seed/3/300/300',
+      userName: 'Bessie Cooper',
+      userAvatarUrl: 'https://picsum.photos/seed/c/150',
+      tag: 'Live',
+      viewers: '34.6K',
+    ),
+    Story(
+      imageUrl: 'https://picsum.photos/seed/10/300/300',
+      userName: 'Jenny Wilson',
+      userAvatarUrl: 'https://picsum.photos/seed/j/150',
+      tag: 'New',
+    ),
+    Story(
+      imageUrl: 'https://picsum.photos/seed/11/300/300',
+      userName: 'Kristin Watson',
+      userAvatarUrl: 'https://picsum.photos/seed/k/150',
+      tag: 'New',
+    ),
   ];
 
   // For You posts (trending/recommended)
@@ -181,8 +196,9 @@ class _HomePageState extends State<HomePage> {
                 });
               },
             ),
-            // Show stories only on For You tab
-            if (_selectedTabIndex == 1) StoriesSection(stories: _stories),
+            // Stories section - show only on For You tab
+            if (_selectedTabIndex == 1)
+              StoriesSection(stories: _stories),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(

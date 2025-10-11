@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'category_page.dart';
 
 class ExplorePage extends StatelessWidget {
   const ExplorePage({super.key});
@@ -7,7 +8,7 @@ class ExplorePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -63,9 +64,7 @@ class ExplorePage extends StatelessWidget {
               ),
             ),
             const _ExploreGrid(),
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 100),
-            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
       ),
@@ -78,7 +77,7 @@ class ExplorePage extends StatelessWidget {
 // Section Title Widget
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title});
-  
+
   final String title;
 
   @override
@@ -152,7 +151,9 @@ class _SearchBar extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: 'Search Syncup',
                     hintStyle: TextStyle(
-                      color: isDark ? Colors.white60 : Colors.black.withOpacity(0.5),
+                      color: isDark
+                          ? Colors.white60
+                          : Colors.black.withOpacity(0.5),
                       fontSize: 16,
                     ),
                     border: InputBorder.none,
@@ -182,11 +183,19 @@ class _CategoryChips extends StatelessWidget {
   const _CategoryChips();
 
   final List<Map<String, dynamic>> categories = const [
-    {'label': 'Trending', 'icon': Icons.local_fire_department, 'color': Colors.redAccent},
+    {
+      'label': 'Trending',
+      'icon': Icons.local_fire_department,
+      'color': Colors.redAccent,
+    },
     {'label': 'Music', 'icon': Icons.music_note, 'color': Colors.blueAccent},
     {'label': 'Learn', 'icon': Icons.lightbulb, 'color': Colors.orangeAccent},
     {'label': 'Gaming', 'icon': Icons.gamepad, 'color': Colors.greenAccent},
-    {'label': 'Sports', 'icon': Icons.sports_basketball, 'color': Colors.purpleAccent},
+    {
+      'label': 'Sports',
+      'icon': Icons.sports_basketball,
+      'color': Colors.purpleAccent,
+    },
     {'label': 'Fashion', 'icon': Icons.checkroom, 'color': Colors.pinkAccent},
   ];
 
@@ -202,52 +211,69 @@ class _CategoryChips extends StatelessWidget {
         separatorBuilder: (context, index) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
           final category = categories[index];
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(25),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isDark
-                        ? [
-                            Colors.white.withOpacity(0.12),
-                            Colors.white.withOpacity(0.06),
-                          ]
-                        : [
-                            Colors.white.withOpacity(0.85),
-                            Colors.white.withOpacity(0.65),
-                          ],
-                  ),
-                  borderRadius: BorderRadius.circular(25),
-                  border: Border.all(
-                    color: isDark
-                        ? Colors.white.withOpacity(0.2)
-                        : Colors.white.withOpacity(0.5),
-                    width: 1.2,
+          return GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CategoryPage(
+                    categoryName: category['label'],
+                    categoryIcon: category['icon'],
+                    categoryColor: category['color'],
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      category['icon'],
-                      color: category['color'],
-                      size: 20,
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(25),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDark
+                          ? [
+                              Colors.white.withOpacity(0.12),
+                              Colors.white.withOpacity(0.06),
+                            ]
+                          : [
+                              Colors.white.withOpacity(0.85),
+                              Colors.white.withOpacity(0.65),
+                            ],
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      category['label'],
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                    borderRadius: BorderRadius.circular(25),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withOpacity(0.2)
+                          : Colors.white.withOpacity(0.5),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        category['icon'],
+                        color: category['color'],
+                        size: 20,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Text(
+                        category['label'],
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -330,52 +356,46 @@ class _ExploreGrid extends StatelessWidget {
           crossAxisSpacing: 16,
           childAspectRatio: 1.0,
         ),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Stack(
-                children: [
-                  // Background image
-                  Positioned.fill(
-                    child: Image.network(
-                      exploreImages[index],
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  // Gradient overlay
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.4),
-                          ],
-                        ),
+        delegate: SliverChildBuilderDelegate((context, index) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              children: [
+                // Background image
+                Positioned.fill(
+                  child: Image.network(exploreImages[index], fit: BoxFit.cover),
+                ),
+                // Gradient overlay
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.4),
+                        ],
                       ),
                     ),
                   ),
-                  // Glass overlay on hover effect
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
-                          width: 1.5,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
+                ),
+                // Glass overlay on hover effect
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.2),
+                        width: 1.5,
                       ),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                   ),
-                ],
-              ),
-            );
-          },
-          childCount: exploreImages.length,
-        ),
+                ),
+              ],
+            ),
+          );
+        }, childCount: exploreImages.length),
       ),
     );
   }
@@ -413,12 +433,7 @@ class _VideoCard extends StatelessWidget {
         child: Stack(
           children: [
             // Background image
-            Positioned.fill(
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-              ),
-            ),
+            Positioned.fill(child: Image.network(imageUrl, fit: BoxFit.cover)),
             // Gradient overlay
             Positioned.fill(
               child: Container(
@@ -502,10 +517,7 @@ class _VideoCard extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                             shadows: [
-                              Shadow(
-                                color: Colors.black45,
-                                blurRadius: 4,
-                              ),
+                              Shadow(color: Colors.black45, blurRadius: 4),
                             ],
                           ),
                           maxLines: 2,

@@ -79,14 +79,9 @@ class _ReelsPageState extends State<ReelsPage> {
               return _buildReelItem(_reels[index], index);
             },
           ),
-          
+
           // Top Bar with Camera and search
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: _buildTopBar(isDark),
-          ),
+          Positioned(top: 0, left: 0, right: 0, child: _buildTopBar(isDark)),
         ],
       ),
     );
@@ -98,10 +93,7 @@ class _ReelsPageState extends State<ReelsPage> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withOpacity(0.6),
-            Colors.transparent,
-          ],
+          colors: [Colors.black.withOpacity(0.6), Colors.transparent],
         ),
       ),
       padding: const EdgeInsets.fromLTRB(16, 45, 16, 16),
@@ -114,12 +106,7 @@ class _ReelsPageState extends State<ReelsPage> {
               color: Colors.white,
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              shadows: [
-                Shadow(
-                  color: Colors.black87,
-                  blurRadius: 8,
-                ),
-              ],
+              shadows: [Shadow(color: Colors.black87, blurRadius: 8)],
             ),
           ),
           Row(
@@ -146,21 +133,13 @@ class _ReelsPageState extends State<ReelsPage> {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.15),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.25),
-            width: 1,
-          ),
+          border: Border.all(color: Colors.white.withOpacity(0.25), width: 1),
         ),
         child: Icon(
           icon,
           color: Colors.white,
           size: 22,
-          shadows: const [
-            Shadow(
-              color: Colors.black87,
-              blurRadius: 8,
-            ),
-          ],
+          shadows: const [Shadow(color: Colors.black87, blurRadius: 8)],
         ),
       ),
     );
@@ -171,11 +150,8 @@ class _ReelsPageState extends State<ReelsPage> {
       fit: StackFit.expand,
       children: [
         // Video/Image Background
-        Image.network(
-          reel.videoUrl,
-          fit: BoxFit.cover,
-        ),
-        
+        Image.network(reel.videoUrl, fit: BoxFit.cover),
+
         // Gradient Overlays
         Positioned.fill(
           child: Container(
@@ -233,7 +209,7 @@ class _ReelsPageState extends State<ReelsPage> {
           },
         ),
         const SizedBox(height: 20),
-        
+
         // Comment Button
         _buildActionButton(
           icon: Icons.mode_comment_outlined,
@@ -243,7 +219,7 @@ class _ReelsPageState extends State<ReelsPage> {
           },
         ),
         const SizedBox(height: 20),
-        
+
         // Share Button
         _buildActionButton(
           icon: Icons.send,
@@ -253,7 +229,7 @@ class _ReelsPageState extends State<ReelsPage> {
           },
         ),
         const SizedBox(height: 20),
-        
+
         // Save Button
         _buildActionButton(
           icon: reel.isSaved ? Icons.bookmark : Icons.bookmark_border,
@@ -267,7 +243,7 @@ class _ReelsPageState extends State<ReelsPage> {
           },
         ),
         const SizedBox(height: 20),
-        
+
         // More Options Button
         _buildActionButton(
           icon: Icons.more_vert,
@@ -294,12 +270,7 @@ class _ReelsPageState extends State<ReelsPage> {
             icon,
             color: color,
             size: 32,
-            shadows: const [
-              Shadow(
-                color: Colors.black87,
-                blurRadius: 8,
-              ),
-            ],
+            shadows: const [Shadow(color: Colors.black87, blurRadius: 8)],
           ),
           if (label.isNotEmpty) ...[
             const SizedBox(height: 2),
@@ -309,12 +280,7 @@ class _ReelsPageState extends State<ReelsPage> {
                 color: Colors.white,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                shadows: [
-                  Shadow(
-                    color: Colors.black87,
-                    blurRadius: 8,
-                  ),
-                ],
+                shadows: [Shadow(color: Colors.black87, blurRadius: 8)],
               ),
             ),
           ],
@@ -334,10 +300,7 @@ class _ReelsPageState extends State<ReelsPage> {
             Container(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white,
-                  width: 1.5,
-                ),
+                border: Border.all(color: Colors.white, width: 1.5),
               ),
               child: CircleAvatar(
                 radius: 16,
@@ -351,12 +314,7 @@ class _ReelsPageState extends State<ReelsPage> {
                 color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                shadows: [
-                  Shadow(
-                    color: Colors.black87,
-                    blurRadius: 8,
-                  ),
-                ],
+                shadows: [Shadow(color: Colors.black87, blurRadius: 8)],
               ),
             ),
             const SizedBox(width: 8),
@@ -365,7 +323,10 @@ class _ReelsPageState extends State<ReelsPage> {
                 _showMessage('Follow ${reel.username}');
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.white, width: 1.2),
                   borderRadius: BorderRadius.circular(4),
@@ -383,33 +344,24 @@ class _ReelsPageState extends State<ReelsPage> {
           ],
         ),
         const SizedBox(height: 8),
-        
+
         // Description
         Text(
           reel.description,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 13,
-            shadows: [
-              Shadow(
-                color: Colors.black87,
-                blurRadius: 8,
-              ),
-            ],
+            shadows: [Shadow(color: Colors.black87, blurRadius: 8)],
           ),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 6),
-        
+
         // Audio Info
         Row(
           children: [
-            const Icon(
-              Icons.music_note,
-              color: Colors.white,
-              size: 14,
-            ),
+            const Icon(Icons.music_note, color: Colors.white, size: 14),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
@@ -417,12 +369,7 @@ class _ReelsPageState extends State<ReelsPage> {
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 11,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black87,
-                      blurRadius: 8,
-                    ),
-                  ],
+                  shadows: [Shadow(color: Colors.black87, blurRadius: 8)],
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -543,7 +490,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -565,7 +512,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
             ),
           ),
           const Divider(height: 1),
-          
+
           // Comments List
           Expanded(
             child: ListView.builder(
@@ -576,7 +523,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
               },
             ),
           ),
-          
+
           // Comment Input
           Container(
             padding: const EdgeInsets.all(12),
@@ -638,7 +585,9 @@ class _CommentsSheetState extends State<_CommentsSheet> {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=${index + 50}'),
+            backgroundImage: NetworkImage(
+              'https://i.pravatar.cc/100?img=${index + 50}',
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -657,20 +606,14 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                     const SizedBox(width: 8),
                     Text(
                       '${index + 1}h',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'This is an amazing reel! Love the content 🔥',
-                  style: TextStyle(
-                    color: Colors.grey[800],
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey[800], fontSize: 14),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -729,10 +672,7 @@ class _ShareSheet extends StatelessWidget {
             ),
             const Text(
               'Share to',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
             Row(
@@ -740,9 +680,9 @@ class _ShareSheet extends StatelessWidget {
               children: [
                 _buildShareOption(Icons.link, 'Copy Link', () {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Link copied!')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('Link copied!')));
                 }),
                 _buildShareOption(Icons.message, 'Messages', () {
                   Navigator.pop(context);
@@ -779,10 +719,7 @@ class _ShareSheet extends StatelessWidget {
             child: Icon(icon, color: Colors.black87),
           ),
           const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12),
-          ),
+          Text(label, style: const TextStyle(fontSize: 12)),
         ],
       ),
     );
@@ -802,55 +739,53 @@ class _MoreOptionsSheet extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
             ),
-            _buildOptionItem(Icons.report_outlined, 'Report', () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Report submitted')),
-              );
-            }),
-            _buildOptionItem(Icons.block_outlined, 'Not Interested', () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Marked as not interested')),
-              );
-            }),
-            _buildOptionItem(Icons.person_remove_outlined, 'Hide posts from ${reel.username}', () {
+          ),
+          _buildOptionItem(Icons.report_outlined, 'Report', () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Report submitted')));
+          }),
+          _buildOptionItem(Icons.block_outlined, 'Not Interested', () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Marked as not interested')),
+            );
+          }),
+          _buildOptionItem(
+            Icons.person_remove_outlined,
+            'Hide posts from ${reel.username}',
+            () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Hidden posts from ${reel.username}')),
               );
-            }),
-            _buildOptionItem(Icons.info_outline, 'About this account', () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Account info')),
-              );
-            }),
-            const SizedBox(height: 10),
-          ],
-        ),
+            },
+          ),
+          _buildOptionItem(Icons.info_outline, 'About this account', () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Account info')));
+          }),
+          SizedBox(height: MediaQuery.of(context).padding.bottom + 10),
+        ],
       ),
     );
   }
 
   Widget _buildOptionItem(IconData icon, String label, VoidCallback onTap) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(label),
-      onTap: onTap,
-    );
+    return ListTile(leading: Icon(icon), title: Text(label), onTap: onTap);
   }
 }
