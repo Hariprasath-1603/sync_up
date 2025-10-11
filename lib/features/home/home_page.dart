@@ -3,7 +3,7 @@ import '../../core/theme.dart';
 import 'models/post_model.dart';
 import 'models/story_model.dart';
 import 'widgets/custom_header.dart';
-import 'widgets/stories_section.dart';
+import 'widgets/stories_section_new.dart';
 import 'widgets/post_card.dart';
 
 class HomePage extends StatefulWidget {
@@ -162,27 +162,31 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     // Get current posts based on selected tab
-    final currentPosts = _selectedTabIndex == 0 ? _followingPosts : _forYouPosts;
-    final sectionTitle = _selectedTabIndex == 0 ? 'Latest from Following' : 'Trending';
-    
+    final currentPosts = _selectedTabIndex == 0
+        ? _followingPosts
+        : _forYouPosts;
+    final sectionTitle = _selectedTabIndex == 0
+        ? 'Latest from Following'
+        : 'Trending';
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: isDark 
-            ? [
-                const Color(0xFF0B0E13),
-                const Color(0xFF1A1F2E),
-                kPrimary.withOpacity(0.1),
-              ]
-            : [
-                const Color(0xFFF6F7FB),
-                const Color(0xFFFFFFFF),
-                kPrimary.withOpacity(0.05),
-              ],
+          colors: isDark
+              ? [
+                  const Color(0xFF0B0E13),
+                  const Color(0xFF1A1F2E),
+                  kPrimary.withOpacity(0.1),
+                ]
+              : [
+                  const Color(0xFFF6F7FB),
+                  const Color(0xFFFFFFFF),
+                  kPrimary.withOpacity(0.05),
+                ],
         ),
       ),
       child: SafeArea(
@@ -196,9 +200,13 @@ class _HomePageState extends State<HomePage> {
                 });
               },
             ),
-            // Stories section - show only on For You tab
+            // Stories section - show only on For You tab with "My Story" feature
             if (_selectedTabIndex == 1)
-              StoriesSection(stories: _stories),
+              StoriesSection(
+                stories: _stories,
+                hasMyStory: false, // Change to true when user has active story
+                myStoryImageUrl: null, // Set to user's story image when active
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(

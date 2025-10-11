@@ -45,7 +45,10 @@ class _SignInPageState extends State<SignInPage> {
         _isLoading = true;
       });
 
-      final user = await _authService.signInWithEmailAndPassword(email, password);
+      final user = await _authService.signInWithEmailAndPassword(
+        email,
+        password,
+      );
 
       setState(() {
         _isLoading = false;
@@ -69,7 +72,7 @@ class _SignInPageState extends State<SignInPage> {
   // Google Sign-In
   Future<void> _signInWithGoogle() async {
     if (_isLoading) return; // Prevent multiple clicks
-    
+
     setState(() {
       _isLoading = true;
     });
@@ -78,9 +81,9 @@ class _SignInPageState extends State<SignInPage> {
       print('Starting Google Sign-In...');
       final user = await _authService.signInWithGoogle();
       print('Sign-in completed. User: ${user?.email}');
-      
+
       if (!mounted) return;
-      
+
       setState(() {
         _isLoading = false;
       });
@@ -109,11 +112,11 @@ class _SignInPageState extends State<SignInPage> {
     } catch (e) {
       print('Error during Google Sign-In: $e');
       if (!mounted) return;
-      
+
       setState(() {
         _isLoading = false;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Sign-in error: ${e.toString()}'),
@@ -132,7 +135,7 @@ class _SignInPageState extends State<SignInPage> {
 
     try {
       final user = await _authService.signInWithMicrosoft();
-      
+
       setState(() {
         _isLoading = false;
       });
@@ -180,7 +183,7 @@ class _SignInPageState extends State<SignInPage> {
 
     try {
       final user = await _authService.signInWithApple();
-      
+
       setState(() {
         _isLoading = false;
       });
@@ -224,13 +227,21 @@ class _SignInPageState extends State<SignInPage> {
     required String labelText,
     required IconData prefixIcon,
     Widget? suffixIcon,
+    required BuildContext context,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: labelText,
-      prefixIcon: Icon(prefixIcon),
+      labelStyle: TextStyle(
+        color: isDark ? Colors.grey[400] : Colors.grey[700],
+      ),
+      prefixIcon: Icon(
+        prefixIcon,
+        color: isDark ? Colors.grey[400] : Colors.grey[600],
+      ),
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: Colors.grey.shade200,
+      fillColor: isDark ? const Color(0xFF1A1D24) : Colors.grey.shade200,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -240,6 +251,13 @@ class _SignInPageState extends State<SignInPage> {
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
       ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark ? Colors.grey[800]! : Colors.grey.shade300,
+          width: 1,
+        ),
+      ),
     );
   }
 
@@ -247,17 +265,24 @@ class _SignInPageState extends State<SignInPage> {
     required VoidCallback onPressed,
     required Widget child,
     Color? backgroundColor,
+    required BuildContext context,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.white,
+        color:
+            backgroundColor ??
+            (isDark ? const Color(0xFF1A1D24) : Colors.white),
         borderRadius: BorderRadius.circular(12),
         border: backgroundColor == null
-            ? Border.all(color: Colors.grey.shade300, width: 1.5)
+            ? Border.all(
+                color: isDark ? Colors.grey[800]! : Colors.grey.shade300,
+                width: 1.5,
+              )
             : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.15),
+            color: (isDark ? Colors.black : Colors.grey).withOpacity(0.15),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -288,24 +313,35 @@ class _SignInPageState extends State<SignInPage> {
               children: [
                 Lottie.asset('assets/lottie/login.json', height: 200),
                 const SizedBox(height: 24),
-                Text('Welcome Back!',
-                    textAlign: TextAlign.center,
-                    style: textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  'Welcome Back!',
+                  textAlign: TextAlign.center,
+                  style: textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 8),
-                Text('Log in to your account',
-                    textAlign: TextAlign.center,
-                    style: textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                Text(
+                  'Log in to your account',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(height: 32),
                 TextFormField(
                   controller: _emailController,
                   decoration: _buildInputDecoration(
                     labelText: 'Email',
                     prefixIcon: Icons.email_outlined,
+                    context: context,
                   ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
-                    if (value == null || value.isEmpty) return 'Please enter your email';
-                    if (!RegExp(r'\S+@\S+\.\S+').hasMatch(value)) return 'Please enter a valid email';
+                    if (value == null || value.isEmpty)
+                      return 'Please enter your email';
+                    if (!RegExp(r'\S+@\S+\.\S+').hasMatch(value))
+                      return 'Please enter a valid email';
                     return null;
                   },
                 ),
@@ -316,17 +352,29 @@ class _SignInPageState extends State<SignInPage> {
                   decoration: _buildInputDecoration(
                     labelText: 'Password',
                     prefixIcon: Icons.lock_outline,
+                    context: context,
                     suffixIcon: IconButton(
-                      icon: Icon(_isPasswordVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                      onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                      icon: Icon(
+                        _isPasswordVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+                      onPressed: () => setState(
+                        () => _isPasswordVisible = !_isPasswordVisible,
+                      ),
                     ),
                   ),
-                  validator: (value) => value == null || value.isEmpty ? 'Please enter your password' : null,
+                  validator: (value) => value == null || value.isEmpty
+                      ? 'Please enter your password'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(onPressed: () => context.go('/forgot-password'), child: const Text('Forgot Password?')),
+                  child: TextButton(
+                    onPressed: () => context.go('/forgot-password'),
+                    child: const Text('Forgot Password?'),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 FilledButton(
@@ -335,8 +383,21 @@ class _SignInPageState extends State<SignInPage> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: _isLoading
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-                      : const Text('Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        )
+                      : const Text(
+                          'Login',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 24),
                 Row(
@@ -361,13 +422,19 @@ class _SignInPageState extends State<SignInPage> {
                     // Google Sign-In Button
                     _buildOAuthButton(
                       onPressed: _signInWithGoogle,
+                      context: context,
                       child: Container(
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF4285F4), Color(0xFFDB4437), Color(0xFFF4B400), Color(0xFF0F9D58)],
+                            colors: [
+                              Color(0xFF4285F4),
+                              Color(0xFFDB4437),
+                              Color(0xFFF4B400),
+                              Color(0xFF0F9D58),
+                            ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -387,9 +454,17 @@ class _SignInPageState extends State<SignInPage> {
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   foreground: Paint()
-                                    ..shader = const LinearGradient(
-                                      colors: [Color(0xFF4285F4), Color(0xFFDB4437), Color(0xFFF4B400), Color(0xFF0F9D58)],
-                                    ).createShader(const Rect.fromLTWH(0, 0, 50, 50)),
+                                    ..shader =
+                                        const LinearGradient(
+                                          colors: [
+                                            Color(0xFF4285F4),
+                                            Color(0xFFDB4437),
+                                            Color(0xFFF4B400),
+                                            Color(0xFF0F9D58),
+                                          ],
+                                        ).createShader(
+                                          const Rect.fromLTWH(0, 0, 50, 50),
+                                        ),
                                 ),
                               ),
                             ),
@@ -401,6 +476,7 @@ class _SignInPageState extends State<SignInPage> {
                     // Microsoft Sign-In Button
                     _buildOAuthButton(
                       onPressed: _signInWithMicrosoft,
+                      context: context,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -446,13 +522,27 @@ class _SignInPageState extends State<SignInPage> {
                       _buildOAuthButton(
                         onPressed: _signInWithApple,
                         backgroundColor: Colors.black,
-                        child: const Icon(Icons.apple, color: Colors.white, size: 28),
+                        context: context,
+                        child: const Icon(
+                          Icons.apple,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
                     ],
                   ],
                 ),
                 const SizedBox(height: 24),
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [ const Text("Don't have an account?"), TextButton(onPressed: () => context.go('/signup'), child: const Text('Sign Up'),)]),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("Don't have an account?"),
+                    TextButton(
+                      onPressed: () => context.go('/signup'),
+                      child: const Text('Sign Up'),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),

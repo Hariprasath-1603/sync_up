@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import 'create_post_page.dart';
+import 'camera_composer_page.dart';
 import 'drafts_page.dart';
 import 'scheduled_posts_page.dart';
 import '../reels/create_reel_page.dart';
-import '../live/go_live_page.dart';
-import '../stories/create_story_page.dart';
 
 class AddPage extends StatefulWidget {
   const AddPage({super.key});
@@ -385,9 +384,68 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
   }
 
   void _showGoLiveSheet(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const GoLivePage()),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1A1D24) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subtitleColor = isDark ? Colors.white54 : Colors.grey[600]!;
+    final borderColor = isDark ? Colors.white12 : Colors.grey[300]!;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: borderColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Icon(Icons.live_tv, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              'Go Live',
+              style: TextStyle(
+                color: textColor,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Live streaming feature coming soon!',
+              style: TextStyle(color: subtitleColor, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Got it'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -395,7 +453,7 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const CreateStoryPage(),
+        builder: (context) => const CameraComposerPage(type: 'story'),
       ),
     );
   }

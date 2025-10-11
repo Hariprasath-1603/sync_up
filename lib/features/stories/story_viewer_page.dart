@@ -1,19 +1,18 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'models/story_model.dart';
+import 'dart:async';
+import '../../core/theme.dart';
+import '../home/models/story_model.dart';
 
 class StoryViewerPage extends StatefulWidget {
-  final String userId;
-  final List<StoryModel> stories;
-  final int initialStoryIndex;
-  final bool isOwnStory;
+  final List<Story> stories;
+  final int initialIndex;
+  final bool isMyStory;
 
   const StoryViewerPage({
     super.key,
-    required this.userId,
     required this.stories,
-    this.initialStoryIndex = 0,
-    this.isOwnStory = false,
+    required this.initialIndex,
+    this.isMyStory = false,
   });
 
   @override
@@ -21,198 +20,251 @@ class StoryViewerPage extends StatefulWidget {
 }
 
 class _StoryViewerPageState extends State<StoryViewerPage>
-    with TickerProviderStateMixin {
-  int _currentStoryIndex = 0;
-  Timer? _storyTimer;
-  
-  final List<AnimationController> _progressControllers = [];
-  final List<Animation<double>> _progressAnimations = [];
+    with SingleTickerProviderStateMixin {
+  late int _currentStoryIndex;
+  late int _currentSegmentIndex;
+  double _progress = 0.0;
+  Timer? _progressTimer;
+  bool _isPaused = false;
+  late PageController _pageController;
+  late AnimationController _transitionController;
+  late Animation<double> _fadeAnimation;
+  bool _isTransitioning = false;
+
+  final List<Map<String, String>> _viewers = [
+    {'name': 'Alex Johnson', 'reaction': '❤️', 'time': '2m ago'},
+    {'name': 'Priya Sharma', 'reaction': '😂', 'time': '5m ago'},
+    {'name': 'John Doe', 'reaction': '', 'time': '10m ago'},
+    {'name': 'Meera Patel', 'reaction': '😮', 'time': '15m ago'},
+  ];
 
   @override
   void initState() {
     super.initState();
-    _currentStoryIndex = widget.initialStoryIndex;
-    _initializeProgressBars();
-    _startStory();
-    _markStoryAsViewed();
+    _currentStoryIndex = widget.initialIndex;
+    _currentSegmentIndex = 0;
+    _pageController = PageController(initialPage: widget.initialIndex);
+
+    // Initialize transition animation controller
+    _transitionController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _transitionController, curve: Curves.easeInOut),
+    );
+
+    _transitionController.forward();
+    _startProgress();
   }
 
-  void _initializeProgressBars() {
-    for (var i = 0; i < widget.stories.length; i++) {
-      final controller = AnimationController(
-        vsync: this,
-        duration: Duration(
-          milliseconds: _getStoryDuration(widget.stories[i]).inMilliseconds,
-        ),
-      );
-      _progressControllers.add(controller);
-      _progressAnimations.add(
-        Tween<double>(begin: 0.0, end: 1.0).animate(controller),
-      );
+  @override
+  void dispose() {
+    _progressTimer?.cancel();
+    _pageController.dispose();
+    _transitionController.dispose();
+    super.dispose();
+  }
 
-      controller.addStatusListener((status) {
-        if (status == AnimationStatus.completed && i == _currentStoryIndex) {
-          _nextStory();
-        }
+  void _startProgress() {
+    _progressTimer?.cancel();
+    _progress = 0.0;
+
+    _progressTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (!_isPaused && mounted) {
+        setState(() {
+          _progress += 0.01;
+          if (_progress >= 1.0) {
+            _nextSegment();
+          }
+        });
+      }
+    });
+  }
+
+  void _nextSegment() {
+    _progressTimer?.cancel();
+    if (_currentSegmentIndex < 0) {
+      // Assuming 1 segment per story for now
+      setState(() {
+        _currentSegmentIndex++;
+        _startProgress();
       });
+    } else {
+      _nextStory();
     }
   }
 
-  Duration _getStoryDuration(StoryModel story) {
-    if (story.mediaType == StoryMediaType.video && story.duration != null) {
-      return Duration(seconds: story.duration!.toInt());
-    }
-    return const Duration(seconds: 5); // Default for images
-  }
-
-  void _startStory() {
-    // Complete all previous progress bars
-    for (var i = 0; i < _currentStoryIndex; i++) {
-      _progressControllers[i].value = 1.0;
-    }
-    
-    // Start current story
-    _progressControllers[_currentStoryIndex].forward();
-  }
-
-  void _pauseStory() {
-    if (_currentStoryIndex < _progressControllers.length) {
-      _progressControllers[_currentStoryIndex].stop();
+  void _previousSegment() {
+    _progressTimer?.cancel();
+    if (_currentSegmentIndex > 0) {
+      setState(() {
+        _currentSegmentIndex--;
+        _startProgress();
+      });
+    } else if (_currentStoryIndex > 0) {
+      _previousStory();
     }
   }
 
-  void _resumeStory() {
-    if (_currentStoryIndex < _progressControllers.length) {
-      _progressControllers[_currentStoryIndex].forward();
-    }
-  }
-
-  void _nextStory() {
+  void _nextStory() async {
     if (_currentStoryIndex < widget.stories.length - 1) {
       setState(() {
-        _currentStoryIndex++;
+        _isTransitioning = true;
       });
-      _startStory();
-      _markStoryAsViewed();
+
+      // Fade out animation
+      await _transitionController.reverse();
+
+      // Move to next page
+      await _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+
+      setState(() {
+        _currentStoryIndex++;
+        _currentSegmentIndex = 0;
+        _isTransitioning = false;
+      });
+
+      // Fade in animation
+      await _transitionController.forward();
+      _startProgress();
     } else {
-      // End of stories, close viewer
-      Navigator.pop(context);
+      // All stories completed, exit with fade out
+      await _transitionController.reverse();
+      if (mounted) {
+        Navigator.pop(context);
+      }
     }
   }
 
-  void _previousStory() {
+  void _previousStory() async {
     if (_currentStoryIndex > 0) {
-      _progressControllers[_currentStoryIndex].reset();
+      setState(() {
+        _isTransitioning = true;
+      });
+
+      // Fade out animation
+      await _transitionController.reverse();
+
+      // Move to previous page
+      await _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+
       setState(() {
         _currentStoryIndex--;
+        _currentSegmentIndex = 0;
+        _isTransitioning = false;
       });
-      _progressControllers[_currentStoryIndex].reset();
-      _startStory();
+
+      // Fade in animation
+      await _transitionController.forward();
+      _startProgress();
     }
   }
 
-  void _markStoryAsViewed() {
-    final story = widget.stories[_currentStoryIndex];
-    // TODO: Call API to mark as viewed
-    print('Story ${story.id} viewed');
-  }
-
-  void _showReactions() {
-    final reactions = ['❤️', '😂', '😮', '😍', '😢', '😡', '👏', '🔥'];
-    
+  void _showViewersSheet() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.9),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(2),
+      isScrollControlled: true,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A1D24) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[700] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Quick Reactions',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              alignment: WrapAlignment.center,
-              children: reactions.map((emoji) {
-                return GestureDetector(
-                  onTap: () {
-                    _sendReaction(emoji);
-                    Navigator.pop(context);
-                  },
-                  child: Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        emoji,
-                        style: const TextStyle(fontSize: 32),
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    const Icon(Icons.visibility, size: 24),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Viewed by ${_viewers.length}',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: _viewers.length,
+                  itemBuilder: (context, index) {
+                    final viewer = _viewers[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: kPrimary.withOpacity(0.2),
+                        child: Text(
+                          viewer['name']![0],
+                          style: const TextStyle(color: kPrimary),
+                        ),
+                      ),
+                      title: Text(
+                        viewer['name']!,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        viewer['time']!,
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                      trailing: viewer['reaction']!.isNotEmpty
+                          ? Text(
+                              viewer['reaction']!,
+                              style: const TextStyle(fontSize: 24),
+                            )
+                          : null,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  void _sendReaction(String emoji) {
-    final story = widget.stories[_currentStoryIndex];
-    // TODO: Call API to send reaction
-    print('Sent reaction $emoji to story ${story.id}');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Sent $emoji'),
-        backgroundColor: Colors.black87,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 1),
-      ),
-    );
-  }
-
-  void _showReplyDialog() {
-    _pauseStory();
-    final controller = TextEditingController();
-    
+  void _showOptionsMenu() {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: Container(
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.9),
+            color: isDark ? const Color(0xFF1A1D24) : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.all(20),
@@ -223,636 +275,400 @@ class _StoryViewerPageState extends State<StoryViewerPage>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
+                  color: isDark ? Colors.grey[700] : Colors.grey[300],
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Send Message',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              if (widget.isMyStory) ...[
+                _buildOptionTile(
+                  Icons.delete_outline,
+                  'Delete Story',
+                  Colors.red,
+                  () {
+                    Navigator.pop(context);
+                    _deleteStory();
+                  },
+                  isDark,
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                style: const TextStyle(color: Colors.white),
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Write a reply...',
-                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.1),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
+                _buildOptionTile(
+                  Icons.download,
+                  'Save to Gallery',
+                  isDark ? Colors.white : Colors.black87,
+                  () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Saved to gallery')),
+                    );
+                  },
+                  isDark,
                 ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _resumeStory();
-                      },
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (controller.text.isNotEmpty) {
-                          _sendReply(controller.text);
-                          Navigator.pop(context);
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4A6CF7),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('Send'),
-                    ),
-                  ),
-                ],
-              ),
+                _buildOptionTile(
+                  Icons.bookmark_border,
+                  'Add to Highlights',
+                  isDark ? Colors.white : Colors.black87,
+                  () {
+                    Navigator.pop(context);
+                    _showHighlightsDialog();
+                  },
+                  isDark,
+                ),
+                _buildOptionTile(
+                  Icons.settings,
+                  'Story Settings',
+                  isDark ? Colors.white : Colors.black87,
+                  () {
+                    Navigator.pop(context);
+                  },
+                  isDark,
+                ),
+              ] else ...[
+                _buildOptionTile(
+                  Icons.volume_off,
+                  'Mute User',
+                  isDark ? Colors.white : Colors.black87,
+                  () {
+                    Navigator.pop(context);
+                  },
+                  isDark,
+                ),
+                _buildOptionTile(
+                  Icons.report_outlined,
+                  'Report Story',
+                  Colors.red,
+                  () {
+                    Navigator.pop(context);
+                  },
+                  isDark,
+                ),
+              ],
+              const SizedBox(height: 12),
             ],
           ),
-        ),
-      ),
-    ).then((_) => _resumeStory());
-  }
-
-  void _sendReply(String message) {
-    final story = widget.stories[_currentStoryIndex];
-    // TODO: Call API to send reply as DM
-    print('Sent reply "$message" to story ${story.id}');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Reply sent'),
-        backgroundColor: Colors.black87,
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 1),
-      ),
+        );
+      },
     );
   }
 
-  void _showViewersList() {
-    _pauseStory();
-    final story = widget.stories[_currentStoryIndex];
-    
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  const Text(
-                    'Viewers',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4A6CF7),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${story.viewCount}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: 10, // TODO: Replace with actual viewers
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      backgroundColor: const Color(0xFF4A6CF7),
-                      child: Text(
-                        'U${index + 1}',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    title: Text('User ${index + 1}'),
-                    subtitle: Text('2${index}m ago'),
-                    trailing: index < 3
-                        ? const Text(
-                            '❤️',
-                            style: TextStyle(fontSize: 20),
-                          )
-                        : null,
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    ).then((_) => _resumeStory());
-  }
-
-  void _showOptionsMenu() {
-    _pauseStory();
-    
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (!widget.isOwnStory) ...[
-              _buildOptionTile(Icons.report, 'Report Story', Colors.red, () {
-                Navigator.pop(context);
-                _showSnackBar('Story reported', Colors.red);
-              }),
-              _buildOptionTile(Icons.volume_off, 'Mute ${widget.stories[0].username}', Colors.black87, () {
-                Navigator.pop(context);
-                _showSnackBar('User muted', Colors.orange);
-              }),
-              _buildOptionTile(Icons.visibility_off, 'Hide Story', Colors.black87, () {
-                Navigator.pop(context);
-                Navigator.pop(context); // Close viewer
-              }),
-            ],
-            _buildOptionTile(Icons.share, 'Share Story', Colors.black87, () {
-              Navigator.pop(context);
-              _showSnackBar('Share feature coming soon', Colors.blue);
-            }),
-            _buildOptionTile(Icons.link, 'Copy Link', Colors.black87, () {
-              Navigator.pop(context);
-              _showSnackBar('Link copied', Colors.green);
-            }),
-          ],
-        ),
-      ),
-    ).then((_) => _resumeStory());
-  }
-
-  Widget _buildOptionTile(IconData icon, String title, Color color, VoidCallback onTap) {
+  Widget _buildOptionTile(
+    IconData icon,
+    String title,
+    Color color,
+    VoidCallback onTap,
+    bool isDark,
+  ) {
     return ListTile(
       leading: Icon(icon, color: color),
-      title: Text(title, style: TextStyle(color: color)),
+      title: Text(
+        title,
+        style: TextStyle(color: color, fontWeight: FontWeight.w500),
+      ),
       onTap: onTap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      tileColor: isDark ? const Color(0xFF0B0E13) : Colors.grey[100],
     );
   }
 
-  void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
+  void _deleteStory() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Story?'),
+        content: const Text('This story will be permanently deleted.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Story deleted'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }
 
-  @override
-  void dispose() {
-    _storyTimer?.cancel();
-    for (var controller in _progressControllers) {
-      controller.dispose();
-    }
-    super.dispose();
+  void _showHighlightsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add to Highlights'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.add)),
+              title: const Text('New Highlight'),
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.bookmark)),
+              title: const Text('Travel 2025'),
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _sendReaction(String emoji) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Reaction sent $emoji'),
+        duration: const Duration(seconds: 1),
+        backgroundColor: kPrimary,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final story = widget.stories[_currentStoryIndex];
+    if (widget.stories.isEmpty) {
+      return Scaffold(body: Center(child: Text('No stories available')));
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: GestureDetector(
-        onTapDown: (details) {
-          final screenWidth = MediaQuery.of(context).size.width;
-          if (details.globalPosition.dx < screenWidth / 3) {
-            // Left third: previous story
-            _previousStory();
-          } else if (details.globalPosition.dx > screenWidth * 2 / 3) {
-            // Right third: next story
-            _nextStory();
-          }
+      body: PageView.builder(
+        controller: _pageController,
+        physics:
+            const NeverScrollableScrollPhysics(), // Disable swipe, use animation instead
+        itemCount: widget.stories.length,
+        onPageChanged: (index) {
+          setState(() {
+            _currentStoryIndex = index;
+          });
         },
-        onLongPressStart: (_) => _pauseStory(),
-        onLongPressEnd: (_) => _resumeStory(),
-        onVerticalDragEnd: (details) {
-          if (details.primaryVelocity! > 0) {
-            // Swipe down: close viewer
-            Navigator.pop(context);
-          } else if (details.primaryVelocity! < 0 && widget.isOwnStory) {
-            // Swipe up: show viewers (only for own story)
-            _showViewersList();
-          }
+        itemBuilder: (context, index) {
+          final story = widget.stories[index];
+          return FadeTransition(
+            opacity: _fadeAnimation,
+            child: _buildStoryContent(context, story),
+          );
         },
-        child: Stack(
-          children: [
-            // Story content
-            Positioned.fill(
-              child: Center(
-                child: story.mediaType == StoryMediaType.video
-                    ? _buildVideoPreview(story)
-                    : _buildImagePreview(story),
+      ),
+    );
+  }
+
+  Widget _buildStoryContent(BuildContext context, Story story) {
+    return GestureDetector(
+      onTapDown: (details) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        if (details.globalPosition.dx < screenWidth / 3) {
+          _previousSegment();
+        } else if (details.globalPosition.dx > screenWidth * 2 / 3) {
+          _nextSegment();
+        }
+      },
+      onLongPressStart: (_) {
+        setState(() {
+          _isPaused = true;
+        });
+      },
+      onLongPressEnd: (_) {
+        setState(() {
+          _isPaused = false;
+        });
+      },
+      onVerticalDragEnd: (details) {
+        if (details.primaryVelocity! > 0) {
+          if (widget.isMyStory) {
+            _showViewersSheet();
+          }
+        }
+      },
+      child: Stack(
+        children: [
+          // Story Content
+          Positioned.fill(
+            child: Image.network(
+              story.imageUrl,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: Colors.grey[900],
+                  child: const Center(
+                    child: Icon(Icons.error, color: Colors.white, size: 50),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Progress bars
+          Positioned(
+            top: 50,
+            left: 8,
+            right: 8,
+            child: Row(
+              children: List.generate(
+                widget.stories.length,
+                (index) => Expanded(
+                  child: Container(
+                    height: 3,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: index < _currentStoryIndex
+                          ? 1.0
+                          : (index == _currentStoryIndex ? _progress : 0.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
+          ),
 
-            // Progress bars
+          // Header
+          Positioned(
+            top: 60,
+            left: 16,
+            right: 16,
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundImage: NetworkImage(story.userAvatarUrl),
+                  radius: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        story.userName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        '2h ago',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.more_vert, color: Colors.white),
+                  onPressed: _showOptionsMenu,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+
+          // Bottom actions
+          if (!widget.isMyStory)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 8,
-              left: 8,
-              right: 8,
+              bottom: 30,
+              left: 16,
+              right: 16,
               child: Row(
-                children: List.generate(
-                  widget.stories.length,
-                  (index) => Expanded(
+                children: [
+                  Expanded(
                     child: Container(
-                      height: 3,
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(2),
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                        ),
                       ),
-                      child: AnimatedBuilder(
-                        animation: _progressAnimations[index],
-                        builder: (context, child) {
-                          return FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: index < _currentStoryIndex
-                                ? 1.0
-                                : index == _currentStoryIndex
-                                    ? _progressAnimations[index].value
-                                    : 0.0,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          );
-                        },
+                      child: Text(
+                        'Send message',
+                        style: TextStyle(color: Colors.white.withOpacity(0.9)),
                       ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  _buildReactionButton('❤️'),
+                  const SizedBox(width: 8),
+                  _buildReactionButton('😂'),
+                  const SizedBox(width: 8),
+                  _buildReactionButton('😍'),
+                  const SizedBox(width: 8),
+                  _buildReactionButton('👍'),
+                ],
               ),
             ),
 
-            // Top bar (user info, close)
+          // My Story - Swipe up hint
+          if (widget.isMyStory)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 20,
-              left: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: const Color(0xFF4A6CF7),
-                      child: story.userAvatarUrl != null
-                          ? ClipOval(
-                              child: Image.network(
-                                story.userAvatarUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return _buildAvatarText(story.username);
-                                },
-                              ),
-                            )
-                          : _buildAvatarText(story.username),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                story.username,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              if (story.isUserVerified) ...[
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.verified,
-                                  color: Color(0xFF4A6CF7),
-                                  size: 14,
-                                ),
-                              ],
-                            ],
-                          ),
-                          Text(
-                            _getTimeAgo(story.createdAt),
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.more_vert, color: Colors.white),
-                      onPressed: _showOptionsMenu,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Caption and metadata
-            if (story.caption != null && story.caption!.isNotEmpty)
-              Positioned(
-                bottom: 120,
-                left: 16,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(12),
+              bottom: 30,
+              left: 0,
+              right: 0,
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.keyboard_arrow_up,
+                    color: Colors.white.withOpacity(0.7),
+                    size: 32,
                   ),
-                  child: Text(
-                    story.caption!,
-                    style: const TextStyle(
-                      color: Colors.white,
+                  Text(
+                    'Swipe up to see viewers',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
                       fontSize: 14,
                     ),
                   ),
-                ),
-              ),
-
-            // Music overlay
-            if (story.musicTrack != null)
-              Positioned(
-                bottom: 180,
-                left: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.music_note,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        story.musicTrack!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            // Bottom actions (reactions, reply)
-            Positioned(
-              bottom: 20,
-              left: 16,
-              right: 16,
-              child: SafeArea(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: _showReplyDialog,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.3),
-                            ),
-                          ),
-                          child: Text(
-                            'Send message...',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    GestureDetector(
-                      onTap: _showReactions,
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.favorite_border,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                ],
               ),
             ),
-
-            // Swipe up indicator (for own story)
-            if (widget.isOwnStory)
-              Positioned(
-                bottom: 80,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Column(
-                    children: [
-                      const Icon(
-                        Icons.keyboard_arrow_up,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                      Text(
-                        'Swipe up to see viewers',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildImagePreview(StoryModel story) {
-    return Container(
-      color: Colors.grey[900],
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.image,
-              size: 100,
-              color: Colors.white.withOpacity(0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Image Story',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
-                fontSize: 18,
-              ),
-            ),
-          ],
+  Widget _buildReactionButton(String emoji) {
+    return GestureDetector(
+      onTap: () => _sendReaction(emoji),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withOpacity(0.3)),
         ),
+        child: Text(emoji, style: const TextStyle(fontSize: 20)),
       ),
     );
-  }
-
-  Widget _buildVideoPreview(StoryModel story) {
-    return Container(
-      color: Colors.grey[900],
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.play_circle_outline,
-              size: 100,
-              color: Colors.white.withOpacity(0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Video Story',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
-                fontSize: 18,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAvatarText(String name) {
-    return Center(
-      child: Text(
-        name.isNotEmpty ? name[0].toUpperCase() : '?',
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
-  String _getTimeAgo(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
   }
 }

@@ -5,10 +5,7 @@ import '../models/story_model.dart';
 class StoriesSection extends StatelessWidget {
   final List<Story> stories;
 
-  const StoriesSection({
-    super.key,
-    required this.stories,
-  });
+  const StoriesSection({super.key, required this.stories});
 
   @override
   Widget build(BuildContext context) {
@@ -84,8 +81,14 @@ class StoriesSection extends StatelessWidget {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
                               return Container(
-                                color: isDark ? const Color(0xFF1A1D24) : Colors.grey[200],
-                                child: const Icon(Icons.person, size: 40, color: Colors.grey),
+                                color: isDark
+                                    ? const Color(0xFF1A1D24)
+                                    : Colors.grey[200],
+                                child: const Icon(
+                                  Icons.person,
+                                  size: 40,
+                                  color: Colors.grey,
+                                ),
                               );
                             },
                           ),
@@ -94,7 +97,10 @@ class StoriesSection extends StatelessWidget {
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
-                                colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(0.7),
+                                ],
                               ),
                             ),
                           ),
@@ -102,14 +108,23 @@ class StoriesSection extends StatelessWidget {
                             top: 8,
                             left: 8,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
-                                color: story.tag == 'Live' ? Colors.red : kPrimary,
+                                color: story.tag == 'Live'
+                                    ? Colors.red
+                                    : kPrimary,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
                                 story.tag,
-                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
@@ -121,7 +136,10 @@ class StoriesSection extends StatelessWidget {
                               height: 32,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
                               ),
                               child: ClipOval(
                                 child: Image.network(
@@ -130,7 +148,11 @@ class StoriesSection extends StatelessWidget {
                                   errorBuilder: (context, error, stackTrace) {
                                     return Container(
                                       color: Colors.grey[300],
-                                      child: const Icon(Icons.person, size: 16, color: Colors.grey),
+                                      child: const Icon(
+                                        Icons.person,
+                                        size: 16,
+                                        color: Colors.grey,
+                                      ),
                                     );
                                   },
                                 ),
@@ -142,7 +164,10 @@ class StoriesSection extends StatelessWidget {
                               bottom: 8,
                               right: 8,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.black.withOpacity(0.6),
                                   borderRadius: BorderRadius.circular(4),
@@ -150,11 +175,19 @@ class StoriesSection extends StatelessWidget {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.visibility, color: Colors.white, size: 10),
+                                    const Icon(
+                                      Icons.visibility,
+                                      color: Colors.white,
+                                      size: 10,
+                                    ),
                                     const SizedBox(width: 2),
                                     Text(
                                       story.viewers!,
-                                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ],
                                 ),

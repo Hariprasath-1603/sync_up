@@ -9,8 +9,9 @@ import '../features/home/home_page.dart';
 import '../features/onboarding/onboarding_page.dart';
 import '../features/profile/profile_page.dart';
 import '../features/explore/explore_page.dart';
-import '../features/reels/reels_page.dart';
+import '../features/reels/reels_page_new.dart';
 import '../features/chat/chat_page.dart';
+
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(
@@ -24,14 +25,8 @@ final appRouter = GoRouter(
       path: '/onboarding',
       builder: (context, state) => const OnboardingPage(),
     ),
-    GoRoute(
-      path: '/signin',
-      builder: (context, state) => const SignInPage(),
-    ),
-    GoRoute(
-      path: '/signup',
-      builder: (context, state) => const SignUpPage(),
-    ),
+    GoRoute(path: '/signin', builder: (context, state) => const SignInPage()),
+    GoRoute(path: '/signup', builder: (context, state) => const SignUpPage()),
     GoRoute(
       path: '/forgot-password',
       builder: (context, state) => const ForgotPasswordPage(),
@@ -41,10 +36,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const ResetConfirmationPage(),
     ),
     // Chat page (standalone, no nav bar)
-    GoRoute(
-      path: '/chat',
-      builder: (context, state) => const ChatPage(),
-    ),
+    GoRoute(path: '/chat', builder: (context, state) => const ChatPage()),
 
     // ShellRoute for all pages that HAVE the navigation bar
     ShellRoute(
@@ -52,10 +44,7 @@ final appRouter = GoRouter(
         return ScaffoldWithNavBar(child: child);
       },
       routes: [
-        GoRoute(
-          path: '/home',
-          builder: (context, state) => const HomePage(),
-        ),
+        GoRoute(path: '/home', builder: (context, state) => const HomePage()),
         GoRoute(
           path: '/profile',
           builder: (context, state) => const MyProfilePage(),
@@ -66,7 +55,7 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: '/reels',
-          builder: (context, state) => const ReelsPage(),
+          builder: (context, state) => const ReelsPageNew(),
         ),
       ],
     ),
