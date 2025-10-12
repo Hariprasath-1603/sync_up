@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
+import '../../core/services/preferences_service.dart';
 import 'auth_service.dart';
 
 class SignInPage extends StatefulWidget {
@@ -34,6 +35,12 @@ class _SignInPageState extends State<SignInPage> {
     // ## HARDCODED LOGIN FOR TESTING ##
     // If the specific email and password are used, log in instantly.
     if (email == '1' && password == '1') {
+      // Save login state
+      await PreferencesService.saveUserSession(
+        userId: 'test_user',
+        email: 'test@example.com',
+        name: 'Test User',
+      );
       if (mounted) context.go('/home');
       return; // This bypasses the Firebase check
     }
@@ -55,6 +62,12 @@ class _SignInPageState extends State<SignInPage> {
       });
 
       if (user != null) {
+        // Save user session
+        await PreferencesService.saveUserSession(
+          userId: user.uid,
+          email: user.email ?? email,
+          name: user.displayName,
+        );
         if (mounted) context.go('/home');
       } else {
         if (mounted) {
@@ -90,6 +103,14 @@ class _SignInPageState extends State<SignInPage> {
 
       if (user != null) {
         print('User signed in successfully: ${user.email}');
+
+        // Save user session
+        await PreferencesService.saveUserSession(
+          userId: user.uid,
+          email: user.email ?? '',
+          name: user.displayName,
+        );
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Welcome ${user.displayName ?? user.email}!'),

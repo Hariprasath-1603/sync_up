@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart'; // Import Firebase Core
 import 'core/theme.dart';
 import 'core/app_router.dart';
+import 'core/services/preferences_service.dart';
 import 'firebase_options.dart'; // Import the generated file
 
 Future<void> main() async {
@@ -9,9 +10,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize Shared Preferences
+  await PreferencesService.init();
 
   // We are not loading the .env file here anymore for this setup
   runApp(const App());
@@ -30,4 +32,3 @@ class App extends StatelessWidget {
     );
   }
 }
-

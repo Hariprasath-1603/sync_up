@@ -75,8 +75,10 @@ class StoriesSection extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: hasMyStory ? kPrimary : Colors.grey,
-                  width: hasMyStory ? 3 : 2,
+                  color: isDark
+                      ? Colors.white.withOpacity(0.2)
+                      : Colors.black.withOpacity(0.1),
+                  width: 2,
                 ),
               ),
               child: ClipRRect(
@@ -210,8 +212,10 @@ class StoriesSection extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: story.tag == 'Live' ? Colors.red : kPrimary,
-                  width: 3,
+                  color: isDark
+                      ? Colors.white.withOpacity(0.2)
+                      : Colors.black.withOpacity(0.1),
+                  width: 2,
                 ),
               ),
               child: ClipRRect(
@@ -244,28 +248,6 @@ class StoriesSection extends StatelessWidget {
                             Colors.transparent,
                             Colors.black.withOpacity(0.7),
                           ],
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: story.tag == 'Live' ? Colors.red : kPrimary,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          story.tag,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
                         ),
                       ),
                     ),

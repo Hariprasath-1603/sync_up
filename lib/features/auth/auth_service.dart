@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../../core/services/preferences_service.dart';
 
 class AuthService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
@@ -12,12 +13,13 @@ class AuthService {
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
 
   // SIGN IN WITH EMAIL AND PASSWORD
-  Future<User?> signInWithEmailAndPassword(String email, String password) async {
+  Future<User?> signInWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
     try {
-      final UserCredential userCredential = await _firebaseAuth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final UserCredential userCredential = await _firebaseAuth
+          .signInWithEmailAndPassword(email: email, password: password);
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
       print('Firebase Auth Exception: ${e.message}');
@@ -29,12 +31,13 @@ class AuthService {
   }
 
   // SIGN UP WITH EMAIL AND PASSWORD
-  Future<User?> signUpWithEmailAndPassword(String email, String password) async {
+  Future<User?> signUpWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
     try {
-      final UserCredential userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final UserCredential userCredential = await _firebaseAuth
+          .createUserWithEmailAndPassword(email: email, password: password);
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
       print('Firebase Auth Exception: ${e.message}');
@@ -49,7 +52,7 @@ class AuthService {
   Future<User?> signInWithGoogle() async {
     try {
       print('AuthService: Starting Google Sign-In flow...');
-      
+
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       print('AuthService: GoogleSignInAccount received: ${googleUser?.email}');
@@ -62,8 +65,11 @@ class AuthService {
 
       // Obtain the auth details from the request
       print('AuthService: Getting authentication details...');
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      print('AuthService: Auth tokens received - accessToken: ${googleAuth.accessToken != null}, idToken: ${googleAuth.idToken != null}');
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      print(
+        'AuthService: Auth tokens received - accessToken: ${googleAuth.accessToken != null}, idToken: ${googleAuth.idToken != null}',
+      );
 
       // Create a new credential
       final credential = GoogleAuthProvider.credential(
@@ -73,12 +79,17 @@ class AuthService {
       print('AuthService: Credential created, signing in to Firebase...');
 
       // Sign in to Firebase with the Google credential
-      final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
-      print('AuthService: Firebase sign-in successful! User: ${userCredential.user?.email}');
-      
+      final UserCredential userCredential = await _firebaseAuth
+          .signInWithCredential(credential);
+      print(
+        'AuthService: Firebase sign-in successful! User: ${userCredential.user?.email}',
+      );
+
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
-      print('AuthService: Firebase Auth Exception - Code: ${e.code}, Message: ${e.message}');
+      print(
+        'AuthService: Firebase Auth Exception - Code: ${e.code}, Message: ${e.message}',
+      );
       rethrow; // Re-throw to show error in UI
     } catch (e) {
       print('AuthService: Error signing in with Google: $e');
@@ -91,14 +102,15 @@ class AuthService {
   Future<User?> signInWithMicrosoft() async {
     try {
       final microsoftProvider = OAuthProvider('microsoft.com');
-      
+
       // You can add custom parameters
       microsoftProvider.setCustomParameters({
         'tenant': 'common', // or your tenant ID
       });
 
       // Sign in with popup on web, or redirect on mobile
-      final UserCredential userCredential = await _firebaseAuth.signInWithProvider(microsoftProvider);
+      final UserCredential userCredential = await _firebaseAuth
+          .signInWithProvider(microsoftProvider);
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
       print('Firebase Auth Exception: ${e.message}');
@@ -114,12 +126,13 @@ class AuthService {
   Future<User?> signInWithApple() async {
     try {
       final appleProvider = OAuthProvider('apple.com');
-      
+
       // Request specific scopes
       appleProvider.addScope('email');
       appleProvider.addScope('name');
 
-      final UserCredential userCredential = await _firebaseAuth.signInWithProvider(appleProvider);
+      final UserCredential userCredential = await _firebaseAuth
+          .signInWithProvider(appleProvider);
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
       print('Firebase Auth Exception: ${e.message}');
@@ -149,6 +162,9 @@ class AuthService {
       }
       // Sign out from Firebase
       await _firebaseAuth.signOut();
+
+      // Clear local session data
+      await PreferencesService.clearUserSession();
     } catch (e) {
       print('Error signing out: $e');
     }

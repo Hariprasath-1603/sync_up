@@ -29,16 +29,18 @@ class OnboardingCard extends StatelessWidget {
           ),
           const SizedBox(height: 30),
 
-          // Title Text
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
+          // Title Text - Only show if title is not empty
+          if (title.isNotEmpty) ...[
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ],
 
           // Subtitle Text
           Text(

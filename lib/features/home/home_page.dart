@@ -4,6 +4,7 @@ import 'models/post_model.dart';
 import 'models/story_model.dart';
 import 'widgets/custom_header.dart';
 import 'widgets/stories_section_new.dart';
+import 'widgets/live_section.dart';
 import 'widgets/post_card.dart';
 
 class HomePage extends StatefulWidget {
@@ -207,6 +208,8 @@ class _HomePageState extends State<HomePage> {
                 hasMyStory: false, // Change to true when user has active story
                 myStoryImageUrl: null, // Set to user's story image when active
               ),
+            // Live section - show only on For You tab
+            if (_selectedTabIndex == 1) const LiveSection(),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(

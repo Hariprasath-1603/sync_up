@@ -7,6 +7,7 @@ import 'camera_composer_page.dart';
 import 'drafts_page.dart';
 import 'scheduled_posts_page.dart';
 import '../reels/create_reel_page.dart';
+import '../live/go_live_page.dart';
 
 class AddPage extends StatefulWidget {
   const AddPage({super.key});
@@ -132,12 +133,11 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
                           icon: Icons.video_call_outlined,
                           title: 'Go Live',
                           description: 'Start a live stream',
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFFF6B6B), Color(0xFFFF5252)],
+                          gradient: LinearGradient(
+                            colors: [kPrimary, kPrimary.withOpacity(0.7)],
                           ),
                           onTap: () {
                             _animationController.reverse().then((_) {
-                              context.pop();
                               _showGoLiveSheet(context);
                             });
                           },
@@ -383,70 +383,89 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
     );
   }
 
-  void _showGoLiveSheet(BuildContext context) {
+  void _showGoLiveSheet(BuildContext context) async {
+    final parentContext = context;
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF1A1D24) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final subtitleColor = isDark ? Colors.white54 : Colors.grey[600]!;
-    final borderColor = isDark ? Colors.white12 : Colors.grey[300]!;
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    // Show confirmation dialog
+    Navigator.of(parentContext).pop();
+
+    final confirmed = await showDialog<bool>(
+      context: parentContext,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1A1D24) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
           children: [
             Container(
-              width: 40,
-              height: 4,
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: borderColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Icon(Icons.live_tv, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              'Go Live',
-              style: TextStyle(
-                color: textColor,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Live streaming feature coming soon!',
-              style: TextStyle(color: subtitleColor, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                gradient: LinearGradient(
+                  colors: [kPrimary, kPrimary.withOpacity(0.7)],
                 ),
-                child: const Text('Got it'),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.videocam_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Go Live?',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
         ),
+        content: Text(
+          'You\'re about to start a live stream. Your followers will be notified. Are you ready?',
+          style: TextStyle(
+            color: isDark ? Colors.white70 : Colors.black87,
+            fontSize: 15,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.grey[600],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Start Live',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
+
+    if (confirmed == true) {
+      Future.microtask(() {
+        rootNavigator.push(
+          MaterialPageRoute<void>(builder: (_) => const GoLivePage()),
+        );
+      });
+    }
   }
 
   void _showCreateStorySheet(BuildContext context) {

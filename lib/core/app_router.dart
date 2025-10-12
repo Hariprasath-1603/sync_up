@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'scaffold_with_nav_bar.dart';
+import 'services/preferences_service.dart';
 import '../features/auth/forgot_password_page.dart';
 import '../features/auth/reset_confirmation_page.dart';
 import '../features/auth/sign_in_page.dart';
@@ -14,11 +15,25 @@ import '../features/chat/chat_page.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
+// Determine initial location based on user state
+String _getInitialLocation() {
+  // Check if user is logged in
+  if (PreferencesService.isLoggedIn()) {
+    return '/home';
+  }
+
+  // Check if user has seen onboarding
+  if (PreferencesService.hasSeenOnboarding()) {
+    return '/signin';
+  }
+
+  // Show onboarding for first-time users
+  return '/onboarding';
+}
+
 final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
-  // ## THIS IS THE FIX ##
-  // Change the initial location to the onboarding screen.
-  initialLocation: '/onboarding',
+  initialLocation: _getInitialLocation(),
   routes: [
     // Standalone routes (no nav bar)
     GoRoute(
