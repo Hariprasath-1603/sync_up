@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/scaffold_with_nav_bar.dart';
 
 class ReelsPageNew extends StatefulWidget {
   const ReelsPageNew({super.key});
@@ -169,35 +170,47 @@ class _ReelsPageNewState extends State<ReelsPageNew>
   }
 
   void _showCommentsModal(ReelData reel) {
+    final navVisibility = NavBarVisibilityScope.maybeOf(context);
+    navVisibility?.value = false;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      useRootNavigator: true,
       builder: (context) => CommentsModal(reel: reel),
-    );
+    ).whenComplete(() => navVisibility?.value = true);
   }
 
   void _showShareSheet(ReelData reel) {
+    final navVisibility = NavBarVisibilityScope.maybeOf(context);
+    navVisibility?.value = false;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      useRootNavigator: true,
       builder: (context) => ShareSheet(reel: reel),
-    );
+    ).whenComplete(() => navVisibility?.value = true);
   }
 
   void _showMusicPage(ReelData reel) {
+    final navVisibility = NavBarVisibilityScope.maybeOf(context);
+    navVisibility?.value = false;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      useRootNavigator: true,
       builder: (context) => MusicReelsPage(musicName: reel.musicName),
-    );
+    ).whenComplete(() => navVisibility?.value = true);
   }
 
   void _showMoreOptions(ReelData reel, int index) {
+    final navVisibility = NavBarVisibilityScope.maybeOf(context);
+    navVisibility?.value = false;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      useRootNavigator: true,
       builder: (context) => MoreOptionsSheet(
         reel: reel,
         onReport: () {
@@ -219,7 +232,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
           );
         },
       ),
-    );
+    ).whenComplete(() => navVisibility?.value = true);
   }
 
   String _formatCount(int count) {
@@ -229,6 +242,15 @@ class _ReelsPageNewState extends State<ReelsPageNew>
       return '${(count / 1000).toStringAsFixed(1)}K';
     }
     return count.toString();
+  }
+
+  String _formatViewCount(int views) {
+    if (views >= 1000000) {
+      return '${(views / 1000000).toStringAsFixed(1)}M';
+    } else if (views >= 1000) {
+      return '${(views / 1000).toStringAsFixed(1)}K';
+    }
+    return views.toString();
   }
 
   @override
@@ -310,21 +332,39 @@ class _ReelsPageNewState extends State<ReelsPageNew>
                       ],
                     ),
 
-                    // Camera/Search Icons
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.search, color: Colors.white),
-                          onPressed: () {},
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.camera_alt,
+                    // View Count
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.remove_red_eye_rounded,
                             color: Colors.white,
+                            size: 18,
                           ),
-                          onPressed: () {},
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Text(
+                            _formatViewCount(
+                              _isFollowingTab
+                                  ? _followingReels[_currentReelIndex].views
+                                  : _forYouReels[_currentReelIndex].views,
+                            ),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -415,12 +455,13 @@ class _ReelsPageNewState extends State<ReelsPageNew>
           // Right Side Action Buttons
           Positioned(
             right: 12,
-            bottom: 200,
+            bottom: 140,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Profile Picture with Follow Button
                 Stack(
+                  clipBehavior: Clip.none,
                   alignment: Alignment.bottomCenter,
                   children: [
                     Container(
@@ -510,159 +551,99 @@ class _ReelsPageNewState extends State<ReelsPageNew>
           Positioned(
             left: 16,
             right: 80,
-            bottom: 120,
-            child: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Username
-                  Row(
-                    children: [
-                      Text(
-                        reel.username,
-                        style: const TextStyle(
+            bottom: 100,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Username
+                Text(
+                  reel.username,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Caption with See More
+                _buildExpandableCaption(reel.caption),
+                const SizedBox(height: 10),
+
+                // Location Tag
+                if (reel.location != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
                           color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                          size: 14,
                         ),
-                      ),
-                      if (!reel.isFollowing) ...[
-                        const SizedBox(width: 12),
-                        GestureDetector(
-                          onTap: () => _toggleFollow(index),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.white, width: 1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'Follow',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                        const SizedBox(width: 4),
+                        Text(
+                          reel.location!,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 12,
                           ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 10),
 
-                  // Caption with See More
-                  _buildExpandableCaption(reel.caption),
-                  const SizedBox(height: 10),
-
-                  // Location Tag
-                  if (reel.location != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
+                // Music Bar
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: GestureDetector(
+                    onTap: () => _showMusicPage(reel),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(
-                            Icons.location_on,
+                            Icons.music_note,
                             color: Colors.white,
-                            size: 14,
+                            size: 16,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            reel.location!,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
-                              fontSize: 12,
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              '${reel.musicName} • ${reel.musicArtist}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: Colors.white,
+                            size: 16,
                           ),
                         ],
                       ),
                     ),
-
-                  // Music Bar
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: GestureDetector(
-                      onTap: () => _showMusicPage(reel),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.music_note,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                '${reel.musicName} • ${reel.musicArtist}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.chevron_right,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   ),
-                ],
-              ),
-            ),
-          ),
-
-          // Views Counter (Bottom Right)
-          Positioned(
-            right: 16,
-            bottom: 120,
-            child: SafeArea(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.play_arrow, color: Colors.white, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      _formatCount(reel.views),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ],
             ),
           ),
         ],

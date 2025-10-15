@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import 'create_post_page.dart';
-import 'camera_composer_page.dart';
 import 'drafts_page.dart';
 import 'scheduled_posts_page.dart';
 import '../reels/create_reel_page.dart';
 import '../live/go_live_page.dart';
+import '../stories/storyverse_page.dart';
 
 class AddPage extends StatefulWidget {
   const AddPage({super.key});
@@ -116,8 +116,8 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
                           icon: Icons.video_library_outlined,
                           title: 'Create Reel',
                           description: 'Record or upload video',
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFE1306C), Color(0xFFC13584)],
+                          gradient: LinearGradient(
+                            colors: [kPrimary, kPrimary.withOpacity(0.7)],
                           ),
                           onTap: () {
                             _animationController.reverse().then((_) {
@@ -149,8 +149,8 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
                           icon: Icons.auto_awesome_outlined,
                           title: 'Create Story',
                           description: '24-hour story update',
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFFCAF45), Color(0xFFF77737)],
+                          gradient: LinearGradient(
+                            colors: [kPrimary, kPrimary.withOpacity(0.7)],
                           ),
                           onTap: () {
                             _animationController.reverse().then((_) {
@@ -254,7 +254,7 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
 
   void _showCreatePostSheet(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF1A1D24) : Colors.white;
+    final cardColor = Theme.of(context).colorScheme.surface;
     final textColor = isDark ? Colors.white : Colors.black87;
     final subtitleColor = isDark ? Colors.white54 : Colors.grey[600]!;
     final borderColor = isDark ? Colors.white12 : Colors.grey[300]!;
@@ -394,7 +394,7 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
     final confirmed = await showDialog<bool>(
       context: parentContext,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1A1D24) : Colors.white,
+        backgroundColor: Theme.of(parentContext).colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
@@ -469,10 +469,12 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
   }
 
   void _showCreateStorySheet(BuildContext context) {
-    Navigator.push(
-      context,
+    Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
-        builder: (context) => const CameraComposerPage(type: 'story'),
+        builder: (context) => const StoryVerseExperience(
+          initialStage: StoryVerseStage.capture,
+          showEntryStage: false,
+        ),
       ),
     );
   }

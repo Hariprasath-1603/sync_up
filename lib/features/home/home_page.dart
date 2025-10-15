@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../core/scaffold_with_nav_bar.dart';
 import '../../core/theme.dart';
 import 'models/post_model.dart';
-import 'models/story_model.dart';
 import 'widgets/custom_header.dart';
 import 'widgets/stories_section_new.dart';
 import 'widgets/live_section.dart';
 import 'widgets/post_card.dart';
+import '../stories/storyverse_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,40 +17,107 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedTabIndex = 1; // 0 = Following, 1 = For You
+  bool _isStoryExperienceVisible = false;
+  StoryVerseStage _storyExperienceStage = StoryVerseStage.capture;
+  StoryVerseMode _storyCaptureMode = StoryVerseMode.photo;
+  StoryVerseStory? _storyToView;
+  ValueNotifier<bool>? _navVisibility;
 
-  // Stories data
-  final List<Story> _stories = [
-    Story(
-      imageUrl: 'https://picsum.photos/seed/1/300/300',
-      userName: 'Guy Hawkins',
-      userAvatarUrl: 'https://picsum.photos/seed/a/150',
-      tag: 'Live',
-      viewers: '20.5K',
+  // Stories data for the StoryVerse experience
+  final List<StoryVerseStory> _stories = [
+    StoryVerseStory(
+      id: 'story-guy',
+      ownerName: 'Guy Hawkins',
+      ownerAvatar: 'https://picsum.photos/seed/a/150',
+      mood: 'Hyped',
+      timestamp: DateTime.now().subtract(const Duration(minutes: 12)),
+      hasNewContent: true,
+      clips: [
+        StoryVerseClip(
+          id: 'clip-guy-1',
+          mode: StoryVerseMode.video,
+          duration: const Duration(seconds: 12),
+          mood: 'Hyped',
+        ),
+      ],
+      music: const StoryVerseMusicTrack(
+        id: 'track-live',
+        title: 'Midnight Crowd',
+        artist: 'Analog Pulse',
+        artworkUrl:
+            'https://images.unsplash.com/photo-1506157786151-b8491531f063',
+      ),
     ),
-    Story(
-      imageUrl: 'https://picsum.photos/seed/2/300/300',
-      userName: 'Robert Fox',
-      userAvatarUrl: 'https://picsum.photos/seed/b/150',
-      tag: 'Premiere',
+    StoryVerseStory(
+      id: 'story-robert',
+      ownerName: 'Robert Fox',
+      ownerAvatar: 'https://picsum.photos/seed/b/150',
+      mood: 'Premiere night',
+      timestamp: DateTime.now().subtract(const Duration(hours: 2, minutes: 20)),
+      hasNewContent: true,
+      clips: [
+        StoryVerseClip(
+          id: 'clip-robert-1',
+          mode: StoryVerseMode.photo,
+          duration: const Duration(seconds: 8),
+          mood: 'Cinematic',
+        ),
+        StoryVerseClip(
+          id: 'clip-robert-2',
+          mode: StoryVerseMode.photo,
+          duration: const Duration(seconds: 7),
+          mood: 'Backstage',
+        ),
+      ],
     ),
-    Story(
-      imageUrl: 'https://picsum.photos/seed/3/300/300',
-      userName: 'Bessie Cooper',
-      userAvatarUrl: 'https://picsum.photos/seed/c/150',
-      tag: 'Live',
-      viewers: '34.6K',
+    StoryVerseStory(
+      id: 'story-bessie',
+      ownerName: 'Bessie Cooper',
+      ownerAvatar: 'https://picsum.photos/seed/c/150',
+      mood: 'Travel vibes',
+      timestamp: DateTime.now().subtract(const Duration(hours: 5, minutes: 15)),
+      hasNewContent: false,
+      clips: [
+        StoryVerseClip(
+          id: 'clip-bessie-1',
+          mode: StoryVerseMode.photo,
+          duration: const Duration(seconds: 6),
+          mood: 'Golden hour',
+        ),
+      ],
     ),
-    Story(
-      imageUrl: 'https://picsum.photos/seed/10/300/300',
-      userName: 'Jenny Wilson',
-      userAvatarUrl: 'https://picsum.photos/seed/j/150',
-      tag: 'New',
+    StoryVerseStory(
+      id: 'story-jenny',
+      ownerName: 'Jenny Wilson',
+      ownerAvatar: 'https://picsum.photos/seed/j/150',
+      mood: 'New drop',
+      timestamp: DateTime.now().subtract(const Duration(hours: 8)),
+      hasNewContent: true,
+      clips: [
+        StoryVerseClip(
+          id: 'clip-jenny-1',
+          mode: StoryVerseMode.text,
+          duration: const Duration(seconds: 7),
+          caption: 'Swipe up for the latest collection',
+          mood: 'Bold',
+        ),
+      ],
     ),
-    Story(
-      imageUrl: 'https://picsum.photos/seed/11/300/300',
-      userName: 'Kristin Watson',
-      userAvatarUrl: 'https://picsum.photos/seed/k/150',
-      tag: 'New',
+    StoryVerseStory(
+      id: 'story-kristin',
+      ownerName: 'Kristin Watson',
+      ownerAvatar: 'https://picsum.photos/seed/k/150',
+      mood: 'Wellness',
+      timestamp: DateTime.now().subtract(const Duration(hours: 13)),
+      hasNewContent: false,
+      clips: [
+        StoryVerseClip(
+          id: 'clip-kristin-1',
+          mode: StoryVerseMode.layout,
+          duration: const Duration(seconds: 9),
+          mood: 'Calm',
+        ),
+      ],
     ),
   ];
 
@@ -160,6 +228,53 @@ class _HomePageState extends State<HomePage> {
     ),
   ];
 
+  void _openStoryCapture(StoryVerseMode mode) {
+    setState(() {
+      _storyCaptureMode = mode;
+      _storyExperienceStage = StoryVerseStage.capture;
+      _storyToView = null;
+      _isStoryExperienceVisible = true;
+    });
+    _updateNavVisibility();
+  }
+
+  void _openStoryViewer(StoryVerseStory story) {
+    setState(() {
+      _storyExperienceStage = StoryVerseStage.viewer;
+      _storyToView = story;
+      _isStoryExperienceVisible = true;
+    });
+    _updateNavVisibility();
+  }
+
+  void _closeStoryExperience() {
+    setState(() {
+      _isStoryExperienceVisible = false;
+      _storyExperienceStage = StoryVerseStage.capture;
+      _storyToView = null;
+    });
+    _updateNavVisibility();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final notifier = NavBarVisibilityScope.maybeOf(context);
+    if (_navVisibility == notifier) return;
+    _navVisibility = notifier;
+    _updateNavVisibility();
+  }
+
+  void _updateNavVisibility() {
+    _navVisibility?.value = !_isStoryExperienceVisible;
+  }
+
+  @override
+  void dispose() {
+    _navVisibility?.value = true;
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -190,41 +305,75 @@ class _HomePageState extends State<HomePage> {
                 ],
         ),
       ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CustomHeader(
-              selectedIndex: _selectedTabIndex,
-              onTabSelected: (index) {
-                setState(() {
-                  _selectedTabIndex = index;
-                });
-              },
-            ),
-            // Stories section - show only on For You tab with "My Story" feature
-            if (_selectedTabIndex == 1)
-              StoriesSection(
-                stories: _stories,
-                hasMyStory: false, // Change to true when user has active story
-                myStoryImageUrl: null, // Set to user's story image when active
-              ),
-            // Live section - show only on For You tab
-            if (_selectedTabIndex == 1) const LiveSection(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                sectionTitle,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
+      child: Stack(
+        children: [
+          SafeArea(
+            child: ListView(
+              children: [
+                CustomHeader(
+                  selectedIndex: _selectedTabIndex,
+                  onTabSelected: (index) {
+                    setState(() {
+                      _selectedTabIndex = index;
+                    });
+                  },
                 ),
+                if (_selectedTabIndex == 1)
+                  StoriesSection(
+                    stories: _stories,
+                    hasMyStory:
+                        false, // Change to true when user has active story
+                    myStoryImageUrl:
+                        null, // Set to user's story image when active
+                    onStartCapture: _openStoryCapture,
+                    onViewStory: _openStoryViewer,
+                  ),
+                if (_selectedTabIndex == 1) const LiveSection(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Text(
+                    sectionTitle,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+                ...currentPosts.map((post) => PostCard(post: post)).toList(),
+                const SizedBox(height: 100),
+              ],
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: !_isStoryExperienceVisible,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 240),
+                child: _isStoryExperienceVisible
+                    ? StoryVerseExperience(
+                        key: ValueKey(
+                          _storyExperienceStage == StoryVerseStage.viewer
+                              ? 'viewer-${_storyToView?.id ?? 'none'}'
+                              : 'capture-${_storyCaptureMode.name}',
+                        ),
+                        initialStage: _storyExperienceStage,
+                        initialStory:
+                            _storyExperienceStage == StoryVerseStage.viewer
+                            ? _storyToView
+                            : null,
+                        feedStories: _stories,
+                        showEntryStage: false,
+                        initialMode: _storyCaptureMode,
+                        onClose: _closeStoryExperience,
+                        showInsightsButton:
+                            false, // Hide insights for others' stories
+                      )
+                    : const SizedBox.shrink(),
               ),
             ),
-            ...currentPosts.map((post) => PostCard(post: post)).toList(),
-            const SizedBox(height: 100), // Space for floating nav bar
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

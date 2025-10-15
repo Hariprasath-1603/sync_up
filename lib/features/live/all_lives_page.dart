@@ -233,8 +233,13 @@ class _AllLivesPageState extends State<AllLivesPage> {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFF6B6B), Color(0xFFFF5252)],
+                        gradient: LinearGradient(
+                          colors: [
+                            Theme.of(context).colorScheme.error,
+                            Theme.of(
+                              context,
+                            ).colorScheme.error.withOpacity(0.8),
+                          ],
                         ),
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -518,10 +523,12 @@ class _LiveStreamCard extends StatelessWidget {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                gradient: const LinearGradient(
+                                gradient: LinearGradient(
                                   colors: [
-                                    Color(0xFFFF6B6B),
-                                    Color(0xFFFF5252),
+                                    Theme.of(context).colorScheme.error,
+                                    Theme.of(
+                                      context,
+                                    ).colorScheme.error.withOpacity(0.8),
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(8),

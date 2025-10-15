@@ -1,9 +1,236 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'category_page.dart';
+import '../../core/theme.dart';
 
-class ExplorePage extends StatelessWidget {
+class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
+
+  @override
+  State<ExplorePage> createState() => _ExplorePageState();
+}
+
+class _ExplorePageState extends State<ExplorePage>
+    with SingleTickerProviderStateMixin {
+  String? _selectedCategory;
+  IconData? _selectedCategoryIcon;
+  Color? _selectedCategoryColor;
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _onCategorySelected(String? category, IconData? icon, Color? color) {
+    setState(() {
+      _selectedCategory = category;
+      _selectedCategoryIcon = icon;
+      _selectedCategoryColor = color;
+    });
+  }
+
+  // Category posts data
+  final Map<String, List<Map<String, String>>> _categoryPosts = {
+    'Trending': [
+      {
+        'imageUrl': 'https://picsum.photos/seed/trend1/600/800',
+        'likes': '245K',
+        'comments': '1.2K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/trend2/600/800',
+        'likes': '189K',
+        'comments': '856',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/trend3/600/800',
+        'likes': '312K',
+        'comments': '2.1K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/trend4/600/800',
+        'likes': '428K',
+        'comments': '3.5K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/trend5/600/800',
+        'likes': '156K',
+        'comments': '942',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/trend6/600/800',
+        'likes': '278K',
+        'comments': '1.8K',
+      },
+    ],
+    'Music': [
+      {
+        'imageUrl': 'https://picsum.photos/seed/music1/600/800',
+        'likes': '167K',
+        'comments': '723',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/music2/600/800',
+        'likes': '234K',
+        'comments': '1.4K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/music3/600/800',
+        'likes': '189K',
+        'comments': '892',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/music4/600/800',
+        'likes': '312K',
+        'comments': '2.3K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/music5/600/800',
+        'likes': '145K',
+        'comments': '634',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/music6/600/800',
+        'likes': '298K',
+        'comments': '1.9K',
+      },
+    ],
+    'Learn': [
+      {
+        'imageUrl': 'https://picsum.photos/seed/learn1/600/800',
+        'likes': '123K',
+        'comments': '567',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/learn2/600/800',
+        'likes': '198K',
+        'comments': '1.1K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/learn3/600/800',
+        'likes': '145K',
+        'comments': '732',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/learn4/600/800',
+        'likes': '267K',
+        'comments': '1.7K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/learn5/600/800',
+        'likes': '112K',
+        'comments': '489',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/learn6/600/800',
+        'likes': '223K',
+        'comments': '1.3K',
+      },
+    ],
+    'Gaming': [
+      {
+        'imageUrl': 'https://picsum.photos/seed/game1/600/800',
+        'likes': '334K',
+        'comments': '2.4K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/game2/600/800',
+        'likes': '289K',
+        'comments': '1.9K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/game3/600/800',
+        'likes': '412K',
+        'comments': '3.1K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/game4/600/800',
+        'likes': '156K',
+        'comments': '876',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/game5/600/800',
+        'likes': '298K',
+        'comments': '2.2K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/game6/600/800',
+        'likes': '378K',
+        'comments': '2.8K',
+      },
+    ],
+    'Sports': [
+      {
+        'imageUrl': 'https://picsum.photos/seed/sport1/600/800',
+        'likes': '445K',
+        'comments': '3.2K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/sport2/600/800',
+        'likes': '289K',
+        'comments': '1.8K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/sport3/600/800',
+        'likes': '367K',
+        'comments': '2.5K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/sport4/600/800',
+        'likes': '198K',
+        'comments': '1.1K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/sport5/600/800',
+        'likes': '423K',
+        'comments': '3.4K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/sport6/600/800',
+        'likes': '312K',
+        'comments': '2.3K',
+      },
+    ],
+    'Fashion': [
+      {
+        'imageUrl': 'https://picsum.photos/seed/fashion1/600/800',
+        'likes': '256K',
+        'comments': '1.5K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/fashion2/600/800',
+        'likes': '334K',
+        'comments': '2.1K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/fashion3/600/800',
+        'likes': '189K',
+        'comments': '967',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/fashion4/600/800',
+        'likes': '412K',
+        'comments': '3.0K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/fashion5/600/800',
+        'likes': '223K',
+        'comments': '1.3K',
+      },
+      {
+        'imageUrl': 'https://picsum.photos/seed/fashion6/600/800',
+        'likes': '367K',
+        'comments': '2.6K',
+      },
+    ],
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -28,46 +255,224 @@ class ExplorePage extends StatelessWidget {
         ),
       ),
       child: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              floating: true,
-              snap: true,
-              pinned: false,
-              toolbarHeight: 140,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              title: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: 16),
-                    _SearchBar(),
-                    SizedBox(height: 16),
-                    _CategoryChips(),
+        child: _selectedCategory == null
+            ? CustomScrollView(
+                slivers: [
+                  SliverAppBar(
+                    floating: true,
+                    snap: true,
+                    pinned: false,
+                    toolbarHeight: 140,
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                    title: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 16),
+                          const _SearchBar(),
+                          const SizedBox(height: 16),
+                          _CategoryChips(
+                            onCategorySelected: _onCategorySelected,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: _SectionTitle(title: 'Trending Videos'),
+                    ),
+                  ),
+                  const _TrendingVideoGrid(),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: _SectionTitle(title: 'Explore'),
+                    ),
+                  ),
+                  const _ExploreGrid(),
+                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                ],
+              )
+            : _buildCategoryView(isDark),
+      ),
+    );
+  }
+
+  Widget _buildCategoryView(bool isDark) {
+    final posts = _categoryPosts[_selectedCategory] ?? [];
+    final reels = posts; // Using same data for reels demonstration
+
+    return Column(
+      children: [
+        // Header with back button and category info
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+                onPressed: () => _onCategorySelected(null, null, null),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _selectedCategoryColor?.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _selectedCategoryIcon,
+                  color: _selectedCategoryColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                _selectedCategory!,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Tabs with glassmorphic design
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(
+                height: 52,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isDark
+                        ? [
+                            Colors.white.withOpacity(0.15),
+                            Colors.white.withOpacity(0.08),
+                          ]
+                        : [
+                            Colors.white.withOpacity(0.9),
+                            Colors.white.withOpacity(0.7),
+                          ],
+                  ),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.2)
+                        : Colors.white.withOpacity(0.6),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark
+                          ? Colors.black.withOpacity(0.3)
+                          : Colors.grey.withOpacity(0.2),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  indicator: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    gradient: LinearGradient(
+                      colors: [kPrimary, kPrimary.withOpacity(0.8)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kPrimary.withOpacity(0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: isDark
+                      ? Colors.white70
+                      : Colors.black54,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    letterSpacing: 0.5,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  tabs: [
+                    Tab(text: '${posts.length} Posts'),
+                    Tab(text: '${reels.length} Reels'),
                   ],
                 ),
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: _SectionTitle(title: 'Trending Videos'),
-              ),
-            ),
-            const _TrendingVideoGrid(),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: _SectionTitle(title: 'Explore'),
-              ),
-            ),
-            const _ExploreGrid(),
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
-          ],
+          ),
         ),
-      ),
+        // Content
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              // Posts Grid
+              GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 4,
+                  mainAxisSpacing: 4,
+                  childAspectRatio: 0.75,
+                ),
+                itemCount: posts.length,
+                itemBuilder: (context, index) {
+                  final post = posts[index];
+                  return _CategoryPostCard(
+                    imageUrl: post['imageUrl']!,
+                    likes: post['likes']!,
+                    comments: post['comments']!,
+                  );
+                },
+              ),
+              // Reels Grid
+              GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 4,
+                  mainAxisSpacing: 4,
+                  childAspectRatio: 0.75,
+                ),
+                itemCount: posts.length,
+                itemBuilder: (context, index) {
+                  final post = posts[index];
+                  return _CategoryPostCard(
+                    imageUrl: post['imageUrl']!,
+                    likes: post['likes']!,
+                    comments: post['comments']!,
+                    isReel: true,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -180,7 +585,9 @@ class _SearchBar extends StatelessWidget {
 }
 
 class _CategoryChips extends StatelessWidget {
-  const _CategoryChips();
+  const _CategoryChips({required this.onCategorySelected});
+
+  final void Function(String?, IconData?, Color?) onCategorySelected;
 
   final List<Map<String, dynamic>> categories = const [
     {
@@ -213,15 +620,10 @@ class _CategoryChips extends StatelessWidget {
           final category = categories[index];
           return GestureDetector(
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CategoryPage(
-                    categoryName: category['label'],
-                    categoryIcon: category['icon'],
-                    categoryColor: category['color'],
-                  ),
-                ),
+              onCategorySelected(
+                category['label'],
+                category['icon'],
+                category['color'],
               );
             },
             child: ClipRRect(
@@ -562,6 +964,95 @@ class _VideoCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CategoryPostCard extends StatelessWidget {
+  const _CategoryPostCard({
+    required this.imageUrl,
+    required this.likes,
+    required this.comments,
+    this.isReel = false,
+  });
+
+  final String imageUrl;
+  final String likes;
+  final String comments;
+  final bool isReel;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.network(imageUrl, fit: BoxFit.cover),
+          // Dark gradient overlay
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                ),
+              ),
+            ),
+          ),
+          // Reel icon if it's a reel
+          if (isReel)
+            const Positioned(
+              top: 8,
+              right: 8,
+              child: Icon(
+                Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+          // Stats at bottom
+          Positioned(
+            bottom: 8,
+            left: 8,
+            right: 8,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.favorite, color: Colors.white, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      likes,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    const Icon(Icons.comment, color: Colors.white, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      comments,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -5,13 +5,9 @@ import 'dart:ui';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import '../../core/theme.dart';
 
-const _primaryGradient = LinearGradient(
-  colors: [Color(0xFFFF0050), Color(0xFF8E2DE2)],
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-);
-
+// Use kPrimary-based gradient (will need context where used)
 const _glassColor = Color(0x33000000);
 const _commentDisplayDuration = Duration(seconds: 6);
 
@@ -510,10 +506,7 @@ class _GoLivePageState extends State<GoLivePage> {
           onToggleComments: _toggleComments,
           onToggleGifts: _toggleGifts,
           onToggleCoHost: (value) => _toggleCoHost(value),
-          onEndLive: () async {
-            Navigator.of(context).pop();
-            await _showEndLiveConfirmation();
-          },
+          onEndLive: _showEndLiveConfirmation,
         );
       },
     );
@@ -522,20 +515,24 @@ class _GoLivePageState extends State<GoLivePage> {
   Future<void> _showEndLiveConfirmation() async {
     final confirmed = await showDialog<bool>(
       context: context,
+      barrierColor: Colors.black87,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1D24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: const Color(0xFF1C1C1E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
+        ),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.2),
+                color: Theme.of(context).colorScheme.error.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.videocam_off_rounded,
-                color: Colors.red,
+                color: Theme.of(context).colorScheme.error,
                 size: 24,
               ),
             ),
@@ -557,10 +554,13 @@ class _GoLivePageState extends State<GoLivePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: Text(
               'Cancel',
               style: TextStyle(
-                color: Colors.white70,
+                color: Colors.white.withOpacity(0.7),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -568,7 +568,7 @@ class _GoLivePageState extends State<GoLivePage> {
           ElevatedButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: Theme.of(context).colorScheme.error,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
@@ -585,7 +585,11 @@ class _GoLivePageState extends State<GoLivePage> {
     );
 
     if (confirmed == true) {
-      _showEndLiveSummary();
+      await _showEndLiveSummary();
+      // After showing the summary, end the live stream
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     }
   }
 
@@ -1004,7 +1008,11 @@ class VideoFeedView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              gradient: _primaryGradient,
+              gradient: LinearGradient(
+                colors: [kPrimary, kPrimary.withOpacity(0.7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
             child: const Text(
               'LIVE',
@@ -1180,10 +1188,14 @@ class TopBarLiveInfo extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
-                        gradient: _primaryGradient,
-                        boxShadow: const [
+                        gradient: LinearGradient(
+                          colors: [kPrimary, kPrimary.withOpacity(0.7)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
                           BoxShadow(
-                            color: Color(0x55FF0050),
+                            color: kPrimary.withOpacity(0.3),
                             blurRadius: 12,
                             spreadRadius: 1,
                           ),
@@ -1775,7 +1787,13 @@ class BottomInputBar extends StatelessWidget {
               _CircularIconButton(
                 icon: micOn ? Icons.mic_none_rounded : Icons.mic_off_rounded,
                 onTap: onToggleMic,
-                gradient: micOn ? _primaryGradient : null,
+                gradient: micOn
+                    ? LinearGradient(
+                        colors: [kPrimary, kPrimary.withOpacity(0.7)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
               ),
               const SizedBox(width: 12),
 
@@ -1785,7 +1803,13 @@ class BottomInputBar extends StatelessWidget {
                     ? Icons.videocam_rounded
                     : Icons.videocam_off_rounded,
                 onTap: onToggleCamera,
-                gradient: cameraOn ? _primaryGradient : null,
+                gradient: cameraOn
+                    ? LinearGradient(
+                        colors: [kPrimary, kPrimary.withOpacity(0.7)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
               ),
               const SizedBox(width: 12),
 
@@ -1809,7 +1833,11 @@ class BottomInputBar extends StatelessWidget {
               _CircularIconButton(
                 icon: Icons.favorite_rounded,
                 onTap: onTapHeart,
-                gradient: _primaryGradient,
+                gradient: LinearGradient(
+                  colors: [kPrimary, kPrimary.withOpacity(0.7)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
               const SizedBox(width: 12),
 
@@ -2074,11 +2102,15 @@ class GiftMenuSheet extends StatelessWidget {
                     onTap: () => Navigator.of(context).pop(gift),
                     child: Container(
                       decoration: BoxDecoration(
-                        gradient: _primaryGradient,
+                        gradient: LinearGradient(
+                          colors: [kPrimary, kPrimary.withOpacity(0.7)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                         borderRadius: BorderRadius.circular(18),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Color(0x33FF0050),
+                            color: kPrimary.withOpacity(0.2),
                             blurRadius: 14,
                             spreadRadius: 1,
                           ),
@@ -2452,9 +2484,20 @@ class _EffectsSheetState extends State<EffectsSheet> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18),
                     gradient: selected
-                        ? _primaryGradient
-                        : const LinearGradient(
-                            colors: [Color(0x33000000), Color(0x66000000)],
+                        ? LinearGradient(
+                            colors: [kPrimary, kPrimary.withOpacity(0.7)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : LinearGradient(
+                            colors: [
+                              Theme.of(
+                                context,
+                              ).colorScheme.surfaceVariant.withOpacity(0.2),
+                              Theme.of(
+                                context,
+                              ).colorScheme.surfaceVariant.withOpacity(0.4),
+                            ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -2878,9 +2921,9 @@ class _LiveSettingsSheetState extends State<LiveSettingsSheet> {
           _PrimarySheetButton(
             label: 'End live',
             destructive: true,
-            onPressed: () {
-              Navigator.of(context).pop();
-              widget.onEndLive();
+            onPressed: () async {
+              Navigator.of(context).pop(); // Close the settings sheet
+              widget.onEndLive(); // This will show the confirmation dialog
             },
           ),
         ],

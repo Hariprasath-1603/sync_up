@@ -4,7 +4,7 @@ import '../../core/theme.dart';
 import 'add_story_page.dart';
 
 class StoriesViewPage extends StatefulWidget {
-  const StoriesViewPage({Key? key}) : super(key: key);
+  const StoriesViewPage({super.key});
 
   @override
   State<StoriesViewPage> createState() => _StoriesViewPageState();
@@ -17,61 +17,61 @@ class _StoriesViewPageState extends State<StoriesViewPage> {
       'title': 'Travel',
       'url': 'https://picsum.photos/seed/s1/200',
       'date': '2 days ago',
-      'views': 234
+      'views': 234,
     },
     {
       'title': 'Food',
       'url': 'https://picsum.photos/seed/s2/200',
       'date': '5 days ago',
-      'views': 456
+      'views': 456,
     },
     {
       'title': 'Friends',
       'url': 'https://picsum.photos/seed/s3/200',
       'date': '1 week ago',
-      'views': 789
+      'views': 789,
     },
     {
       'title': 'Hangout',
       'url': 'https://picsum.photos/seed/s4/200',
       'date': '1 week ago',
-      'views': 321
+      'views': 321,
     },
     {
       'title': 'Workout',
       'url': 'https://picsum.photos/seed/s5/200',
       'date': '2 weeks ago',
-      'views': 567
+      'views': 567,
     },
     {
       'title': 'Nature',
       'url': 'https://picsum.photos/seed/s6/200',
       'date': '2 weeks ago',
-      'views': 890
+      'views': 890,
     },
     {
       'title': 'Party',
       'url': 'https://picsum.photos/seed/s7/200',
       'date': '3 weeks ago',
-      'views': 1234
+      'views': 1234,
     },
     {
       'title': 'Beach',
       'url': 'https://picsum.photos/seed/s8/200',
       'date': '3 weeks ago',
-      'views': 678
+      'views': 678,
     },
     {
       'title': 'Concert',
       'url': 'https://picsum.photos/seed/s9/200',
       'date': '1 month ago',
-      'views': 2345
+      'views': 2345,
     },
     {
       'title': 'Family',
       'url': 'https://picsum.photos/seed/s10/200',
       'date': '1 month ago',
-      'views': 543
+      'views': 543,
     },
   ];
 
@@ -105,9 +105,7 @@ class _StoriesViewPageState extends State<StoriesViewPage> {
               _buildHeader(context, isDark),
               const SizedBox(height: 16),
               // Stories Grid
-              Expanded(
-                child: _buildStoriesGrid(isDark),
-              ),
+              Expanded(child: _buildStoriesGrid(isDark)),
             ],
           ),
         ),
@@ -169,10 +167,7 @@ class _StoriesViewPageState extends State<StoriesViewPage> {
                       SizedBox(height: 2),
                       Text(
                         'View all your archived stories',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),
@@ -242,20 +237,14 @@ class _StoriesViewPageState extends State<StoriesViewPage> {
           fit: StackFit.expand,
           children: [
             // Story Image
-            Image.network(
-              story['url'],
-              fit: BoxFit.cover,
-            ),
+            Image.network(story['url'], fit: BoxFit.cover),
             // Gradient Overlay
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.7),
-                  ],
+                  colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
                 ),
               ),
             ),
@@ -375,10 +364,7 @@ class _StoryFullScreenViewState extends State<_StoryFullScreenView> {
           children: [
             // Story Image
             Center(
-              child: Image.network(
-                widget.story['url'],
-                fit: BoxFit.contain,
-              ),
+              child: Image.network(widget.story['url'], fit: BoxFit.contain),
             ),
             // Top Bar
             Positioned(
@@ -518,8 +504,11 @@ class _StoryFullScreenViewState extends State<_StoryFullScreenView> {
                   _buildOptionItem(Icons.share_rounded, 'Share Story', () {}),
                   _buildOptionItem(Icons.download_rounded, 'Download', () {}),
                   _buildOptionItem(
-                      Icons.delete_outline_rounded, 'Delete Story', () {},
-                      isDestructive: true),
+                    Icons.delete_outline_rounded,
+                    'Delete Story',
+                    () {},
+                    isDestructive: true,
+                  ),
                 ],
               ),
             ),
@@ -529,13 +518,14 @@ class _StoryFullScreenViewState extends State<_StoryFullScreenView> {
     );
   }
 
-  Widget _buildOptionItem(IconData icon, String label, VoidCallback onTap,
-      {bool isDestructive = false}) {
+  Widget _buildOptionItem(
+    IconData icon,
+    String label,
+    VoidCallback onTap, {
+    bool isDestructive = false,
+  }) {
     return ListTile(
-      leading: Icon(
-        icon,
-        color: isDestructive ? Colors.red : kPrimary,
-      ),
+      leading: Icon(icon, color: isDestructive ? Colors.red : kPrimary),
       title: Text(
         label,
         style: TextStyle(

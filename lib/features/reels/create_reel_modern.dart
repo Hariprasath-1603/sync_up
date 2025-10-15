@@ -1647,7 +1647,7 @@ class _AudioLibrarySheetState extends State<AudioLibrarySheet>
                         hintText: 'Search sounds, artists or moods',
                         prefixIcon: const Icon(Icons.search),
                         filled: true,
-                        fillColor: theme.colorScheme.surfaceVariant,
+                        fillColor: theme.colorScheme.surfaceContainerHighest,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(24),
                           borderSide: BorderSide.none,
@@ -1740,7 +1740,7 @@ class _AudioListTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           color: isSelected
               ? theme.colorScheme.primary.withOpacity(0.12)
-              : theme.colorScheme.surfaceVariant.withOpacity(0.6),
+              : theme.colorScheme.surfaceContainerHighest.withOpacity(0.6),
         ),
         child: Row(
           children: [
@@ -3436,7 +3436,7 @@ class _ReelCoverCaptionScreenState extends State<ReelCoverCaptionScreen> {
                       'Allow comments',
                       style: TextStyle(color: Colors.white),
                     ),
-                    activeColor: const Color(0xFF4A6CF7),
+                    activeThumbColor: const Color(0xFF4A6CF7),
                     contentPadding: EdgeInsets.zero,
                   ),
                   SwitchListTile(
@@ -3450,7 +3450,7 @@ class _ReelCoverCaptionScreenState extends State<ReelCoverCaptionScreen> {
                       'Let others create content with your reel',
                       style: TextStyle(color: Colors.white54, fontSize: 12),
                     ),
-                    activeColor: const Color(0xFF4A6CF7),
+                    activeThumbColor: const Color(0xFF4A6CF7),
                     contentPadding: EdgeInsets.zero,
                   ),
                   SwitchListTile(
@@ -3464,7 +3464,7 @@ class _ReelCoverCaptionScreenState extends State<ReelCoverCaptionScreen> {
                       'Auto-generated captions (when available)',
                       style: TextStyle(color: Colors.white54, fontSize: 12),
                     ),
-                    activeColor: const Color(0xFF4A6CF7),
+                    activeThumbColor: const Color(0xFF4A6CF7),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ],

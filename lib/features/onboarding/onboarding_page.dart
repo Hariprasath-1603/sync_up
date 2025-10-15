@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
+import '../../core/services/preferences_service.dart';
 import 'onboarding_controller.dart';
 import 'widgets/onboarding_card.dart';
 import 'widgets/onboarding_bottom_bar.dart';
@@ -16,24 +16,24 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   final items = const [
     (
-    'assets/lottie/welcome.json',
-    'Welcome',
-    'Your space to connect, share, and grow. Join a vibrant community where every moment matters.'
+      'assets/lottie/welcome.json',
+      '',
+      'Your space to connect, share, and grow. Join a vibrant community where every moment matters.',
     ),
     (
-    'assets/lottie/search.json',
-    'Explore the World of Syncup',
-    'Fresh content. New connections. Endless inspiration.'
+      'assets/lottie/search.json',
+      'Explore the World of Syncup',
+      'Fresh content. New connections. Endless inspiration.',
     ),
     (
-    'assets/lottie/connect.json',
-    'Stay Connected. Stay Inspired',
-    'Your hub for the latest posts, people, and conversations.'
+      'assets/lottie/connect.json',
+      'Stay Connected. Stay Inspired',
+      'Your hub for the latest posts, people, and conversations.',
     ),
     (
-    'assets/lottie/launch.json',
-    'Unlock Your Social Space',
-    'Let’s get you connected — it all begins with a tap.'
+      'assets/lottie/launch.json',
+      'Unlock Your Social Space',
+      'Let’s get you connected — it all begins with a tap.',
     ),
   ];
 
@@ -47,6 +47,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
   void dispose() {
     ctrl.disposeAll();
     super.dispose();
+  }
+
+  Future<void> _completeOnboarding() async {
+    // Save that user has seen onboarding
+    await PreferencesService.setOnboardingSeen(true);
+    if (mounted) {
+      context.go('/signin');
+    }
   }
 
   @override
@@ -80,7 +88,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 lastIndex: lastIndex,
                 onSkip: () => ctrl.skipToEnd(lastIndex),
                 onNext: () => ctrl.next(lastIndex),
-                onGetStarted: () => context.go('/signin'),
+                onGetStarted: _completeOnboarding,
               ),
             ],
           ),

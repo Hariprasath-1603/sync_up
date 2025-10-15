@@ -14,7 +14,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController(text: 'John Doe');
   final _usernameController = TextEditingController(text: '@johndoe');
-  final _bioController = TextEditingController(text: 'Digital Creator | Travel Enthusiast 🌍\nLiving my best life! ✨');
+  final _bioController = TextEditingController(
+    text: 'Digital Creator | Travel Enthusiast 🌍\nLiving my best life! ✨',
+  );
   final _emailController = TextEditingController(text: 'johndoe@example.com');
   final _phoneController = TextEditingController(text: '+1 234 567 8900');
   final _websiteController = TextEditingController(text: 'www.johndoe.com');
@@ -215,11 +217,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               child: CircleAvatar(
                 radius: 60,
                 backgroundColor: kPrimary.withOpacity(0.2),
-                child: Icon(
-                  Icons.person_rounded,
-                  size: 60,
-                  color: kPrimary,
-                ),
+                child: Icon(Icons.person_rounded, size: 60, color: kPrimary),
               ),
             ),
           ),
@@ -372,15 +370,27 @@ class _EditProfilePageState extends State<EditProfilePage> {
               Row(
                 children: [
                   Expanded(
-                    child: _buildGenderOption('Male', Icons.male_rounded, isDark),
+                    child: _buildGenderOption(
+                      'Male',
+                      Icons.male_rounded,
+                      isDark,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildGenderOption('Female', Icons.female_rounded, isDark),
+                    child: _buildGenderOption(
+                      'Female',
+                      Icons.female_rounded,
+                      isDark,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildGenderOption('Other', Icons.transgender_rounded, isDark),
+                    child: _buildGenderOption(
+                      'Other',
+                      Icons.transgender_rounded,
+                      isDark,
+                    ),
                   ),
                 ],
               ),
@@ -403,9 +413,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           gradient: isSelected
-              ? LinearGradient(
-                  colors: [kPrimary, kPrimary.withOpacity(0.8)],
-                )
+              ? LinearGradient(colors: [kPrimary, kPrimary.withOpacity(0.8)])
               : null,
           color: isSelected
               ? null
@@ -420,11 +428,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : kPrimary,
-              size: 24,
-            ),
+            Icon(icon, color: isSelected ? Colors.white : kPrimary, size: 24),
             const SizedBox(height: 4),
             Text(
               gender,
@@ -546,7 +550,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               Switch(
                 value: value,
                 onChanged: onChanged,
-                activeColor: kPrimary,
+                activeThumbColor: kPrimary,
               ),
             ],
           ),
@@ -664,7 +668,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   color: Colors.purple.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.photo_library_rounded, color: Colors.purple),
+                child: const Icon(
+                  Icons.photo_library_rounded,
+                  color: Colors.purple,
+                ),
               ),
               title: const Text('Choose from Gallery'),
               onTap: () {
@@ -687,7 +694,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   color: Colors.red.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                child: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.red,
+                ),
               ),
               title: const Text('Remove Photo'),
               onTap: () {

@@ -97,12 +97,27 @@ class _SignUpPageState extends State<SignUpPage> {
     IconData? prefixIcon,
     Widget? suffixIcon,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final bool isDark = colorScheme.brightness == Brightness.dark;
+    final Color baseSurface = colorScheme.surface;
+    final Color fillColor = Color.alphaBlend(
+      colorScheme.onSurface.withOpacity(isDark ? 0.08 : 0.04),
+      baseSurface,
+    );
+    final Color iconColor = colorScheme.onSurfaceVariant;
+
     return InputDecoration(
       hintText: hintText,
-      prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
+      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+        color: colorScheme.onSurface.withOpacity(0.6),
+      ),
+      prefixIcon: prefixIcon != null
+          ? Icon(prefixIcon, color: iconColor)
+          : null,
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: Colors.grey.shade200,
+      fillColor: fillColor,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -110,18 +125,22 @@ class _SignUpPageState extends State<SignUpPage> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
+        borderSide: BorderSide(color: colorScheme.primary, width: 2),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final onSurface = colorScheme.onSurface;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colorScheme.background,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: onSurface),
           onPressed: () {
             if (_pageController.hasClients && _pageController.page == 1.0) {
               _goToPreviousPage();
@@ -130,23 +149,29 @@ class _SignUpPageState extends State<SignUpPage> {
             }
           },
         ),
-        title: const Text('Create Account', style: TextStyle(color: Colors.black)),
+        title: Text(
+          'Create Account',
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         centerTitle: true,
-        backgroundColor: Colors.transparent,
+        backgroundColor: colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
       ),
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
-        children: [
-          _buildAccountDetailsPage(),
-          _buildPersonalDetailsPage(),
-        ],
+        children: [_buildAccountDetailsPage(), _buildPersonalDetailsPage()],
       ),
     );
   }
 
-  Widget _buildPasswordStrengthIndicator() {
+  Widget _buildPasswordStrengthIndicator(BuildContext context) {
+    final theme = Theme.of(context);
+    final neutralColor = theme.colorScheme.onSurface.withOpacity(0.14);
     double strength = _calculatePasswordStrength(_passwordController.text);
     Color strengthColor = _getStrengthColor(strength);
 
@@ -159,7 +184,7 @@ class _SignUpPageState extends State<SignUpPage> {
               child: Container(
                 height: 6,
                 decoration: BoxDecoration(
-                  color: strength > 0 ? strengthColor : Colors.grey.shade300,
+                  color: strength > 0 ? strengthColor : neutralColor,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -169,7 +194,7 @@ class _SignUpPageState extends State<SignUpPage> {
               child: Container(
                 height: 6,
                 decoration: BoxDecoration(
-                  color: strength >= 0.5 ? strengthColor : Colors.grey.shade300,
+                  color: strength >= 0.5 ? strengthColor : neutralColor,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -179,7 +204,7 @@ class _SignUpPageState extends State<SignUpPage> {
               child: Container(
                 height: 6,
                 decoration: BoxDecoration(
-                  color: strength >= 0.75 ? strengthColor : Colors.grey.shade300,
+                  color: strength >= 0.75 ? strengthColor : neutralColor,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -200,6 +225,12 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   Widget _buildAccountDetailsPage() {
+    final theme = Theme.of(context);
+    final headingStyle = theme.textTheme.titleLarge?.copyWith(
+      fontWeight: FontWeight.bold,
+      color: theme.colorScheme.onBackground,
+    );
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Form(
@@ -209,10 +240,10 @@ class _SignUpPageState extends State<SignUpPage> {
           children: [
             Lottie.asset('assets/lottie/login.json', height: 150),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Account Details (1/2)',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              style: headingStyle,
             ),
             const SizedBox(height: 24),
             TextFormField(
@@ -222,7 +253,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 prefixIcon: Icons.person_outline,
               ),
               validator: (value) =>
-              value!.isEmpty ? 'Please enter a username' : null,
+                  value!.isEmpty ? 'Please enter a username' : null,
             ),
             const SizedBox(height: 20),
             TextFormField(
@@ -248,20 +279,22 @@ class _SignUpPageState extends State<SignUpPage> {
                 hintText: 'Password',
                 prefixIcon: Icons.lock_outline,
                 suffixIcon: IconButton(
-                  icon: Icon(_isPasswordVisible
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined),
-                  onPressed: () => setState(() =>
-                  _isPasswordVisible = !_isPasswordVisible),
+                  icon: Icon(
+                    _isPasswordVisible
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                  ),
+                  onPressed: () =>
+                      setState(() => _isPasswordVisible = !_isPasswordVisible),
                 ),
               ),
               onChanged: (value) => setState(() {}),
               validator: (value) =>
-              value!.isEmpty ? 'Please enter a password' : null,
+                  value!.isEmpty ? 'Please enter a password' : null,
             ),
             const SizedBox(height: 8),
             if (_passwordController.text.isNotEmpty)
-              _buildPasswordStrengthIndicator(),
+              _buildPasswordStrengthIndicator(context),
             const SizedBox(height: 20),
             TextFormField(
               controller: _confirmPasswordController,
@@ -270,11 +303,15 @@ class _SignUpPageState extends State<SignUpPage> {
                 hintText: 'Confirm Password',
                 prefixIcon: Icons.lock_outline,
                 suffixIcon: IconButton(
-                  icon: Icon(_isConfirmPasswordVisible
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined),
-                  onPressed: () => setState(() =>
-                  _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
+                  icon: Icon(
+                    _isConfirmPasswordVisible
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                  ),
+                  onPressed: () => setState(
+                    () =>
+                        _isConfirmPasswordVisible = !_isConfirmPasswordVisible,
+                  ),
                 ),
               ),
               validator: (value) {
@@ -286,10 +323,7 @@ class _SignUpPageState extends State<SignUpPage> {
               },
             ),
             const SizedBox(height: 32),
-            FilledButton(
-              onPressed: _goToNextPage,
-              child: const Text('Next'),
-            ),
+            FilledButton(onPressed: _goToNextPage, child: const Text('Next')),
           ],
         ),
       ),
@@ -297,6 +331,13 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   Widget _buildPersonalDetailsPage() {
+    final theme = Theme.of(context);
+    final headingStyle = theme.textTheme.titleLarge?.copyWith(
+      fontWeight: FontWeight.bold,
+      color: theme.colorScheme.onBackground,
+    );
+    final borderColor = theme.colorScheme.outline.withOpacity(0.5);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Form(
@@ -306,10 +347,10 @@ class _SignUpPageState extends State<SignUpPage> {
           children: [
             Lottie.asset('assets/lottie/login.json', height: 150),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Personal Details (2/2)',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              style: headingStyle,
             ),
             const SizedBox(height: 24),
             TextFormField(
@@ -327,29 +368,30 @@ class _SignUpPageState extends State<SignUpPage> {
                   lastDate: DateTime.now(),
                 );
                 if (pickedDate != null) {
-                  _dobController.text =
-                      DateFormat('yyyy-MM-dd').format(pickedDate);
+                  _dobController.text = DateFormat(
+                    'yyyy-MM-dd',
+                  ).format(pickedDate);
                 }
               },
               validator: (value) =>
-              value!.isEmpty ? 'Please select your date of birth' : null,
+                  value!.isEmpty ? 'Please select your date of birth' : null,
             ),
             const SizedBox(height: 20),
             DropdownButtonFormField<String>(
-              value: _selectedGender,
+              initialValue: _selectedGender,
               decoration: _buildInputDecoration(
                 hintText: 'Gender',
                 prefixIcon: Icons.person_search_outlined,
               ),
               items: ['Male', 'Female', 'Other']
-                  .map((gender) => DropdownMenuItem(
-                value: gender,
-                child: Text(gender),
-              ))
+                  .map(
+                    (gender) =>
+                        DropdownMenuItem(value: gender, child: Text(gender)),
+                  )
                   .toList(),
               onChanged: (value) => setState(() => _selectedGender = value),
               validator: (value) =>
-              value == null ? 'Please select a gender' : null,
+                  value == null ? 'Please select a gender' : null,
             ),
             const SizedBox(height: 20),
             Row(
@@ -366,13 +408,20 @@ class _SignUpPageState extends State<SignUpPage> {
                     );
                   },
                   child: Container(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 16,
+                    ),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade400),
+                      border: Border.all(color: borderColor),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text('+$_countryCode'),
+                    child: Text(
+                      '+$_countryCode',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -380,8 +429,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   child: TextFormField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
-                    decoration:
-                    _buildInputDecoration(hintText: 'Phone Number'),
+                    decoration: _buildInputDecoration(hintText: 'Phone Number'),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter a phone number';
@@ -408,10 +456,7 @@ class _SignUpPageState extends State<SignUpPage> {
             ),
 
             const SizedBox(height: 32),
-            FilledButton(
-              onPressed: _onSignUp,
-              child: const Text('Sign Up'),
-            ),
+            FilledButton(onPressed: _onSignUp, child: const Text('Sign Up')),
           ],
         ),
       ),

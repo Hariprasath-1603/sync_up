@@ -19,11 +19,11 @@ class _CreatePostPageState extends State<CreatePostPage> {
   final ImagePicker _picker = ImagePicker();
   Timer? _autosaveTimer;
 
-  List<XFile> _selectedMedia = [];
-  List<Map<String, dynamic>> _taggedUsers = [];
+  final List<XFile> _selectedMedia = [];
+  final List<Map<String, dynamic>> _taggedUsers = [];
   List<String> _hashtags = [];
   String _selectedAudience = 'Public';
-  List<Map<String, dynamic>> _customAudienceUsers = [];
+  final List<Map<String, dynamic>> _customAudienceUsers = [];
   Map<String, dynamic>? _location;
   String? _feeling;
   bool _enableComments = true;
@@ -40,8 +40,8 @@ class _CreatePostPageState extends State<CreatePostPage> {
   bool _crossPostTwitter = false;
   bool _crossPostLinkedIn = false;
   bool _enableBoost = false;
-  String _selectedLanguage = 'English';
-  List<String> _productTags = [];
+  final String _selectedLanguage = 'English';
+  final List<String> _productTags = [];
 
   @override
   void initState() {
@@ -1143,7 +1143,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF4A6CF7),
+        activeThumbColor: const Color(0xFF4A6CF7),
       ),
     );
   }
@@ -1671,7 +1671,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                             ],
                                           ),
                                         );
-                                      }).toList(),
+                                      }),
                                     ],
                                   ),
                                 ),

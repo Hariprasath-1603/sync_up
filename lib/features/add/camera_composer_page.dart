@@ -25,8 +25,8 @@ class _CameraComposerPageState extends State<CameraComposerPage>
   bool _isFlashOn = false;
   String _selectedFilter = 'None';
   String? _selectedMusic;
-  double _videoSpeed = 1.0;
-  int _timerSeconds = 0;
+  final double _videoSpeed = 1.0;
+  final int _timerSeconds = 0;
 
   // AR Effects
   String? _selectedAREffect;

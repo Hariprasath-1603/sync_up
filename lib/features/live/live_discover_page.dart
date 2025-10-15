@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'live_viewer_page.dart';
 
 class LiveDiscoverPage extends StatelessWidget {
-  LiveDiscoverPage({super.key});
+  const LiveDiscoverPage({super.key});
 
   final List<_LiveSession> _sessions = const [
     _LiveSession(
@@ -151,11 +151,7 @@ class _LiveSessionCard extends StatelessWidget {
                 ),
               ),
             ),
-            Positioned(
-              top: 16,
-              left: 16,
-              child: _LiveBadge(isDark: isDark),
-            ),
+            Positioned(top: 16, left: 16, child: _LiveBadge(isDark: isDark)),
             Positioned(
               top: 16,
               right: 16,
@@ -271,11 +267,7 @@ class _LiveBadge extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
-          BoxShadow(
-            color: Color(0x55FF416C),
-            blurRadius: 12,
-            spreadRadius: 1,
-          ),
+          BoxShadow(color: Color(0x55FF416C), blurRadius: 12, spreadRadius: 1),
         ],
       ),
       child: Row(

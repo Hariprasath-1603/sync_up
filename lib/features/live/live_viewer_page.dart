@@ -94,23 +94,18 @@ class _LiveViewerPageState extends State<LiveViewerPage> {
 
   void _startMockActivity() {
     final random = Random();
-    _mockCommentTimer =
-        Timer.periodic(const Duration(seconds: 5), (timer) {
+    _mockCommentTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       final username = _mockUsernames[random.nextInt(_mockUsernames.length)];
       final message = _mockMessages[random.nextInt(_mockMessages.length)];
       _pushComment(LiveComment(username: username, message: message));
     });
 
-    _mockReactionTimer =
-        Timer.periodic(const Duration(seconds: 4), (timer) {
+    _mockReactionTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
       const emojis = ['❤️', '💜', '💛', '🔥'];
-      _reactionController.addReaction(
-        emojis[random.nextInt(emojis.length)],
-      );
+      _reactionController.addReaction(emojis[random.nextInt(emojis.length)]);
     });
 
-    _viewerCountTimer =
-        Timer.periodic(const Duration(seconds: 8), (timer) {
+    _viewerCountTimer = Timer.periodic(const Duration(seconds: 8), (timer) {
       final delta = random.nextInt(120) - 50;
       setState(() {
         _viewerCount = max(0, _viewerCount + delta);
@@ -136,9 +131,7 @@ class _LiveViewerPageState extends State<LiveViewerPage> {
 
   void _sendHeart() {
     const palette = ['❤️', '💗', '💜', '💛', '🔥'];
-    _reactionController.addReaction(
-      palette[Random().nextInt(palette.length)],
-    );
+    _reactionController.addReaction(palette[Random().nextInt(palette.length)]);
   }
 
   void _toggleFollow() {
@@ -182,7 +175,7 @@ class _LiveViewerPageState extends State<LiveViewerPage> {
       builder: (context) => GiftMenuSheet(gifts: gifts),
     );
     if (selected != null && mounted) {
-  _showSnack('Sent ${selected.label}!');
+      _showSnack('Sent ${selected.label}!');
       _reactionController.addReaction(selected.emoji);
     }
   }
@@ -200,9 +193,9 @@ class _LiveViewerPageState extends State<LiveViewerPage> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String get _formattedViewerCount {
@@ -305,10 +298,7 @@ class _LiveViewerPageState extends State<LiveViewerPage> {
           ),
         ),
         const SizedBox(width: 12),
-        _FollowBadge(
-          isFollowing: _isFollowing,
-          onToggle: _toggleFollow,
-        ),
+        _FollowBadge(isFollowing: _isFollowing, onToggle: _toggleFollow),
         const SizedBox(width: 12),
         _HeaderIconButton(
           icon: Icons.chat_bubble_outline,
@@ -368,15 +358,13 @@ class _LiveViewerPageState extends State<LiveViewerPage> {
                     ),
                   ),
                 ),
-                Positioned(
-                  top: 20,
-                  left: 20,
-                  child: _LiveBadge(theme: theme),
-                ),
+                Positioned(top: 20, left: 20, child: _LiveBadge(theme: theme)),
                 Positioned(
                   top: 20,
                   right: 20,
-                  child: _ViewerCountBadge(text: '${_formattedViewerCount} watching'),
+                  child: _ViewerCountBadge(
+                    text: '$_formattedViewerCount watching',
+                  ),
                 ),
                 Positioned(
                   top: 76,
@@ -430,8 +418,10 @@ class _LiveViewerPageState extends State<LiveViewerPage> {
                   left: 20,
                   bottom: 40,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.45),
                       borderRadius: BorderRadius.circular(18),
@@ -444,10 +434,7 @@ class _LiveViewerPageState extends State<LiveViewerPage> {
                         SizedBox(width: 8),
                         Text(
                           'Double tap to send hearts',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12.5,
-                          ),
+                          style: TextStyle(color: Colors.white, fontSize: 12.5),
                         ),
                       ],
                     ),
@@ -476,43 +463,48 @@ class _LiveViewerPageState extends State<LiveViewerPage> {
           ),
         ),
         const SizedBox(height: 10),
-        ..._commentHistory.take(3).map(
-          (comment) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: kPrimary.withOpacity(0.2),
-                  child: Text(
-                    comment.username.substring(0, 1).toUpperCase(),
-                    style: const TextStyle(color: kPrimary, fontSize: 12),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        comment.username,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
+        ..._commentHistory
+            .take(3)
+            .map(
+              (comment) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 14,
+                      backgroundColor: kPrimary.withOpacity(0.2),
+                      child: Text(
+                        comment.username.substring(0, 1).toUpperCase(),
+                        style: const TextStyle(color: kPrimary, fontSize: 12),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        comment.message,
-                        style: TextStyle(color: subtitleColor, fontSize: 13),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            comment.username,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            comment.message,
+                            style: TextStyle(
+                              color: subtitleColor,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
       ],
     );
   }
@@ -606,8 +598,10 @@ class _ViewerInputBar extends StatelessWidget {
                           ),
                           border: InputBorder.none,
                           suffixIcon: IconButton(
-                            icon: const Icon(Icons.send_rounded,
-                                color: Colors.white),
+                            icon: const Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                            ),
                             onPressed: () => onSubmitted(controller.text),
                           ),
                         ),
@@ -832,11 +826,7 @@ class _LiveBadge extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: const [
-          BoxShadow(
-            color: Color(0x55FF416C),
-            blurRadius: 18,
-            spreadRadius: 2,
-          ),
+          BoxShadow(color: Color(0x55FF416C), blurRadius: 18, spreadRadius: 2),
         ],
       ),
       child: Row(

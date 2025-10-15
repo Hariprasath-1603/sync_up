@@ -8,11 +8,11 @@ class CategoryPage extends StatefulWidget {
   final Color categoryColor;
 
   const CategoryPage({
-    Key? key,
+    super.key,
     required this.categoryName,
     required this.categoryIcon,
     required this.categoryColor,
-  }) : super(key: key);
+  });
 
   @override
   State<CategoryPage> createState() => _CategoryPageState();
@@ -584,55 +584,74 @@ class _CategoryPageState extends State<CategoryPage>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(30),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
+            height: 52,
             decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.white.withOpacity(0.05)
-                  : Colors.white.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        Colors.white.withOpacity(0.15),
+                        Colors.white.withOpacity(0.08),
+                      ]
+                    : [
+                        Colors.white.withOpacity(0.9),
+                        Colors.white.withOpacity(0.7),
+                      ],
+              ),
+              borderRadius: BorderRadius.circular(30),
               border: Border.all(
                 color: isDark
-                    ? Colors.white.withOpacity(0.1)
-                    : Colors.white.withOpacity(0.3),
+                    ? Colors.white.withOpacity(0.2)
+                    : Colors.white.withOpacity(0.6),
+                width: 1.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: isDark
+                      ? Colors.black.withOpacity(0.3)
+                      : Colors.grey.withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: TabBar(
               controller: _tabController,
               indicator: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
                 gradient: LinearGradient(
-                  colors: [kPrimary, kPrimary.withOpacity(0.7)],
+                  colors: [kPrimary, kPrimary.withOpacity(0.8)],
                 ),
-                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: kPrimary.withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              labelColor: Colors.white,
-              unselectedLabelColor: isDark ? Colors.white60 : Colors.black54,
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
+              labelColor: Colors.white,
+              unselectedLabelColor: isDark ? Colors.white70 : Colors.black54,
+              labelStyle: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                letterSpacing: 0.5,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
               padding: const EdgeInsets.all(4),
               tabs: [
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.grid_on_rounded, size: 18),
-                      const SizedBox(width: 8),
-                      Text('Posts (${currentPosts.length})'),
-                    ],
-                  ),
-                ),
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.play_circle_outline_rounded, size: 18),
-                      const SizedBox(width: 8),
-                      Text('Reels (${currentReels.length})'),
-                    ],
-                  ),
-                ),
+                Tab(text: '${currentPosts.length} Posts'),
+                Tab(text: '${currentReels.length} Reels'),
               ],
             ),
           ),

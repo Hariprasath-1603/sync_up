@@ -2,11 +2,13 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import 'edit_profile_page.dart';
-import 'stories_view_page.dart';
-import 'add_story_page.dart';
+import 'followers_following_page.dart';
+import 'user_posts_page.dart';
+import 'stories_archive_page.dart';
+import '../stories/storyverse_page.dart';
 
 class MyProfilePage extends StatefulWidget {
-  const MyProfilePage({Key? key}) : super(key: key);
+  const MyProfilePage({super.key});
 
   @override
   State<MyProfilePage> createState() => _MyProfilePageState();
@@ -18,12 +20,94 @@ class _MyProfilePageState extends State<MyProfilePage>
 
   final List<String> _posts = List.generate(
     8,
-        (index) => 'https://picsum.photos/seed/post$index/400/600',
+    (index) => 'https://picsum.photos/seed/post$index/400/600',
   );
   final List<String> _media = List.generate(
     6,
-        (index) => 'https://picsum.photos/seed/media$index/600/400',
+    (index) => 'https://picsum.photos/seed/media$index/600/400',
   );
+
+  // User's story collections grouped by category
+  final Map<String, List<StoryVerseStory>> _userStoryCollections = {
+    'Travel': [
+      StoryVerseStory(
+        id: 'travel_1',
+        ownerName: 'Jane Cooper',
+        ownerAvatar: 'https://i.pravatar.cc/150?img=1',
+        mood: '✈️ Wanderlust',
+        timestamp: DateTime.now().subtract(const Duration(hours: 3)),
+        clips: [
+          StoryVerseClip(
+            id: 'clip_travel_1',
+            mode: StoryVerseMode.photo,
+            duration: const Duration(seconds: 5),
+            caption: 'Beautiful sunset at the beach! 🌅',
+            mood: '✈️ Wanderlust',
+          ),
+          StoryVerseClip(
+            id: 'clip_travel_2',
+            mode: StoryVerseMode.photo,
+            duration: const Duration(seconds: 5),
+            caption: 'Mountain views 🏔️',
+          ),
+        ],
+      ),
+    ],
+    'Food': [
+      StoryVerseStory(
+        id: 'food_1',
+        ownerName: 'Jane Cooper',
+        ownerAvatar: 'https://i.pravatar.cc/150?img=1',
+        mood: '🍕 Foodie',
+        timestamp: DateTime.now().subtract(const Duration(hours: 5)),
+        clips: [
+          StoryVerseClip(
+            id: 'clip_food_1',
+            mode: StoryVerseMode.photo,
+            duration: const Duration(seconds: 5),
+            caption: 'Delicious pasta! 🍝',
+            mood: '🍕 Foodie',
+          ),
+        ],
+      ),
+    ],
+    'Friends': [
+      StoryVerseStory(
+        id: 'friends_1',
+        ownerName: 'Jane Cooper',
+        ownerAvatar: 'https://i.pravatar.cc/150?img=1',
+        mood: '👥 Squad',
+        timestamp: DateTime.now().subtract(const Duration(hours: 8)),
+        clips: [
+          StoryVerseClip(
+            id: 'clip_friends_1',
+            mode: StoryVerseMode.photo,
+            duration: const Duration(seconds: 5),
+            caption: 'Best day with the squad! 💙',
+            mood: '👥 Squad',
+          ),
+        ],
+      ),
+    ],
+    'Hangout': [
+      StoryVerseStory(
+        id: 'hangout_1',
+        ownerName: 'Jane Cooper',
+        ownerAvatar: 'https://i.pravatar.cc/150?img=1',
+        mood: '🎉 Party',
+        timestamp: DateTime.now().subtract(const Duration(hours: 12)),
+        clips: [
+          StoryVerseClip(
+            id: 'clip_hangout_1',
+            mode: StoryVerseMode.photo,
+            duration: const Duration(seconds: 5),
+            caption: 'Fun times! 🎊',
+            mood: '🎉 Party',
+          ),
+        ],
+      ),
+    ],
+  };
 
   final List<Map<String, String?>> _stories = [
     {'title': 'Add', 'url': null},
@@ -32,6 +116,23 @@ class _MyProfilePageState extends State<MyProfilePage>
     {'title': 'Friends', 'url': 'https://picsum.photos/seed/s3/200'},
     {'title': 'Hangout', 'url': 'https://picsum.photos/seed/s4/200'},
   ];
+
+  void _openStoryCollection(String category) {
+    final stories = _userStoryCollections[category];
+    if (stories != null && stories.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => StoryVerseExperience(
+            initialStage: StoryVerseStage.viewer,
+            initialStory: stories.first,
+            feedStories: stories,
+            showEntryStage: false,
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -48,24 +149,24 @@ class _MyProfilePageState extends State<MyProfilePage>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: isDark 
-              ? [
-                  const Color(0xFF0B0E13),
-                  const Color(0xFF1A1F2E),
-                  kPrimary.withOpacity(0.15),
-                ]
-              : [
-                  const Color(0xFFF6F7FB),
-                  kPrimary.withOpacity(0.08),
-                  const Color(0xFFE8ECFF),
-                ],
+            colors: isDark
+                ? [
+                    const Color(0xFF0B0E13),
+                    const Color(0xFF1A1F2E),
+                    kPrimary.withOpacity(0.15),
+                  ]
+                : [
+                    const Color(0xFFF6F7FB),
+                    kPrimary.withOpacity(0.08),
+                    const Color(0xFFE8ECFF),
+                  ],
           ),
         ),
         child: SafeArea(
@@ -87,9 +188,7 @@ class _MyProfilePageState extends State<MyProfilePage>
                 ),
               ),
               // Stories Section
-              SliverToBoxAdapter(
-                child: _buildStories(context, isDark),
-              ),
+              SliverToBoxAdapter(child: _buildStories(context, isDark)),
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
               // Tab Bar in Glass
               SliverPersistentHeader(
@@ -101,8 +200,14 @@ class _MyProfilePageState extends State<MyProfilePage>
                     indicatorColor: kPrimary,
                     indicatorWeight: 3,
                     indicatorSize: TabBarIndicatorSize.tab,
-                    labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                    unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+                    labelStyle: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
+                    ),
                     tabs: const [
                       Tab(text: 'Posts'),
                       Tab(text: 'Media'),
@@ -133,8 +238,8 @@ class _MyProfilePageState extends State<MyProfilePage>
   Widget _buildGlassmorphicHeader(BuildContext context, bool isDark) {
     const coverUrl = 'https://picsum.photos/seed/cover/1200/400';
     const avatarUrl = 'https://i.pravatar.cc/300?img=13';
-    
-    return Container(
+
+    return SizedBox(
       height: 280,
       child: Stack(
         clipBehavior: Clip.none,
@@ -155,8 +260,12 @@ class _MyProfilePageState extends State<MyProfilePage>
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    (isDark ? kDarkBackground : kLightBackground).withOpacity(0.3),
-                    (isDark ? kDarkBackground : kLightBackground).withOpacity(0.95),
+                    (isDark ? kDarkBackground : kLightBackground).withOpacity(
+                      0.3,
+                    ),
+                    (isDark ? kDarkBackground : kLightBackground).withOpacity(
+                      0.95,
+                    ),
                   ],
                 ),
               ),
@@ -166,7 +275,11 @@ class _MyProfilePageState extends State<MyProfilePage>
           Positioned(
             top: 16,
             right: 16,
-            child: _buildGlassIconButton(Icons.settings_outlined, isDark, () {}),
+            child: _buildGlassIconButton(
+              Icons.settings_outlined,
+              isDark,
+              () {},
+            ),
           ),
           // Avatar with Glass Effect
           Positioned(
@@ -212,7 +325,11 @@ class _MyProfilePageState extends State<MyProfilePage>
   }
 
   // Glass Icon Button
-  Widget _buildGlassIconButton(IconData icon, bool isDark, VoidCallback onPressed) {
+  Widget _buildGlassIconButton(
+    IconData icon,
+    bool isDark,
+    VoidCallback onPressed,
+  ) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(15),
       child: BackdropFilter(
@@ -230,7 +347,11 @@ class _MyProfilePageState extends State<MyProfilePage>
           ),
           child: IconButton(
             onPressed: onPressed,
-            icon: Icon(icon, color: isDark ? Colors.white : Colors.black87, size: 22),
+            icon: Icon(
+              icon,
+              color: isDark ? Colors.white : Colors.black87,
+              size: 22,
+            ),
           ),
         ),
       ),
@@ -332,7 +453,10 @@ class _MyProfilePageState extends State<MyProfilePage>
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 48,
+                      vertical: 14,
+                    ),
                     child: const Text(
                       'Edit Profile',
                       style: TextStyle(
@@ -352,34 +476,57 @@ class _MyProfilePageState extends State<MyProfilePage>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildStatItem('103', 'Posts', isDark),
+            _buildStatItem('103', 'Posts', isDark, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const UserPostsPage()),
+              );
+            }),
             Container(
               width: 1,
               height: 40,
               color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
             ),
-            _buildStatItem('870', 'Following', isDark),
+            _buildStatItem('870', 'Following', isDark, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const FollowersFollowingPage(initialTab: 1),
+                ),
+              );
+            }),
             Container(
               width: 1,
               height: 40,
               color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
             ),
-            _buildStatItem('120k', 'Followers', isDark),
+            _buildStatItem('120k', 'Followers', isDark, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const FollowersFollowingPage(initialTab: 0),
+                ),
+              );
+            }),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildStatItem(String count, String label, bool isDark) {
-    return Column(
+  Widget _buildStatItem(
+    String count,
+    String label,
+    bool isDark,
+    VoidCallback? onTap,
+  ) {
+    final statWidget = Column(
       children: [
         Text(
           count,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
         Text(
@@ -391,6 +538,19 @@ class _MyProfilePageState extends State<MyProfilePage>
         ),
       ],
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: statWidget,
+        ),
+      );
+    }
+
+    return statWidget;
   }
 
   Widget _buildStories(BuildContext context, bool isDark) {
@@ -411,13 +571,18 @@ class _MyProfilePageState extends State<MyProfilePage>
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const StoriesViewPage(),
+                      builder: (context) => StoriesArchivePage(
+                        storyCollections: _userStoryCollections,
+                      ),
                     ),
                   );
                 },
                 child: Text(
                   'View all',
-                  style: TextStyle(color: kPrimary, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: kPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -444,13 +609,15 @@ class _MyProfilePageState extends State<MyProfilePage>
     return Column(
       children: [
         if (story['url'] == null)
-          // Add Story Button
+          // Add Story Button - Now opens Stories Archive
           GestureDetector(
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const AddStoryPage(),
+                  builder: (context) => StoriesArchivePage(
+                    storyCollections: _userStoryCollections,
+                  ),
                 ),
               );
             },
@@ -480,25 +647,31 @@ class _MyProfilePageState extends State<MyProfilePage>
             ),
           )
         else
-          // Story with Glass Border
-          Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                colors: [
-                  kPrimary.withOpacity(0.8),
-                  kPrimary.withOpacity(0.4),
-                ],
+          // Story with Glass Border - Clickable
+          GestureDetector(
+            onTap: () {
+              final category = story['title']!;
+              _openStoryCollection(category);
+            },
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: LinearGradient(
+                  colors: [
+                    kPrimary.withOpacity(0.8),
+                    kPrimary.withOpacity(0.4),
+                  ],
+                ),
               ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(17),
-              child: Image.network(
-                story['url']!,
-                width: 70,
-                height: 70,
-                fit: BoxFit.cover,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(17),
+                child: Image.network(
+                  story['url']!,
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
           ),
@@ -535,10 +708,7 @@ class _MyProfilePageState extends State<MyProfilePage>
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.3),
-                    ],
+                    colors: [Colors.transparent, Colors.black.withOpacity(0.3)],
                   ),
                 ),
               ),
@@ -562,7 +732,11 @@ class _GlassmorphicTabBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => _tabBar.preferredSize.height + 10;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: ClipRRect(

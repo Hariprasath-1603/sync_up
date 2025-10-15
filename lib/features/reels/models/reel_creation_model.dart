@@ -246,8 +246,9 @@ class TextOverlay {
     // If style is provided, extract properties from it
     if (style != null) {
       if (style.fontSize != null) fontSize = style.fontSize!;
-      if (style.color != null)
+      if (style.color != null) {
         color = '#${style.color!.value.toRadixString(16).padLeft(8, '0')}';
+      }
       if (style.fontFamily != null) fontFamily = style.fontFamily!;
     }
     // If position is provided, use it
