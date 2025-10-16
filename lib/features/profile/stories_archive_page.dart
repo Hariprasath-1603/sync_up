@@ -7,10 +7,7 @@ import '../stories/storyverse_page.dart';
 class StoriesArchivePage extends StatefulWidget {
   final Map<String, List<StoryVerseStory>> storyCollections;
 
-  const StoriesArchivePage({
-    super.key,
-    required this.storyCollections,
-  });
+  const StoriesArchivePage({super.key, required this.storyCollections});
 
   @override
   State<StoriesArchivePage> createState() => _StoriesArchivePageState();
@@ -45,7 +42,9 @@ class _StoriesArchivePageState extends State<StoriesArchivePage> {
       // Filter by date range
       return allStories.where((story) {
         return story.timestamp.isAfter(_selectedDateRange!.start) &&
-            story.timestamp.isBefore(_selectedDateRange!.end.add(const Duration(days: 1)));
+            story.timestamp.isBefore(
+              _selectedDateRange!.end.add(const Duration(days: 1)),
+            );
       }).toList();
     }
 
@@ -106,7 +105,10 @@ class _StoriesArchivePageState extends State<StoriesArchivePage> {
     }
   }
 
-  void _openStoryViewer(StoryVerseStory story, List<StoryVerseStory> allStories) {
+  void _openStoryViewer(
+    StoryVerseStory story,
+    List<StoryVerseStory> allStories,
+  ) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -125,7 +127,7 @@ class _StoriesArchivePageState extends State<StoriesArchivePage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final navVisibility = NavBarVisibilityScope.maybeOf(context);
     navVisibility?.value = false;
-    
+
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -249,9 +251,7 @@ class _StoriesArchivePageState extends State<StoriesArchivePage> {
                       },
                       icon: const Icon(Icons.clear),
                       label: const Text('Clear Filter'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.red,
-                      ),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
                     ),
                 ],
               ),
@@ -329,7 +329,11 @@ class _StoriesArchivePageState extends State<StoriesArchivePage> {
               Expanded(
                 child: allStories.isEmpty
                     ? _buildEmptyState(isDark)
-                    : _buildStoriesListByDate(storiesGroupedByDate, allStories, isDark),
+                    : _buildStoriesListByDate(
+                        storiesGroupedByDate,
+                        allStories,
+                        isDark,
+                      ),
               ),
             ],
           ),
@@ -341,7 +345,8 @@ class _StoriesArchivePageState extends State<StoriesArchivePage> {
   Widget _buildFilterInfo(bool isDark) {
     String filterText = '';
     if (_selectedDate != null) {
-      filterText = 'Showing stories from ${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}';
+      filterText =
+          'Showing stories from ${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}';
     } else if (_selectedDateRange != null) {
       filterText =
           'Showing stories from ${_selectedDateRange!.start.day}/${_selectedDateRange!.start.month}/${_selectedDateRange!.start.year} to ${_selectedDateRange!.end.day}/${_selectedDateRange!.end.month}/${_selectedDateRange!.end.year}';
@@ -353,18 +358,11 @@ class _StoriesArchivePageState extends State<StoriesArchivePage> {
       decoration: BoxDecoration(
         color: kPrimary.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: kPrimary.withOpacity(0.3),
-          width: 1,
-        ),
+        border: Border.all(color: kPrimary.withOpacity(0.3), width: 1),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.filter_alt_rounded,
-            color: kPrimary,
-            size: 20,
-          ),
+          Icon(Icons.filter_alt_rounded, color: kPrimary, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -514,10 +512,7 @@ class _StoriesArchivePageState extends State<StoriesArchivePage> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.6),
-                  ],
+                  colors: [Colors.transparent, Colors.black.withOpacity(0.6)],
                 ),
               ),
             ),
@@ -557,10 +552,7 @@ class _StoriesArchivePageState extends State<StoriesArchivePage> {
               top: 6,
               right: 6,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 3,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.6),
                   borderRadius: BorderRadius.circular(10),
