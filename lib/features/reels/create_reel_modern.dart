@@ -603,7 +603,28 @@ class _CreateReelModernState extends State<CreateReelModern>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            CameraPreview(controller),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // Calculate scale to fill screen while maintaining aspect ratio
+                final size = MediaQuery.of(context).size;
+                final deviceRatio = size.width / size.height;
+                final cameraRatio = controller.value.aspectRatio;
+
+                double scale;
+                if (cameraRatio > deviceRatio) {
+                  // Camera is wider, scale based on height
+                  scale = 1 / cameraRatio / deviceRatio;
+                } else {
+                  // Camera is taller, scale based on width
+                  scale = 1.0;
+                }
+
+                return Transform.scale(
+                  scale: scale,
+                  child: Center(child: CameraPreview(controller)),
+                );
+              },
+            ),
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(

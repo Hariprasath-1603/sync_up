@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/scaffold_with_nav_bar.dart';
+import '../profile/pages/widgets/floating_reactions.dart';
 
 class ReelsPageNew extends StatefulWidget {
   const ReelsPageNew({super.key});
@@ -15,6 +16,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
   bool _isFollowingTab = false;
   late AnimationController _likeAnimationController;
   bool _showLikeAnimation = false;
+  final GlobalKey<FloatingReactionsState> _reactionsKey = GlobalKey();
 
   // For You Reels (all reels)
   final List<ReelData> _forYouReels = [
@@ -145,6 +147,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
       if (_currentReels[index].isLiked) {
         _currentReels[index].likes++;
         _showLikeAnimation = true;
+        _reactionsKey.currentState?.addReaction('❤️'); // Add floating heart
         _likeAnimationController.forward().then((_) {
           _likeAnimationController.reverse();
           setState(() {
@@ -452,6 +455,10 @@ class _ReelsPageNewState extends State<ReelsPageNew>
               ),
             ),
 
+          // Floating Hearts Animation
+          if (_currentReelIndex == index)
+            Positioned.fill(child: FloatingReactions(key: _reactionsKey)),
+
           // Right Side Action Buttons
           Positioned(
             right: 12,
@@ -735,22 +742,129 @@ class _ExpandableTextState extends State<_ExpandableText> {
 }
 
 // Comments Modal
-class CommentsModal extends StatelessWidget {
+class CommentsModal extends StatefulWidget {
   final ReelData reel;
 
   const CommentsModal({super.key, required this.reel});
 
   @override
+  State<CommentsModal> createState() => _CommentsModalState();
+}
+
+class _CommentsModalState extends State<CommentsModal> {
+  final Map<int, bool> _likedComments = {};
+  final Map<int, bool> _showReplies = {};
+  final Map<int, int> _likeCounts = {};
+  final Map<int, List<Map<String, dynamic>>> _replies = {};
+  final TextEditingController _commentController = TextEditingController();
+  final TextEditingController _replyController = TextEditingController();
+  int? _replyingToIndex;
+  String? _replyingToUsername;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize like counts and some sample replies
+    for (int i = 0; i < 10; i++) {
+      _likeCounts[i] = (i + 1) * 5;
+      // Add sample replies for every 3rd comment
+      if (i % 3 == 0) {
+        _replies[i] = [
+          {
+            'username': '@replier_1',
+            'text': 'Thanks for sharing!',
+            'time': '${i}m',
+            'avatar': 'https://i.pravatar.cc/150?img=${i + 20}',
+          },
+          {
+            'username': '@replier_2',
+            'text': 'Agreed! 💯',
+            'time': '${i + 1}m',
+            'avatar': 'https://i.pravatar.cc/150?img=${i + 21}',
+          },
+        ];
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    _replyController.dispose();
+    super.dispose();
+  }
+
+  void _toggleLike(int index) {
+    setState(() {
+      _likedComments[index] = !(_likedComments[index] ?? false);
+      _likeCounts[index] =
+          (_likeCounts[index] ?? 0) + (_likedComments[index]! ? 1 : -1);
+    });
+  }
+
+  void _toggleReplies(int index) {
+    setState(() {
+      _showReplies[index] = !(_showReplies[index] ?? false);
+    });
+  }
+
+  void _startReply(int index, String username) {
+    setState(() {
+      _replyingToIndex = index;
+      _replyingToUsername = username;
+    });
+    // Focus on reply input
+    FocusScope.of(context).requestFocus(FocusNode());
+  }
+
+  void _cancelReply() {
+    setState(() {
+      _replyingToIndex = null;
+      _replyingToUsername = null;
+      _replyController.clear();
+    });
+  }
+
+  void _submitReply() {
+    if (_replyController.text.trim().isEmpty || _replyingToIndex == null)
+      return;
+
+    setState(() {
+      final replies = _replies[_replyingToIndex!] ?? [];
+      replies.add({
+        'username': '@you',
+        'text': _replyController.text.trim(),
+        'time': 'Just now',
+        'avatar': 'https://i.pravatar.cc/150?img=1',
+      });
+      _replies[_replyingToIndex!] = replies;
+      _showReplies[_replyingToIndex!] =
+          true; // Auto-show replies after submitting
+      _replyController.clear();
+      _replyingToIndex = null;
+      _replyingToUsername = null;
+    });
+  }
+
+  void _submitComment() {
+    if (_commentController.text.trim().isEmpty) return;
+    // TODO: Implement actual comment submission
+    _commentController.clear();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1D24),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A1D24) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
@@ -760,7 +874,7 @@ class CommentsModal extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[600],
+                  color: isDark ? Colors.grey[600] : Colors.grey[400],
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -770,148 +884,197 @@ class CommentsModal extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '${reel.comments} Comments',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      '${widget.reel.comments} Comments',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
+                      icon: Icon(
+                        Icons.close,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
               ),
-              const Divider(color: Colors.grey, height: 1),
+              Divider(
+                color: isDark ? Colors.grey[800] : Colors.grey[300],
+                height: 1,
+              ),
               Expanded(
                 child: ListView.builder(
                   controller: scrollController,
                   itemCount: 10,
                   padding: const EdgeInsets.all(16),
                   itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CircleAvatar(
-                            radius: 18,
-                            backgroundImage: NetworkImage(
-                              'https://i.pravatar.cc/150?img=${index + 10}',
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      '@user_${index + 1}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      '${index + 1}h',
-                                      style: TextStyle(
-                                        color: Colors.grey[400],
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Amazing content! Keep it up 🔥',
-                                  style: TextStyle(
-                                    color: Colors.grey[200],
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Reply',
-                                      style: TextStyle(
-                                        color: Colors.grey[400],
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Text(
-                                      '${(index + 1) * 5} likes',
-                                      style: TextStyle(
-                                        color: Colors.grey[400],
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.favorite_border,
-                              color: Colors.grey[400],
-                              size: 20,
-                            ),
-                            onPressed: () {},
-                          ),
-                        ],
-                      ),
+                    final isLiked = _likedComments[index] ?? false;
+                    final likeCount = _likeCounts[index] ?? 0;
+                    final showReplies = _showReplies[index] ?? false;
+
+                    return Column(
+                      children: [
+                        _buildCommentItem(
+                          index,
+                          '@user_${index + 1}',
+                          '${index + 1}h',
+                          'Amazing content! Keep it up 🔥',
+                          isLiked,
+                          likeCount,
+                          'https://i.pravatar.cc/150?img=${index + 10}',
+                          hasReplies: index % 3 == 0,
+                          showReplies: showReplies,
+                          isDark: isDark,
+                        ),
+                        // Show replies if toggled
+                        if (showReplies && index % 3 == 0)
+                          _buildRepliesSection(index, isDark),
+                      ],
                     );
                   },
                 ),
               ),
-              // Comment Input
+              // Comment/Reply Input
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0B0E13),
+                  color: isDark ? const Color(0xFF0B0E13) : Colors.grey[100],
                   border: Border(
-                    top: BorderSide(color: Colors.grey[800]!, width: 1),
+                    top: BorderSide(
+                      color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
+                      width: 1,
+                    ),
                   ),
                 ),
                 child: SafeArea(
-                  child: Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const CircleAvatar(
-                        radius: 18,
-                        backgroundImage: NetworkImage(
-                          'https://i.pravatar.cc/150?img=1',
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Container(
+                      // Show replying-to banner if replying
+                      if (_replyingToIndex != null)
+                        Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
+                            horizontal: 12,
+                            vertical: 8,
                           ),
+                          margin: const EdgeInsets.only(bottom: 8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1A1D24),
-                            borderRadius: BorderRadius.circular(24),
+                            color: isDark
+                                ? const Color(0xFF1A1D24)
+                                : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Text(
-                            'Add a comment...',
-                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Replying to $_replyingToUsername',
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? Colors.grey[400]
+                                        : Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: _cancelReply,
+                                child: Icon(
+                                  Icons.close,
+                                  size: 18,
+                                  color: isDark
+                                      ? Colors.grey[400]
+                                      : Colors.grey[600],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.send, color: Colors.blue),
-                        onPressed: () {},
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 18,
+                            backgroundImage: NetworkImage(
+                              'https://i.pravatar.cc/150?img=1',
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _replyingToIndex != null
+                                  ? _replyController
+                                  : _commentController,
+                              decoration: InputDecoration(
+                                hintText: _replyingToIndex != null
+                                    ? 'Write a reply...'
+                                    : 'Add a comment...',
+                                hintStyle: TextStyle(
+                                  color: isDark
+                                      ? Colors.grey[400]
+                                      : Colors.grey[600],
+                                  fontSize: 14,
+                                ),
+                                filled: true,
+                                fillColor: isDark
+                                    ? const Color(0xFF1A1D24)
+                                    : Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide(
+                                    color: isDark
+                                        ? Colors.grey[700]!
+                                        : Colors.grey[300]!,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide(
+                                    color: isDark
+                                        ? Colors.grey[700]!
+                                        : Colors.grey[300]!,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF4A6CF7),
+                                    width: 2,
+                                  ),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                              ),
+                              maxLines: null,
+                              textInputAction: TextInputAction.send,
+                              onSubmitted: (_) {
+                                if (_replyingToIndex != null) {
+                                  _submitReply();
+                                } else {
+                                  _submitComment();
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.send,
+                              color: Color(0xFF4A6CF7),
+                            ),
+                            onPressed: () {
+                              if (_replyingToIndex != null) {
+                                _submitReply();
+                              } else {
+                                _submitComment();
+                              }
+                            },
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -921,6 +1084,204 @@ class CommentsModal extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCommentItem(
+    int index,
+    String username,
+    String time,
+    String comment,
+    bool isLiked,
+    int likeCount,
+    String avatarUrl, {
+    bool hasReplies = false,
+    bool showReplies = false,
+    required bool isDark,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(radius: 18, backgroundImage: NetworkImage(avatarUrl)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      username,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      time,
+                      style: TextStyle(
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  comment,
+                  style: TextStyle(
+                    color: isDark ? Colors.grey[200] : Colors.black87,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    // Reply button
+                    GestureDetector(
+                      onTap: () => _startReply(index, username),
+                      child: Text(
+                        'Reply',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (hasReplies) ...[
+                      const SizedBox(width: 16),
+                      // View/Hide replies button
+                      GestureDetector(
+                        onTap: () => _toggleReplies(index),
+                        child: Text(
+                          showReplies
+                              ? 'Hide replies'
+                              : 'View ${(_replies[index]?.length ?? 0) + 2} replies',
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 16),
+                    // Like count
+                    GestureDetector(
+                      onTap: () => _toggleLike(index),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isLiked ? Icons.favorite : Icons.favorite_border,
+                            color: isLiked
+                                ? Colors.red
+                                : (isDark
+                                      ? Colors.grey[400]
+                                      : Colors.grey[600]),
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$likeCount',
+                            style: TextStyle(
+                              color: isDark
+                                  ? Colors.grey[400]
+                                  : Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Like button
+          IconButton(
+            icon: Icon(
+              isLiked ? Icons.favorite : Icons.favorite_border,
+              color: isLiked
+                  ? Colors.red
+                  : (isDark ? Colors.grey[400] : Colors.grey[600]),
+              size: 20,
+            ),
+            onPressed: () => _toggleLike(index),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRepliesSection(int parentIndex, bool isDark) {
+    final replies = _replies[parentIndex] ?? [];
+
+    if (replies.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 42, bottom: 16),
+      child: Column(
+        children: replies
+            .map(
+              (reply) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 14,
+                      backgroundImage: NetworkImage(reply['avatar']),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                reply['username'],
+                                style: TextStyle(
+                                  color: isDark ? Colors.white : Colors.black87,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                reply['time'],
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.grey[400]
+                                      : Colors.grey[600],
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            reply['text'],
+                            style: TextStyle(
+                              color: isDark ? Colors.grey[200] : Colors.black87,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+      ),
     );
   }
 }

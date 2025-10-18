@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../../core/scaffold_with_nav_bar.dart';
 import '../../../core/theme.dart';
 import '../models/post_model.dart';
+import '../../profile/models/post_model.dart' as profile_post;
+import '../../profile/pages/post_viewer_instagram_style.dart';
 
 class PostCard extends StatefulWidget {
   const PostCard({super.key, required this.post});
@@ -136,44 +138,49 @@ class _PostCardState extends State<PostCard> {
                     ],
                   ),
                 ),
-                ClipRRect(
-                  borderRadius: const BorderRadius.all(Radius.circular(20)),
-                  child: Stack(
-                    children: [
-                      Image.network(
-                        post.imageUrl,
-                        width: double.infinity,
-                        height: 280,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                GestureDetector(
+                  onTap: () => _openPostViewer(context),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.all(Radius.circular(20)),
+                    child: Stack(
+                      children: [
+                        Image.network(
+                          post.imageUrl,
+                          width: double.infinity,
                           height: 280,
-                          color: Theme.of(context).colorScheme.surfaceVariant,
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.image_not_supported_rounded,
-                            size: 48,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: Container(
-                          height: 100,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black.withOpacity(0.3),
-                              ],
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            height: 280,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.image_not_supported_rounded,
+                              size: 48,
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 100,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(0.3),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Padding(
@@ -324,6 +331,33 @@ class _PostCardState extends State<PostCard> {
     ).whenComplete(() => navVisibility?.value = true);
   }
 
+  void _openPostViewer(BuildContext context) {
+    // Convert home Post model to profile PostModel
+    final profilePost = profile_post.PostModel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      type: profile_post.PostType.image,
+      mediaUrls: [post.imageUrl],
+      thumbnailUrl: post.imageUrl,
+      username: post.userName,
+      userAvatar: post.userAvatarUrl,
+      timestamp: DateTime.now(),
+      caption: '',
+      likes: _likeCount,
+      comments: _commentCount,
+      shares: _parseCount(post.shares),
+      views: _likeCount * 10, // Estimate
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PostViewerInstagramStyle(
+          initialPost: profilePost,
+          allPosts: [profilePost],
+        ),
+      ),
+    );
+  }
+
   void _openPostOptions(BuildContext context) {
     final navVisibility = NavBarVisibilityScope.maybeOf(context);
     navVisibility?.value = false;
@@ -471,7 +505,10 @@ class _CommentsSheet extends StatefulWidget {
 
 class _CommentsSheetState extends State<_CommentsSheet> {
   late final TextEditingController _controller;
+  late final TextEditingController _replyController;
   final Map<int, bool> _expandedReplies = {};
+  int? _replyingToIndex;
+  String? _replyingToUsername;
 
   List<_Comment> get comments => widget.comments;
 
@@ -479,12 +516,47 @@ class _CommentsSheetState extends State<_CommentsSheet> {
   void initState() {
     super.initState();
     _controller = TextEditingController();
+    _replyController = TextEditingController();
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _replyController.dispose();
     super.dispose();
+  }
+
+  void _startReply(int index) {
+    setState(() {
+      _replyingToIndex = index;
+      _replyingToUsername = 'User'; // In real app, get from comment data
+      _expandedReplies[index] = true; // Auto-expand to see where reply will go
+    });
+    // Focus on reply input
+    FocusScope.of(context).requestFocus(FocusNode());
+  }
+
+  void _cancelReply() {
+    setState(() {
+      _replyingToIndex = null;
+      _replyingToUsername = null;
+      _replyController.clear();
+    });
+  }
+
+  void _submitReply() {
+    if (_replyController.text.trim().isEmpty || _replyingToIndex == null) {
+      return;
+    }
+
+    setState(() {
+      comments[_replyingToIndex!].replies.add(
+        _Comment(text: _replyController.text.trim(), timestamp: DateTime.now()),
+      );
+      _replyController.clear();
+      _replyingToIndex = null;
+      _replyingToUsername = null;
+    });
   }
 
   @override
@@ -561,6 +633,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                           });
                         },
                         isExpanded: _expandedReplies[index] ?? false,
+                        onReply: () => _startReply(index),
                       ),
                     ),
             ),
@@ -569,40 +642,101 @@ class _CommentsSheetState extends State<_CommentsSheet> {
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _controller,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _handleSubmit(context),
-                        maxLines: null,
-                        decoration: InputDecoration(
-                          hintText: 'Write a comment...',
-                          filled: true,
-                          fillColor: isDark
+                    // Show replying-to banner if replying
+                    if (_replyingToIndex != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: isDark
                               ? Colors.white.withOpacity(0.05)
                               : Colors.grey.withOpacity(0.1),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(24),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          isDense: true,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Replying to $_replyingToUsername',
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.grey
+                                      : Colors.grey.shade600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: _cancelReply,
+                              child: Icon(
+                                Icons.close,
+                                size: 18,
+                                color: isDark
+                                    ? Colors.grey
+                                    : Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      onPressed: () => _handleSubmit(context),
-                      icon: const Icon(Icons.send_rounded),
-                      style: IconButton.styleFrom(
-                        backgroundColor: theme.colorScheme.primary,
-                        foregroundColor: Colors.white,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _replyingToIndex != null
+                                ? _replyController
+                                : _controller,
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (_) {
+                              if (_replyingToIndex != null) {
+                                _submitReply();
+                              } else {
+                                _handleSubmit(context);
+                              }
+                            },
+                            maxLines: null,
+                            decoration: InputDecoration(
+                              hintText: _replyingToIndex != null
+                                  ? 'Write a reply...'
+                                  : 'Write a comment...',
+                              filled: true,
+                              fillColor: isDark
+                                  ? Colors.white.withOpacity(0.05)
+                                  : Colors.grey.withOpacity(0.1),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(24),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filled(
+                          onPressed: () {
+                            if (_replyingToIndex != null) {
+                              _submitReply();
+                            } else {
+                              _handleSubmit(context);
+                            }
+                          },
+                          icon: const Icon(Icons.send_rounded),
+                          style: IconButton.styleFrom(
+                            backgroundColor: theme.colorScheme.primary,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -674,7 +808,9 @@ class _ShareSheet extends StatelessWidget {
                     errorBuilder: (_, __, ___) => Container(
                       width: 56,
                       height: 56,
-                      color: Theme.of(context).colorScheme.surfaceVariant,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                       child: const Icon(Icons.image_not_supported_rounded),
                     ),
                   ),
@@ -682,7 +818,7 @@ class _ShareSheet extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    "Share ${userName}'s post",
+                    "Share $userName's post",
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
@@ -803,11 +939,13 @@ class _CommentTile extends StatelessWidget {
     required this.onLike,
     required this.onToggleReplies,
     required this.isExpanded,
+    required this.onReply,
   });
 
   final _Comment comment;
   final VoidCallback onLike;
   final VoidCallback onToggleReplies;
+  final VoidCallback onReply;
   final bool isExpanded;
 
   String _getTimeAgo(DateTime timestamp) {
@@ -917,9 +1055,7 @@ class _CommentTile extends StatelessWidget {
                         ),
                         const SizedBox(width: 16),
                         InkWell(
-                          onTap: () {
-                            // TODO: Implement reply functionality
-                          },
+                          onTap: onReply,
                           borderRadius: BorderRadius.circular(4),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(

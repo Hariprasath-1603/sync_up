@@ -1,11 +1,15 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../../core/scaffold_with_nav_bar.dart';
 import 'edit_profile_page.dart';
 import 'followers_following_page.dart';
 import 'user_posts_page.dart';
 import 'stories_archive_page.dart';
 import '../stories/storyverse_page.dart';
+import 'models/post_model.dart' as profile_post;
+import 'pages/post_viewer_instagram_style.dart';
+import 'pages/profile_photo_viewer.dart';
 
 class MyProfilePage extends StatefulWidget {
   const MyProfilePage({super.key});
@@ -311,9 +315,16 @@ class _MyProfilePageState extends State<MyProfilePage>
                     shape: BoxShape.circle,
                     color: isDark ? kDarkBackground : Colors.white,
                   ),
-                  child: const CircleAvatar(
-                    radius: 50,
-                    backgroundImage: NetworkImage(avatarUrl),
+                  child: GestureDetector(
+                    onLongPress: () =>
+                        _openProfilePhotoViewer(context, avatarUrl),
+                    child: Hero(
+                      tag: 'profile_photo_Jane Cooper',
+                      child: const CircleAvatar(
+                        radius: 50,
+                        backgroundImage: NetworkImage(avatarUrl),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -322,6 +333,46 @@ class _MyProfilePageState extends State<MyProfilePage>
         ],
       ),
     );
+  }
+
+  // Open Profile Photo Viewer
+  void _openProfilePhotoViewer(BuildContext context, String photoUrl) {
+    final navVisibility = NavBarVisibilityScope.maybeOf(context);
+    navVisibility?.value = false; // Hide navigation bar
+
+    Navigator.of(context)
+        .push(
+          PageRouteBuilder(
+            opaque: false,
+            barrierColor: Colors.black87,
+            pageBuilder: (context, animation, secondaryAnimation) {
+              return ProfilePhotoViewer(
+                photoUrl: photoUrl,
+                username: 'Jane Cooper',
+                isOwnProfile: true, // Set based on your logic
+                onFollow: () {
+                  // Handle follow action
+                },
+                onShare: () {
+                  // Handle share action
+                },
+                onCopyLink: () {
+                  // Handle copy link action
+                },
+                onQRCode: () {
+                  // Handle QR code action
+                },
+              );
+            },
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+          ),
+        )
+        .whenComplete(() {
+          navVisibility?.value = true; // Show navigation bar when closed
+        });
   }
 
   // Glass Icon Button
@@ -696,26 +747,65 @@ class _MyProfilePageState extends State<MyProfilePage>
         childAspectRatio: 0.75,
       ),
       itemBuilder: (context, index) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.network(images[index], fit: BoxFit.cover),
-              // Glass overlay on hover effect
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.3)],
+        return GestureDetector(
+          onTap: () => _openPostViewer(context, images, index),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.network(images[index], fit: BoxFit.cover),
+                // Glass overlay on hover effect
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.3),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
+    );
+  }
+
+  void _openPostViewer(
+    BuildContext context,
+    List<String> images,
+    int initialIndex,
+  ) {
+    // Convert image URLs to PostModel list
+    final posts = images.map((imageUrl) {
+      return profile_post.PostModel(
+        id: imageUrl,
+        type: profile_post.PostType.image,
+        mediaUrls: [imageUrl],
+        thumbnailUrl: imageUrl,
+        username: 'Jane Cooper', // Current user
+        userAvatar: 'https://i.pravatar.cc/150?img=1',
+        timestamp: DateTime.now(),
+        caption: '',
+        likes: 1234,
+        comments: 56,
+        shares: 12,
+        views: 10000,
+      );
+    }).toList();
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PostViewerInstagramStyle(
+          initialPost: posts[initialIndex],
+          allPosts: posts,
+        ),
+      ),
     );
   }
 }
