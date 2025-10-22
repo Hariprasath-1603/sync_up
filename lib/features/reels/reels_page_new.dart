@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/scaffold_with_nav_bar.dart';
 import '../profile/pages/widgets/floating_reactions.dart';
+import '../profile/other_user_profile_page.dart';
 
 class ReelsPageNew extends StatefulWidget {
   const ReelsPageNew({super.key});
@@ -9,19 +10,17 @@ class ReelsPageNew extends StatefulWidget {
   State<ReelsPageNew> createState() => _ReelsPageNewState();
 }
 
-class _ReelsPageNewState extends State<ReelsPageNew>
-    with SingleTickerProviderStateMixin {
+class _ReelsPageNewState extends State<ReelsPageNew> {
   final PageController _pageController = PageController();
   int _currentReelIndex = 0;
   bool _isFollowingTab = false;
-  late AnimationController _likeAnimationController;
-  bool _showLikeAnimation = false;
   final GlobalKey<FloatingReactionsState> _reactionsKey = GlobalKey();
 
   // For You Reels (all reels)
   final List<ReelData> _forYouReels = [
     ReelData(
       id: 'r12345',
+      userId: 'user_ynxz_001',
       username: '@YNxz',
       profilePic: 'https://i.pravatar.cc/150?img=1',
       caption: 'It is not easy to meet each other in such a big world 🌍',
@@ -39,6 +38,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
     ),
     ReelData(
       id: 'r12346',
+      userId: 'user_alex_002',
       username: '@alex_travel',
       profilePic: 'https://i.pravatar.cc/150?img=2',
       caption: 'Paradise found 🏝️ Living my best life! #travel #adventure',
@@ -56,6 +56,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
     ),
     ReelData(
       id: 'r12347',
+      userId: 'user_fitness_003',
       username: '@fitness_king',
       profilePic: 'https://i.pravatar.cc/150?img=3',
       caption: 'No excuses! 💪 Day 30 of the challenge #fitness #motivation',
@@ -73,6 +74,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
     ),
     ReelData(
       id: 'r12348',
+      userId: 'user_foodie_004',
       username: '@foodie_life',
       profilePic: 'https://i.pravatar.cc/150?img=4',
       caption: 'Homemade pasta from scratch 🍝 Recipe in bio! #cooking #food',
@@ -90,6 +92,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
     ),
     ReelData(
       id: 'r12349',
+      userId: 'user_dance_005',
       username: '@dance_queen',
       profilePic: 'https://i.pravatar.cc/150?img=5',
       caption: 'New choreography alert! 💃 Who wants to learn? #dance #viral',
@@ -118,18 +121,8 @@ class _ReelsPageNewState extends State<ReelsPageNew>
   }
 
   @override
-  void initState() {
-    super.initState();
-    _likeAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-  }
-
-  @override
   void dispose() {
     _pageController.dispose();
-    _likeAnimationController.dispose();
     super.dispose();
   }
 
@@ -146,14 +139,8 @@ class _ReelsPageNewState extends State<ReelsPageNew>
       _currentReels[index].isLiked = !_currentReels[index].isLiked;
       if (_currentReels[index].isLiked) {
         _currentReels[index].likes++;
-        _showLikeAnimation = true;
-        _reactionsKey.currentState?.addReaction('❤️'); // Add floating heart
-        _likeAnimationController.forward().then((_) {
-          _likeAnimationController.reverse();
-          setState(() {
-            _showLikeAnimation = false;
-          });
-        });
+        // Add multiple floating hearts from bottom
+        _reactionsKey.currentState?.addReaction('❤️');
       } else {
         _currentReels[index].likes--;
       }
@@ -431,31 +418,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
             ],
           ),
 
-          // Double Tap Like Animation
-          if (_showLikeAnimation && _currentReelIndex == index)
-            Center(
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.5, end: 1.5).animate(
-                  CurvedAnimation(
-                    parent: _likeAnimationController,
-                    curve: Curves.elasticOut,
-                  ),
-                ),
-                child: FadeTransition(
-                  opacity: Tween<double>(
-                    begin: 1.0,
-                    end: 0.0,
-                  ).animate(_likeAnimationController),
-                  child: const Icon(
-                    Icons.favorite,
-                    color: Colors.white,
-                    size: 120,
-                  ),
-                ),
-              ),
-            ),
-
-          // Floating Hearts Animation
+          // Floating Hearts Animation (from bottom)
           if (_currentReelIndex == index)
             Positioned.fill(child: FloatingReactions(key: _reactionsKey)),
 
@@ -471,15 +434,35 @@ class _ReelsPageNewState extends State<ReelsPageNew>
                   clipBehavior: Clip.none,
                   alignment: Alignment.bottomCenter,
                   children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                        image: DecorationImage(
-                          image: NetworkImage(reel.profilePic),
-                          fit: BoxFit.cover,
+                    GestureDetector(
+                      onTap: () {
+                        final navVisibility = NavBarVisibilityScope.maybeOf(context);
+                        navVisibility?.value = false;
+                        
+                        Navigator.of(context)
+                            .push(
+                              MaterialPageRoute(
+                                builder: (context) => OtherUserProfilePage(
+                                  userId: reel.userId,
+                                  username: reel.username,
+                                  avatarUrl: reel.profilePic,
+                                ),
+                              ),
+                            )
+                            .whenComplete(() {
+                              navVisibility?.value = true;
+                            });
+                      },
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                          image: DecorationImage(
+                            image: NetworkImage(reel.profilePic),
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                     ),
@@ -563,13 +546,33 @@ class _ReelsPageNewState extends State<ReelsPageNew>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Username
-                Text(
-                  reel.username,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                // Username - Clickable to navigate to profile
+                GestureDetector(
+                  onTap: () {
+                    final navVisibility = NavBarVisibilityScope.maybeOf(context);
+                    navVisibility?.value = false;
+                    
+                    Navigator.of(context)
+                        .push(
+                          MaterialPageRoute(
+                            builder: (context) => OtherUserProfilePage(
+                              userId: reel.userId,
+                              username: reel.username,
+                              avatarUrl: reel.profilePic,
+                            ),
+                          ),
+                        )
+                        .whenComplete(() {
+                          navVisibility?.value = true;
+                        });
+                  },
+                  child: Text(
+                    reel.username,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -826,8 +829,9 @@ class _CommentsModalState extends State<CommentsModal> {
   }
 
   void _submitReply() {
-    if (_replyController.text.trim().isEmpty || _replyingToIndex == null)
+    if (_replyController.text.trim().isEmpty || _replyingToIndex == null) {
       return;
+    }
 
     setState(() {
       final replies = _replies[_replyingToIndex!] ?? [];
@@ -1544,6 +1548,7 @@ class MusicReelsPage extends StatelessWidget {
 // Reel Data Model
 class ReelData {
   final String id;
+  final String userId;
   final String username;
   final String profilePic;
   final String caption;
@@ -1561,6 +1566,7 @@ class ReelData {
 
   ReelData({
     required this.id,
+    required this.userId,
     required this.username,
     required this.profilePic,
     required this.caption,

@@ -1,42 +1,47 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
-/// Floating hearts that rise from the bottom with varying sizes
-class FloatingReactions extends StatefulWidget {
-  const FloatingReactions({super.key});
+/// Floating hearts that rise from a specific position (for post images)
+class FloatingHeartsFromPosition extends StatefulWidget {
+  final Offset? spawnPosition; // Position where hearts should spawn from
+
+  const FloatingHeartsFromPosition({super.key, this.spawnPosition});
 
   @override
-  State<FloatingReactions> createState() => FloatingReactionsState();
+  State<FloatingHeartsFromPosition> createState() =>
+      FloatingHeartsFromPositionState();
 }
 
-class FloatingReactionsState extends State<FloatingReactions>
+class FloatingHeartsFromPositionState extends State<FloatingHeartsFromPosition>
     with TickerProviderStateMixin {
   final List<_HeartItem> _hearts = [];
   final Random _random = Random();
 
-  void addReaction(String emoji) {
+  void addHeartsFromPosition(Offset position) {
     // Create multiple hearts (5-8 hearts) with different sizes
     final heartCount = 5 + _random.nextInt(4); // 5 to 8 hearts
 
     for (int i = 0; i < heartCount; i++) {
-      // Slight delay between hearts for staggered effect
-      Future.delayed(Duration(milliseconds: i * 50), () {
+      // Very slight delay between hearts for staggered effect (reduced from 40ms to 15ms)
+      Future.delayed(Duration(milliseconds: i * 15), () {
         if (!mounted) return;
 
         final controller = AnimationController(
           vsync: this,
           duration: Duration(
-            milliseconds: 1800 + _random.nextInt(600),
-          ), // 1800-2400ms
+            milliseconds: 1500 + _random.nextInt(500),
+          ), // 1500-2000ms
         );
 
         final heart = _HeartItem(
           controller: controller,
-          startX:
-              0.2 + _random.nextDouble() * 0.6, // 0.2 to 0.8 (from bottom area)
-          driftX: (_random.nextDouble() - 0.5) * 0.3, // -0.15 to 0.15 drift
-          size: 24.0 + _random.nextDouble() * 24, // 24 to 48 size
-          rotation: (_random.nextDouble() - 0.5) * 0.5, // -0.25 to 0.25 radians
+          startPosition: position,
+          offsetX:
+              (_random.nextDouble() - 0.5) *
+              100, // -50 to 50 px horizontal spread
+          offsetY: -200 - _random.nextDouble() * 150, // Rise 200-350px up
+          size: 28.0 + _random.nextDouble() * 20, // 28 to 48 size
+          rotation: (_random.nextDouble() - 0.5) * 0.4, // -0.2 to 0.2 radians
         );
 
         setState(() => _hearts.add(heart));
@@ -53,8 +58,6 @@ class FloatingReactionsState extends State<FloatingReactions>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return IgnorePointer(
       child: Stack(
         children: _hearts.map((heart) {
@@ -67,26 +70,26 @@ class FloatingReactionsState extends State<FloatingReactions>
               final verticalProgress = Curves.easeOut.transform(progress);
 
               // Horizontal drift with sine wave for natural movement
-              final horizontalDrift = sin(progress * pi * 2) * 20;
+              final horizontalDrift = sin(progress * pi * 2) * 15;
 
-              // Calculate position (start from bottom)
+              // Calculate position (start from tap position)
               final x =
-                  size.width * (heart.startX + (heart.driftX * progress)) +
+                  heart.startPosition.dx +
+                  (heart.offsetX * progress) +
                   horizontalDrift;
               final y =
-                  size.height -
-                  (size.height * 0.8 * verticalProgress); // Rise 80% of screen
+                  heart.startPosition.dy + (heart.offsetY * verticalProgress);
 
-              // Fade out as it rises (start fading at 70% of animation)
-              final opacity = progress < 0.7
+              // Fade out as it rises (start fading at 60% of animation)
+              final opacity = progress < 0.6
                   ? 1.0
-                  : (1.0 - (progress - 0.7) / 0.3);
+                  : (1.0 - (progress - 0.6) / 0.4);
 
-              // Slight scale animation (grow slightly then shrink)
-              final scale = progress < 0.2
-                  ? 0.8 +
-                        (progress * 2) // Grow from 0.8 to 1.2
-                  : 1.2 - (progress * 0.4); // Shrink from 1.2 to 0.8
+              // Scale animation (grow slightly then shrink)
+              final scale = progress < 0.15
+                  ? 0.5 +
+                        (progress * 3.33) // Grow from 0.5 to 1.0 quickly
+                  : 1.0 - (progress * 0.3); // Shrink from 1.0 to 0.7
 
               return Positioned(
                 left: x - (heart.size / 2),
@@ -102,7 +105,7 @@ class FloatingReactionsState extends State<FloatingReactions>
                         color: Colors.red.shade400,
                         size: heart.size,
                         shadows: const [
-                          Shadow(color: Colors.black26, blurRadius: 8),
+                          Shadow(color: Colors.black38, blurRadius: 12),
                         ],
                       ),
                     ),
@@ -128,15 +131,17 @@ class FloatingReactionsState extends State<FloatingReactions>
 class _HeartItem {
   _HeartItem({
     required this.controller,
-    required this.startX,
-    required this.driftX,
+    required this.startPosition,
+    required this.offsetX,
+    required this.offsetY,
     required this.size,
     required this.rotation,
   });
 
   final AnimationController controller;
-  final double startX; // Starting X position (0.0 to 1.0)
-  final double driftX; // Horizontal drift amount
+  final Offset startPosition; // Where the heart starts (tap position)
+  final double offsetX; // Horizontal offset from start
+  final double offsetY; // Vertical offset (negative = upward)
   final double size; // Heart size
   final double rotation; // Rotation amount
 }

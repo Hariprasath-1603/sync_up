@@ -151,6 +151,12 @@ class _CreateReelModernState extends State<CreateReelModern>
 
     if (state == AppLifecycleState.inactive) {
       controller.dispose();
+      if (mounted) {
+        setState(() {
+          _cameraController = null;
+          _isCameraReady = false;
+        });
+      }
     } else if (state == AppLifecycleState.resumed) {
       _recreateCameraController();
     }

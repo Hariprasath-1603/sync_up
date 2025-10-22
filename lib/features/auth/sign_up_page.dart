@@ -3,6 +3,11 @@ import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../core/services/database_service.dart';
+import '../../core/models/user_model.dart';
+import 'auth_service.dart';
+import 'dart:async';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -24,10 +29,20 @@ class _SignUpPageState extends State<SignUpPage> {
   final _phoneController = TextEditingController();
   final _locationController = TextEditingController();
 
+  final DatabaseService _databaseService = DatabaseService();
+  final AuthService _authService = AuthService();
+
   String? _selectedGender;
   String _countryCode = '91';
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
+  bool _isLoading = false;
+
+  // Username validation states
+  bool _isCheckingUsername = false;
+  bool? _isUsernameAvailable;
+  String? _usernameError;
+  Timer? _usernameDebounce;
 
   @override
   void dispose() {
@@ -39,7 +54,43 @@ class _SignUpPageState extends State<SignUpPage> {
     _dobController.dispose();
     _phoneController.dispose();
     _locationController.dispose();
+    _usernameDebounce?.cancel();
     super.dispose();
+  }
+
+  // Check username availability with debounce
+  void _checkUsernameAvailability(String username) {
+    // Cancel previous timer
+    _usernameDebounce?.cancel();
+
+    // Validate format first
+    final formatError = _databaseService.validateUsernameFormat(username);
+    if (formatError != null) {
+      setState(() {
+        _isCheckingUsername = false;
+        _isUsernameAvailable = false;
+        _usernameError = formatError;
+      });
+      return;
+    }
+
+    // Start checking availability after 500ms delay
+    setState(() {
+      _isCheckingUsername = true;
+      _usernameError = null;
+    });
+
+    _usernameDebounce = Timer(const Duration(milliseconds: 500), () async {
+      final isAvailable = await _databaseService.isUsernameAvailable(username);
+
+      if (!mounted) return;
+
+      setState(() {
+        _isCheckingUsername = false;
+        _isUsernameAvailable = isAvailable;
+        _usernameError = isAvailable ? null : 'Username is already taken';
+      });
+    });
   }
 
   void _goToNextPage() {
@@ -58,15 +109,268 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
-  void _onSignUp() {
+  Future<void> _onSignUp() async {
     if (_page2FormKey.currentState!.validate()) {
-      print('Signing up with:');
-      print('Username: ${_usernameController.text}');
-      print('Email: ${_emailController.text}');
-      print('DOB: ${_dobController.text}');
-      print('Gender: $_selectedGender');
-      print('Phone: +$_countryCode ${_phoneController.text}');
-      print('Location: ${_locationController.text}');
+      setState(() => _isLoading = true);
+
+      try {
+        print('DEBUG: Starting signup process...');
+        print('DEBUG: Email: ${_emailController.text.trim()}');
+        print('DEBUG: Username: ${_usernameController.text.trim()}');
+
+        // Create Firebase Auth account
+        print('DEBUG: Creating Firebase Auth account...');
+        final firebaseUser = await _authService.signUpWithEmailAndPassword(
+          _emailController.text.trim(),
+          _passwordController.text.trim(),
+        );
+
+        if (firebaseUser == null) {
+          print('ERROR: Firebase Auth returned null user');
+          throw Exception(
+            'Failed to create Firebase account. Please try again.',
+          );
+        }
+
+        print('DEBUG: Firebase user created with UID: ${firebaseUser.uid}');
+
+        // Send email verification
+        print('DEBUG: Sending verification email...');
+        try {
+          await firebaseUser.sendEmailVerification();
+          print('SUCCESS: Verification email sent to: ${firebaseUser.email}');
+        } catch (emailError) {
+          print('WARNING: Email verification send failed: $emailError');
+          // Continue even if email fails - user can resend later
+        }
+
+        // Create user model
+        print('DEBUG: Creating user model...');
+        final userModel = UserModel.fromFirebaseUser(
+          uid: firebaseUser.uid,
+          username: _usernameController.text.trim(),
+          email: _emailController.text.trim(),
+          displayName: _usernameController.text.trim(),
+          dateOfBirth: _dobController.text,
+          gender: _selectedGender,
+          phone: _phoneController.text.isNotEmpty
+              ? '+$_countryCode${_phoneController.text.trim()}'
+              : null,
+          location: _locationController.text.trim().isNotEmpty
+              ? _locationController.text.trim()
+              : null,
+        );
+
+        print('DEBUG: User model created, saving to Firestore...');
+        // Save user to Firestore
+        final success = await _databaseService.createUser(userModel);
+
+        if (!success) {
+          print('ERROR: Failed to save user to Firestore');
+          // Delete Firebase Auth account if Firestore save fails
+          print(
+            'DEBUG: Deleting Firebase Auth account due to Firestore failure...',
+          );
+          await firebaseUser.delete();
+          throw Exception(
+            'Username is already taken or database error. Please try a different username.',
+          );
+        }
+
+        print('SUCCESS: User document saved to Firestore');
+
+        if (!mounted) return;
+
+        print('DEBUG: Navigating to email verification page...');
+        // Navigate to email verification page
+        context.go(
+          '/email-verification?email=${Uri.encodeComponent(_emailController.text.trim())}',
+        );
+      } on FirebaseAuthException catch (e) {
+        print(
+          'ERROR: FirebaseAuthException - Code: ${e.code}, Message: ${e.message}',
+        );
+        if (!mounted) return;
+
+        String errorMessage = 'An error occurred during signup.';
+
+        // Handle specific Firebase Auth errors
+        switch (e.code) {
+          case 'email-already-in-use':
+            errorMessage =
+                'This email is already registered. Please sign in instead.';
+            break;
+          case 'weak-password':
+            errorMessage =
+                'Password is too weak. Please use at least 6 characters.';
+            break;
+          case 'invalid-email':
+            errorMessage = 'Invalid email address. Please check and try again.';
+            break;
+          case 'operation-not-allowed':
+            errorMessage =
+                'Email/password accounts are not enabled. Please contact support.';
+            break;
+          case 'network-request-failed':
+            errorMessage =
+                'Network error. Please check your internet connection.';
+            break;
+          default:
+            errorMessage =
+                e.message ?? 'Failed to create account. Please try again.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'Help',
+              textColor: Colors.white,
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Signup Error'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(errorMessage),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error Code: ${e.code}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Common Solutions:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('• Try a different email address'),
+                          const Text(
+                            '• Use a stronger password (6+ characters)',
+                          ),
+                          const Text('• Check your internet connection'),
+                          const Text('• Make sure Firebase Auth is enabled'),
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      } on Exception catch (e) {
+        print('ERROR: Exception during signup: $e');
+        if (!mounted) return;
+
+        String errorMessage = e.toString().replaceAll('Exception: ', '');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      } catch (e) {
+        print('ERROR: Unknown error during signup: $e');
+        if (!mounted) return;
+
+        String errorMessage =
+            'An error occurred during signup. Please try again.';
+
+        // Check for common Firebase errors
+        if (e.toString().contains('email-already-in-use')) {
+          errorMessage =
+              'This email is already registered. Please sign in instead.';
+        } else if (e.toString().contains('weak-password')) {
+          errorMessage =
+              'Password is too weak. Please use a stronger password.';
+        } else if (e.toString().contains('invalid-email')) {
+          errorMessage = 'Invalid email address. Please check and try again.';
+        } else if (e.toString().contains('network')) {
+          errorMessage =
+              'Network error. Please check your internet connection.';
+        } else if (e.toString().contains('permission-denied') ||
+            e.toString().contains('PERMISSION_DENIED')) {
+          errorMessage =
+              'Database not configured. Please enable Firestore in Firebase Console.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'Help',
+              textColor: Colors.white,
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Signup Error'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(errorMessage),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Common Solutions:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('• Enable Firestore in Firebase Console'),
+                          const Text('• Check your internet connection'),
+                          const Text('• Try a different username'),
+                          const Text(
+                            '• Verify all fields are filled correctly',
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Technical details: $e',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     }
   }
 
@@ -137,7 +441,7 @@ class _SignUpPageState extends State<SignUpPage> {
     final onSurface = colorScheme.onSurface;
 
     return Scaffold(
-      backgroundColor: colorScheme.background,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: onSurface),
@@ -228,7 +532,7 @@ class _SignUpPageState extends State<SignUpPage> {
     final theme = Theme.of(context);
     final headingStyle = theme.textTheme.titleLarge?.copyWith(
       fontWeight: FontWeight.bold,
-      color: theme.colorScheme.onBackground,
+      color: theme.colorScheme.onSurface,
     );
 
     return SingleChildScrollView(
@@ -248,12 +552,54 @@ class _SignUpPageState extends State<SignUpPage> {
             const SizedBox(height: 24),
             TextFormField(
               controller: _usernameController,
-              decoration: _buildInputDecoration(
-                hintText: 'Username',
-                prefixIcon: Icons.person_outline,
-              ),
-              validator: (value) =>
-                  value!.isEmpty ? 'Please enter a username' : null,
+              decoration:
+                  _buildInputDecoration(
+                    hintText: 'Username',
+                    prefixIcon: Icons.person_outline,
+                  ).copyWith(
+                    suffixIcon: _isCheckingUsername
+                        ? const Padding(
+                            padding: EdgeInsets.all(12.0),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : _isUsernameAvailable == true
+                        ? const Icon(Icons.check_circle, color: Colors.green)
+                        : _isUsernameAvailable == false
+                        ? const Icon(Icons.cancel, color: Colors.red)
+                        : null,
+                    helperText: _isUsernameAvailable == true
+                        ? 'Username is available'
+                        : null,
+                    helperStyle: const TextStyle(color: Colors.green),
+                    errorText: _usernameError,
+                  ),
+              onChanged: (value) {
+                if (value.isNotEmpty) {
+                  _checkUsernameAvailability(value);
+                } else {
+                  setState(() {
+                    _isUsernameAvailable = null;
+                    _usernameError = null;
+                    _isCheckingUsername = false;
+                  });
+                }
+              },
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter a username';
+                }
+                if (_usernameError != null) {
+                  return _usernameError;
+                }
+                if (_isUsernameAvailable == false) {
+                  return 'Username is already taken';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 20),
             TextFormField(
@@ -334,7 +680,7 @@ class _SignUpPageState extends State<SignUpPage> {
     final theme = Theme.of(context);
     final headingStyle = theme.textTheme.titleLarge?.copyWith(
       fontWeight: FontWeight.bold,
-      color: theme.colorScheme.onBackground,
+      color: theme.colorScheme.onSurface,
     );
     final borderColor = theme.colorScheme.outline.withOpacity(0.5);
 
@@ -456,7 +802,28 @@ class _SignUpPageState extends State<SignUpPage> {
             ),
 
             const SizedBox(height: 32),
-            FilledButton(onPressed: _onSignUp, child: const Text('Sign Up')),
+            FilledButton(
+              onPressed: _isLoading ? null : _onSignUp,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                    )
+                  : const Text(
+                      'Sign Up',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
           ],
         ),
       ),

@@ -7,6 +7,8 @@ import '../../../core/theme.dart';
 import '../models/post_model.dart';
 import '../../profile/models/post_model.dart' as profile_post;
 import '../../profile/pages/post_viewer_instagram_style.dart';
+import '../../profile/other_user_profile_page.dart';
+import 'floating_hearts_from_position.dart';
 
 class PostCard extends StatefulWidget {
   const PostCard({super.key, required this.post});
@@ -26,6 +28,7 @@ class _PostCardState extends State<PostCard> {
   late bool _compressCommentCount;
   late final NumberFormat _decimalFormat;
   final List<_Comment> _comments = [];
+  final GlobalKey<FloatingHeartsFromPositionState> _heartsKey = GlobalKey();
 
   Post get post => widget.post;
 
@@ -75,42 +78,48 @@ class _PostCardState extends State<PostCard> {
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [
-                              kPrimary.withOpacity(0.8),
-                              kPrimary.withOpacity(0.4),
-                            ],
+                      GestureDetector(
+                        onTap: () => _openUserProfile(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                kPrimary.withOpacity(0.8),
+                                kPrimary.withOpacity(0.4),
+                              ],
+                            ),
                           ),
-                        ),
-                        child: CircleAvatar(
-                          radius: 20,
-                          backgroundImage: NetworkImage(post.userAvatarUrl),
+                          child: CircleAvatar(
+                            radius: 20,
+                            backgroundImage: NetworkImage(post.userAvatarUrl),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              post.userName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
+                        child: GestureDetector(
+                          onTap: () => _openUserProfile(context),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                post.userName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
                               ),
-                            ),
-                            Text(
-                              post.userHandle,
-                              style: TextStyle(
-                                color: isDark ? Colors.white60 : Colors.grey,
-                                fontSize: 13,
+                              Text(
+                                post.userHandle,
+                                style: TextStyle(
+                                  color: isDark ? Colors.white60 : Colors.grey,
+                                  fontSize: 13,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       ClipRRect(
@@ -140,47 +149,71 @@ class _PostCardState extends State<PostCard> {
                 ),
                 GestureDetector(
                   onTap: () => _openPostViewer(context),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.all(Radius.circular(20)),
-                    child: Stack(
-                      children: [
-                        Image.network(
-                          post.imageUrl,
-                          width: double.infinity,
-                          height: 280,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            height: 280,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                            alignment: Alignment.center,
-                            child: const Icon(
-                              Icons.image_not_supported_rounded,
-                              size: 48,
-                            ),
-                          ),
+                  onDoubleTapDown: (details) {
+                    // Store the old like state
+                    final wasLiked = _isLiked;
+                    // Toggle like on double tap
+                    _toggleLike();
+                    // Show hearts from tap position only if we're now liked (changed from unliked to liked)
+                    // This ensures hearts show immediately when liking
+                    if (!wasLiked && _isLiked) {
+                      _heartsKey.currentState?.addHeartsFromPosition(
+                        details.localPosition,
+                      );
+                    }
+                  },
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(20),
                         ),
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            height: 100,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withOpacity(0.3),
-                                ],
+                        child: Stack(
+                          children: [
+                            Image.network(
+                              post.imageUrl,
+                              width: double.infinity,
+                              height: 280,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: double.infinity,
+                                height: 280,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.image_not_supported_rounded,
+                                  size: 48,
+                                ),
                               ),
                             ),
-                          ),
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.black.withOpacity(0.3),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      // Hearts overlay
+                      Positioned.fill(
+                        child: FloatingHeartsFromPosition(key: _heartsKey),
+                      ),
+                    ],
                   ),
                 ),
                 Padding(
@@ -196,7 +229,7 @@ class _PostCardState extends State<PostCard> {
                         isDark: isDark,
                         isActive: _isLiked,
                         accentColor: Colors.red.shade400,
-                        onPressed: _toggleLike,
+                        onPressed: _toggleLikeWithHearts,
                       ),
                       const SizedBox(width: 16),
                       _GlassActionButton(
@@ -249,6 +282,17 @@ class _PostCardState extends State<PostCard> {
       }
       _compressLikeCount = false;
     });
+  }
+
+  void _toggleLikeWithHearts() {
+    // Store the old like state before toggling
+    final wasLiked = _isLiked;
+    _toggleLike();
+    // Show hearts from center of image when liking via button
+    if (!wasLiked && _isLiked) {
+      // Trigger hearts from center of the image (140px from left, 140px from top of image)
+      _heartsKey.currentState?.addHeartsFromPosition(const Offset(140, 140));
+    }
   }
 
   void _toggleBookmark() {
@@ -353,6 +397,18 @@ class _PostCardState extends State<PostCard> {
         builder: (context) => PostViewerInstagramStyle(
           initialPost: profilePost,
           allPosts: [profilePost],
+        ),
+      ),
+    );
+  }
+
+  void _openUserProfile(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => OtherUserProfilePage(
+          userId: post.userHandle,
+          username: post.userName,
+          avatarUrl: post.userAvatarUrl,
         ),
       ),
     );

@@ -12,20 +12,7 @@ ThemeData buildAppTheme() {
   final lightScheme = ColorScheme.fromSeed(
     seedColor: kPrimary,
     brightness: Brightness.light,
-  ).copyWith(
-    primary: kPrimary,
-    surface: kLightBackground,
-    background: kLightBackground,
-  );
-
-  final darkScheme = ColorScheme.fromSeed(
-    seedColor: kPrimary,
-    brightness: Brightness.dark,
-  ).copyWith(
-    primary: kPrimary,
-    surface: kDarkBackground,
-    background: kDarkBackground,
-  );
+  ).copyWith(primary: kPrimary, surface: kLightBackground);
 
   ButtonStyle baseFilledButtonStyle = FilledButton.styleFrom(
     minimumSize: const Size.fromHeight(52),
@@ -51,14 +38,18 @@ ThemeData buildAppTheme() {
       surfaceTintColor: Colors.transparent,
     ),
     filledButtonTheme: FilledButtonThemeData(style: baseFilledButtonStyle),
-    outlinedButtonTheme: OutlinedButtonThemeData(style: baseOutlinedButtonStyle),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: baseOutlinedButtonStyle,
+    ),
     navigationBarTheme: NavigationBarThemeData(
       height: 68,
       backgroundColor: kLightBackground,
       indicatorColor: kPrimary.withOpacity(0.12),
       iconTheme: WidgetStateProperty.resolveWith((states) {
         final isSelected = states.contains(WidgetState.selected);
-        return IconThemeData(color: isSelected ? kPrimary : Colors.grey.shade600);
+        return IconThemeData(
+          color: isSelected ? kPrimary : Colors.grey.shade600,
+        );
       }),
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final isSelected = states.contains(WidgetState.selected);
@@ -82,11 +73,7 @@ ThemeData buildDarkAppTheme() {
   final darkScheme = ColorScheme.fromSeed(
     seedColor: kPrimary,
     brightness: Brightness.dark,
-  ).copyWith(
-    primary: kPrimary,
-    surface: kDarkBackground,
-    background: kDarkBackground,
-  );
+  ).copyWith(primary: kPrimary, surface: kDarkBackground);
 
   ButtonStyle baseFilledButtonStyle = FilledButton.styleFrom(
     minimumSize: const Size.fromHeight(52),
@@ -112,14 +99,18 @@ ThemeData buildDarkAppTheme() {
       surfaceTintColor: Colors.transparent,
     ),
     filledButtonTheme: FilledButtonThemeData(style: baseFilledButtonStyle),
-    outlinedButtonTheme: OutlinedButtonThemeData(style: baseOutlinedButtonStyle),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: baseOutlinedButtonStyle,
+    ),
     navigationBarTheme: NavigationBarThemeData(
       height: 68,
       backgroundColor: kDarkBackground,
       indicatorColor: kPrimary.withOpacity(0.18),
       iconTheme: WidgetStateProperty.resolveWith((states) {
         final isSelected = states.contains(WidgetState.selected);
-        return IconThemeData(color: isSelected ? kPrimary : Colors.grey.shade300);
+        return IconThemeData(
+          color: isSelected ? kPrimary : Colors.grey.shade300,
+        );
       }),
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final isSelected = states.contains(WidgetState.selected);

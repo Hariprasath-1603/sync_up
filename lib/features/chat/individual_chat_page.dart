@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -24,6 +25,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
   bool _isRecording = false;
   bool _showEmojiPicker = false;
   double _recordingDuration = 0.0;
+  Timer? _recordingTimer;
 
   final List<ChatMessage> _messages = [
     ChatMessage(
@@ -69,11 +71,14 @@ class _IndividualChatPageState extends State<IndividualChatPage>
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _recordingTimer?.cancel();
     super.dispose();
   }
 
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty) return;
+
+    if (!mounted) return;
 
     setState(() {
       _messages.add(
@@ -88,6 +93,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
     });
 
     Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 300),
@@ -97,6 +103,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
   }
 
   void _sendVoiceMessage() {
+    if (!mounted) return;
+
     setState(() {
       _messages.add(
         ChatMessage(
@@ -132,9 +140,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
           child: Column(
             children: [
               _buildHeader(isDark),
-              Expanded(
-                child: _buildMessagesList(isDark),
-              ),
+              Expanded(child: _buildMessagesList(isDark)),
               if (_isRecording) _buildRecordingIndicator(isDark),
               _buildMessageInput(isDark),
             ],
@@ -261,7 +267,11 @@ class _IndividualChatPageState extends State<IndividualChatPage>
               ],
             ),
             child: IconButton(
-              icon: const Icon(Icons.videocam_rounded, color: Colors.white, size: 22),
+              icon: const Icon(
+                Icons.videocam_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
               onPressed: () {
                 _showCallDialog(true);
               },
@@ -281,12 +291,12 @@ class _IndividualChatPageState extends State<IndividualChatPage>
       itemCount: _messages.length,
       itemBuilder: (context, index) {
         final message = _messages[index];
-        final showTimestamp = index == 0 ||
-            _messages[index - 1]
-                .timestamp
-                .difference(message.timestamp)
-                .inMinutes
-                .abs() >
+        final showTimestamp =
+            index == 0 ||
+            _messages[index - 1].timestamp
+                    .difference(message.timestamp)
+                    .inMinutes
+                    .abs() >
                 30;
 
         return Column(
@@ -324,8 +334,9 @@ class _IndividualChatPageState extends State<IndividualChatPage>
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
-        mainAxisAlignment:
-            message.isSent ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: message.isSent
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         children: [
           if (!message.isSent) const SizedBox(width: 40),
           Flexible(
@@ -344,9 +355,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: message.isSent
-            ? LinearGradient(
-                colors: [kPrimary, kPrimary.withOpacity(0.8)],
-              )
+            ? LinearGradient(colors: [kPrimary, kPrimary.withOpacity(0.8)])
             : null,
         color: message.isSent
             ? null
@@ -410,9 +419,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         gradient: message.isSent
-            ? LinearGradient(
-                colors: [kPrimary, kPrimary.withOpacity(0.8)],
-              )
+            ? LinearGradient(colors: [kPrimary, kPrimary.withOpacity(0.8)])
             : null,
         color: message.isSent
             ? null
@@ -485,10 +492,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
       decoration: BoxDecoration(
         color: Colors.red.withOpacity(0.1),
         border: Border(
-          top: BorderSide(
-            color: Colors.red.withOpacity(0.3),
-            width: 1,
-          ),
+          top: BorderSide(color: Colors.red.withOpacity(0.3), width: 1),
         ),
       ),
       child: Row(
@@ -499,11 +503,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
               color: Colors.red,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.mic_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
+            child: const Icon(Icons.mic_rounded, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -523,6 +523,9 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                 TweenAnimationBuilder(
                   tween: Tween<double>(begin: 0, end: 100),
                   duration: const Duration(seconds: 60),
+                  onEnd: () {
+                    _recordingTimer?.cancel();
+                  },
                   builder: (context, value, child) {
                     _recordingDuration = value;
                     return Row(
@@ -533,7 +536,9 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                             child: LinearProgressIndicator(
                               value: value / 100,
                               backgroundColor: Colors.red.withOpacity(0.2),
-                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.red),
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Colors.red,
+                              ),
                               minHeight: 4,
                             ),
                           ),
@@ -573,7 +578,11 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                 ),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.send_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
             onPressed: _sendVoiceMessage,
           ),
@@ -624,10 +633,14 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                    color: (isDark ? Colors.white : Colors.black).withOpacity(
+                      0.05,
+                    ),
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
+                      color: (isDark ? Colors.white : Colors.black).withOpacity(
+                        0.1,
+                      ),
                       width: 1,
                     ),
                   ),
@@ -641,7 +654,9 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                           decoration: InputDecoration(
                             hintText: 'Message...',
                             hintStyle: TextStyle(
-                              color: isDark ? Colors.white60 : Colors.grey.shade400,
+                              color: isDark
+                                  ? Colors.white60
+                                  : Colors.grey.shade400,
                             ),
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.symmetric(
@@ -679,16 +694,32 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                   onLongPressStart: (_) {
                     setState(() {
                       _isRecording = true;
+                      _recordingDuration = 0.0;
                     });
+                    // Start a timer to track recording duration
+                    _recordingTimer?.cancel();
+                    _recordingTimer = Timer.periodic(
+                      const Duration(milliseconds: 100),
+                      (timer) {
+                        if (mounted) {
+                          setState(() {
+                            _recordingDuration += 0.1;
+                          });
+                        }
+                      },
+                    );
                   },
                   onLongPressEnd: (_) {
+                    _recordingTimer?.cancel();
                     if (_recordingDuration > 1) {
                       _sendVoiceMessage();
                     } else {
-                      setState(() {
-                        _isRecording = false;
-                        _recordingDuration = 0.0;
-                      });
+                      if (mounted) {
+                        setState(() {
+                          _isRecording = false;
+                          _recordingDuration = 0.0;
+                        });
+                      }
                     }
                   },
                   child: Container(
@@ -779,7 +810,9 @@ class _IndividualChatPageState extends State<IndividualChatPage>
             Text(isVideo ? 'Video Call' : 'Audio Call'),
           ],
         ),
-        content: Text('Start a ${isVideo ? 'video' : 'audio'} call with ${widget.userName}?'),
+        content: Text(
+          'Start a ${isVideo ? 'video' : 'audio'} call with ${widget.userName}?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -790,7 +823,9 @@ class _IndividualChatPageState extends State<IndividualChatPage>
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Starting ${isVideo ? 'video' : 'audio'} call with ${widget.userName}...'),
+                  content: Text(
+                    'Starting ${isVideo ? 'video' : 'audio'} call with ${widget.userName}...',
+                  ),
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -798,9 +833,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                 ),
               );
             },
-            style: FilledButton.styleFrom(
-              backgroundColor: kPrimary,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: kPrimary),
             child: const Text('Call'),
           ),
         ],
@@ -908,12 +941,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
   }
 }
 
-enum MessageType {
-  text,
-  voice,
-  image,
-  video,
-}
+enum MessageType { text, voice, image, video }
 
 class ChatMessage {
   final String text;

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
 import '../../core/services/preferences_service.dart';
+import '../../core/services/database_service.dart';
 import 'auth_service.dart';
 
 class SignInPage extends StatefulWidget {
@@ -14,44 +15,94 @@ class SignInPage extends StatefulWidget {
 
 class _SignInPageState extends State<SignInPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _emailOrUsernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
+  final DatabaseService _databaseService = DatabaseService();
 
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _emailOrUsernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _signIn() async {
-    final email = _emailController.text.trim();
+    final emailOrUsername = _emailOrUsernameController.text.trim();
     final password = _passwordController.text.trim();
 
-    // ## HARDCODED LOGIN FOR TESTING ##
-    // If the specific email and password are used, log in instantly.
-    if (email == '1' && password == '1') {
-      // Save login state
-      await PreferencesService.saveUserSession(
-        userId: 'test_user',
-        email: 'test@example.com',
-        name: 'Test User',
-      );
-      if (mounted) context.go('/home');
-      return; // This bypasses the Firebase check
-    }
-
-    // --- Real Firebase Sign-In Logic ---
-    // This will run for any other email and password.
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
 
+      String? email;
+
+      // Check if input is email or username
+      if (emailOrUsername.contains('@')) {
+        // It's an email
+        email = emailOrUsername;
+      } else {
+        // It's a username - look up the email
+        try {
+          final userModel = await _databaseService.getUserByUsername(
+            emailOrUsername,
+          );
+          if (userModel != null) {
+            email = userModel.email;
+          } else {
+            // Username not found
+            setState(() {
+              _isLoading = false;
+            });
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.error_outline, color: Colors.white),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Username not found. Please check and try again.',
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 4),
+                ),
+              );
+            }
+            return;
+          }
+        } catch (e) {
+          setState(() {
+            _isLoading = false;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text('Error: ${e.toString()}')),
+                  ],
+                ),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      // Now sign in with the email
       final user = await _authService.signInWithEmailAndPassword(
         email,
         password,
@@ -62,7 +113,53 @@ class _SignInPageState extends State<SignInPage> {
       });
 
       if (user != null) {
-        // Save user session
+        // Check if email is verified
+        if (!user.emailVerified) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.white),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Please verify your email before signing in. Check your inbox for the verification link.',
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.orange[700],
+                duration: const Duration(seconds: 5),
+                action: SnackBarAction(
+                  label: 'Resend',
+                  textColor: Colors.white,
+                  onPressed: () async {
+                    try {
+                      await user.sendEmailVerification();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Verification email sent!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      print('Error resending email: $e');
+                    }
+                  },
+                ),
+              ),
+            );
+
+            // Sign out the user since email is not verified
+            await _authService.signOut();
+          }
+          return;
+        }
+
+        // Email is verified, proceed with login
         await PreferencesService.saveUserSession(
           userId: user.uid,
           email: user.email ?? email,
@@ -126,7 +223,7 @@ class _SignInPageState extends State<SignInPage> {
           const SnackBar(
             content: Text('Google sign-in was canceled'),
             backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 2),
+            duration: Duration(seconds: 2),
           ),
         );
       }
@@ -351,18 +448,17 @@ class _SignInPageState extends State<SignInPage> {
                 ),
                 const SizedBox(height: 32),
                 TextFormField(
-                  controller: _emailController,
+                  controller: _emailOrUsernameController,
                   decoration: _buildInputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icons.email_outlined,
+                    labelText: 'Email or Username',
+                    prefixIcon: Icons.person_outline,
                     context: context,
                   ),
-                  keyboardType: TextInputType.emailAddress,
+                  keyboardType: TextInputType.text,
                   validator: (value) {
-                    if (value == null || value.isEmpty)
-                      return 'Please enter your email';
-                    if (!RegExp(r'\S+@\S+\.\S+').hasMatch(value))
-                      return 'Please enter a valid email';
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your email or username';
+                    }
                     return null;
                   },
                 ),

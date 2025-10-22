@@ -1,10 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/services/preferences_service.dart';
+import '../../core/services/database_service.dart';
 
 class AuthService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final DatabaseService _databaseService = DatabaseService();
 
   // Get current user
   User? get currentUser => _firebaseAuth.currentUser;
@@ -40,11 +42,11 @@ class AuthService {
           .createUserWithEmailAndPassword(email: email, password: password);
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
-      print('Firebase Auth Exception: ${e.message}');
-      return null;
+      print('Firebase Auth Exception - Code: ${e.code}, Message: ${e.message}');
+      rethrow; // Re-throw to get specific error details
     } catch (e) {
       print('Error signing up: $e');
-      return null;
+      rethrow; // Re-throw to get error details
     }
   }
 
@@ -149,7 +151,33 @@ class AuthService {
       await _firebaseAuth.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException catch (e) {
       print('Firebase Auth Exception on password reset: ${e.message}');
-      throw e;
+      rethrow;
+    }
+  }
+
+  // SEND PASSWORD RESET WITH EMAIL OR USERNAME
+  Future<String?> sendPasswordResetByIdentifier(String identifier) async {
+    try {
+      final normalizedIdentifier = identifier.toLowerCase().trim();
+
+      // Find user by email or username
+      final user = await _databaseService.findUserForPasswordReset(
+        normalizedIdentifier,
+      );
+
+      if (user == null) {
+        return 'No account found with this email or username';
+      }
+
+      // Send reset email to the user's email
+      await _firebaseAuth.sendPasswordResetEmail(email: user.email);
+      return null; // Success, no error
+    } on FirebaseAuthException catch (e) {
+      print('Firebase Auth Exception on password reset: ${e.message}');
+      return e.message ?? 'Failed to send reset email';
+    } catch (e) {
+      print('Error sending password reset: $e');
+      return 'An unexpected error occurred';
     }
   }
 
@@ -176,7 +204,7 @@ class AuthService {
       await currentUser?.delete();
     } on FirebaseAuthException catch (e) {
       print('Firebase Auth Exception: ${e.message}');
-      throw e;
+      rethrow;
     }
   }
 }

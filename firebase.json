@@ -1,1 +1,71 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"syncup-social-app-2025","appId":"1:792629822847:android:94573d2c80018eafed864a","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"syncup-social-app-2025","configurations":{"android":"1:792629822847:android:94573d2c80018eafed864a","ios":"1:792629822847:ios:fc99a1077f171684ed864a","macos":"1:792629822847:ios:fc99a1077f171684ed864a","web":"1:792629822847:web:a03e0e1704b97505ed864a","windows":"1:792629822847:web:44cc8a6e61559844ed864a"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "syncup-social-app-2025",
+          "appId": "1:792629822847:android:94573d2c80018eafed864a",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "syncup-social-app-2025",
+          "configurations": {
+            "android": "1:792629822847:android:94573d2c80018eafed864a",
+            "ios": "1:792629822847:ios:fc99a1077f171684ed864a",
+            "macos": "1:792629822847:ios:fc99a1077f171684ed864a",
+            "web": "1:792629822847:web:a03e0e1704b97505ed864a",
+            "windows": "1:792629822847:web:44cc8a6e61559844ed864a"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "asia-south1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint"
+      ]
+    }
+  ],
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "storage": {
+      "port": 9199
+    },
+    "ui": {
+      "enabled": true
+    },
+    "singleProjectMode": true
+  },
+  "database": {
+    "rules": "database.rules.json"
+  }
+}

@@ -6,6 +6,7 @@ import '../features/auth/forgot_password_page.dart';
 import '../features/auth/reset_confirmation_page.dart';
 import '../features/auth/sign_in_page.dart';
 import '../features/auth/sign_up_page.dart';
+import '../features/auth/email_verification_page.dart';
 import '../features/home/home_page.dart';
 import '../features/onboarding/onboarding_page.dart';
 import '../features/profile/profile_page.dart';
@@ -42,6 +43,13 @@ final appRouter = GoRouter(
     ),
     GoRoute(path: '/signin', builder: (context, state) => const SignInPage()),
     GoRoute(path: '/signup', builder: (context, state) => const SignUpPage()),
+    GoRoute(
+      path: '/email-verification',
+      builder: (context, state) {
+        final email = state.uri.queryParameters['email'] ?? '';
+        return EmailVerificationPage(email: email);
+      },
+    ),
     GoRoute(
       path: '/forgot-password',
       builder: (context, state) => const ForgotPasswordPage(),

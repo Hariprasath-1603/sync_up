@@ -10,6 +10,7 @@ import '../stories/storyverse_page.dart';
 import 'models/post_model.dart' as profile_post;
 import 'pages/post_viewer_instagram_style.dart';
 import 'pages/profile_photo_viewer.dart';
+import 'highlight_viewer.dart';
 
 class MyProfilePage extends StatefulWidget {
   const MyProfilePage({super.key});
@@ -112,6 +113,15 @@ class _MyProfilePageState extends State<MyProfilePage>
       ),
     ],
   };
+
+  // User's active stories (set to empty list for no stories)
+  final List<Map<String, String>> _myActiveStories = [
+    {'url': 'https://picsum.photos/seed/mystory1/400/600', 'title': 'Today'},
+    {'url': 'https://picsum.photos/seed/mystory2/400/600', 'title': 'Work'},
+    {'url': 'https://picsum.photos/seed/mystory3/400/600', 'title': 'Fun'},
+  ];
+
+  bool get hasActiveStories => _myActiveStories.isNotEmpty;
 
   final List<Map<String, String?>> _stories = [
     {'title': 'Add', 'url': null},
@@ -296,14 +306,21 @@ class _MyProfilePageState extends State<MyProfilePage>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [
-                      kPrimary.withOpacity(0.8),
-                      kPrimary.withOpacity(0.4),
-                    ],
+                    colors: hasActiveStories
+                        ? [
+                            Colors.blue.withOpacity(0.8),
+                            Colors.blueAccent.withOpacity(0.6),
+                          ]
+                        : [
+                            kPrimary.withOpacity(0.8),
+                            kPrimary.withOpacity(0.4),
+                          ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: kPrimary.withOpacity(0.3),
+                      color: hasActiveStories
+                          ? Colors.blue.withOpacity(0.3)
+                          : kPrimary.withOpacity(0.3),
                       blurRadius: 20,
                       spreadRadius: 2,
                     ),
@@ -316,6 +333,9 @@ class _MyProfilePageState extends State<MyProfilePage>
                     color: isDark ? kDarkBackground : Colors.white,
                   ),
                   child: GestureDetector(
+                    onTap: hasActiveStories
+                        ? () => _openMyStories(context)
+                        : null,
                     onLongPress: () =>
                         _openProfilePhotoViewer(context, avatarUrl),
                     child: Hero(
@@ -333,6 +353,28 @@ class _MyProfilePageState extends State<MyProfilePage>
         ],
       ),
     );
+  }
+
+  // Open My Active Stories
+  void _openMyStories(BuildContext context) {
+    if (_myActiveStories.isEmpty) return;
+
+    final navVisibility = NavBarVisibilityScope.maybeOf(context);
+    navVisibility?.value = false;
+
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (context) => HighlightViewer(
+              highlights: _myActiveStories,
+              initialIndex: 0,
+              username: 'Jane Cooper',
+            ),
+          ),
+        )
+        .whenComplete(() {
+          navVisibility?.value = true;
+        });
   }
 
   // Open Profile Photo Viewer
