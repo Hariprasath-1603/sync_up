@@ -1,6 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../../core/scaffold_with_nav_bar.dart';
+import '../profile/pages/post_viewer_instagram_style.dart';
+import '../profile/models/post_model.dart' as profile_post;
+import '../reels/reels_page_new.dart';
+import 'explore_search_page.dart';
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
@@ -506,77 +511,80 @@ class _SearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(30),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDark
-                  ? [
-                      Colors.white.withOpacity(0.15),
-                      Colors.white.withOpacity(0.08),
-                    ]
-                  : [
-                      Colors.white.withOpacity(0.9),
-                      Colors.white.withOpacity(0.7),
-                    ],
-            ),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withOpacity(0.25)
-                  : Colors.white.withOpacity(0.6),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ExploreSearchPage()),
+        );
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        Colors.white.withOpacity(0.15),
+                        Colors.white.withOpacity(0.08),
+                      ]
+                    : [
+                        Colors.white.withOpacity(0.9),
+                        Colors.white.withOpacity(0.7),
+                      ],
+              ),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
                 color: isDark
-                    ? Colors.black.withOpacity(0.3)
-                    : Colors.grey.withOpacity(0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
+                    ? Colors.white.withOpacity(0.25)
+                    : Colors.white.withOpacity(0.6),
+                width: 1.5,
               ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.search_rounded,
-                color: isDark ? Colors.white70 : Colors.black.withOpacity(0.6),
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search Syncup',
-                    hintStyle: TextStyle(
+              boxShadow: [
+                BoxShadow(
+                  color: isDark
+                      ? Colors.black.withOpacity(0.3)
+                      : Colors.grey.withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.search_rounded,
+                  color: isDark
+                      ? Colors.white70
+                      : Colors.black.withOpacity(0.6),
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Search Syncup',
+                    style: TextStyle(
                       color: isDark
                           ? Colors.white60
                           : Colors.black.withOpacity(0.5),
                       fontSize: 16,
                     ),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
-                    fontSize: 16,
                   ),
                 ),
-              ),
-              Icon(
-                Icons.mic_rounded,
-                color: isDark ? Colors.white60 : Colors.black.withOpacity(0.5),
-                size: 22,
-              ),
-            ],
+                Icon(
+                  Icons.mic_rounded,
+                  color: isDark
+                      ? Colors.white60
+                      : Colors.black.withOpacity(0.5),
+                  size: 22,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -747,6 +755,38 @@ class _ExploreGrid extends StatelessWidget {
     'https://picsum.photos/seed/explore6/400/400',
   ];
 
+  void _openPostViewer(BuildContext context, String imageUrl) {
+    final navVisibility = NavBarVisibilityScope.maybeOf(context);
+    navVisibility?.value = false;
+
+    // Create a mock post model
+    final post = profile_post.PostModel(
+      id: imageUrl,
+      type: profile_post.PostType.image,
+      mediaUrls: [imageUrl],
+      thumbnailUrl: imageUrl,
+      username: '@explorer',
+      userAvatar: 'https://i.pravatar.cc/150?img=10',
+      timestamp: DateTime.now(),
+      caption: 'Explore post',
+      likes: 1234,
+      comments: 56,
+      shares: 10,
+      views: 10000,
+    );
+
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (context) =>
+                PostViewerInstagramStyle(initialPost: post, allPosts: [post]),
+          ),
+        )
+        .whenComplete(() {
+          navVisibility?.value = true;
+        });
+  }
+
   @override
   Widget build(BuildContext context) {
     return SliverPadding(
@@ -759,42 +799,48 @@ class _ExploreGrid extends StatelessWidget {
           childAspectRatio: 1.0,
         ),
         delegate: SliverChildBuilderDelegate((context, index) {
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              children: [
-                // Background image
-                Positioned.fill(
-                  child: Image.network(exploreImages[index], fit: BoxFit.cover),
-                ),
-                // Gradient overlay
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.4),
-                        ],
+          return GestureDetector(
+            onTap: () => _openPostViewer(context, exploreImages[index]),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Stack(
+                children: [
+                  // Background image
+                  Positioned.fill(
+                    child: Image.network(
+                      exploreImages[index],
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  // Gradient overlay
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.4),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                // Glass overlay on hover effect
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
-                        width: 1.5,
+                  // Glass overlay on hover effect
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1.5,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      borderRadius: BorderRadius.circular(20),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         }, childCount: exploreImages.length),
@@ -816,153 +862,187 @@ class _VideoCard extends StatelessWidget {
   final String userName;
   final String userAvatarUrl;
 
+  void _openReelPage(BuildContext context) {
+    // Create a ReelData object from the video data
+    final reelData = ReelData(
+      id: 'explore_${imageUrl.hashCode}',
+      userId: 'user_${userName.replaceAll('.', '_')}',
+      username: '@$userName',
+      profilePic: userAvatarUrl,
+      caption: title,
+      musicName: 'Original Audio',
+      musicArtist: '@$userName',
+      videoUrl: imageUrl,
+      likes: 12400,
+      comments: 856,
+      shares: 234,
+      views: 98000,
+      isLiked: false,
+      isSaved: false,
+      isFollowing: false,
+      location: null,
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            ReelsPageNew(initialReel: reelData, initialIndex: 0),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 180,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Stack(
-          children: [
-            // Background image
-            Positioned.fill(child: Image.network(imageUrl, fit: BoxFit.cover)),
-            // Gradient overlay
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.3),
-                      Colors.black.withOpacity(0.7),
-                    ],
-                  ),
-                ),
-              ),
+    return GestureDetector(
+      onTap: () => _openReelPage(context),
+      child: Container(
+        width: 180,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
-            // Play button in the center
-            Center(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withOpacity(0.3),
-                      Colors.white.withOpacity(0.15),
-                    ],
-                  ),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.4),
-                    width: 2,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 32,
-                ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            children: [
+              // Background image
+              Positioned.fill(
+                child: Image.network(imageUrl, fit: BoxFit.cover),
               ),
-            ),
-            // Glass user info at the bottom
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(20),
-                  bottomRight: Radius.circular(20),
-                ),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withOpacity(0.2),
-                          Colors.white.withOpacity(0.1),
-                        ],
-                      ),
-                      border: Border(
-                        top: BorderSide(
-                          color: Colors.white.withOpacity(0.3),
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            shadows: [
-                              Shadow(color: Colors.black45, blurRadius: 4),
-                            ],
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.5),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: CircleAvatar(
-                                radius: 10,
-                                backgroundImage: NetworkImage(userAvatarUrl),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                userName,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
+              // Gradient overlay
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.3),
+                        Colors.black.withOpacity(0.7),
                       ],
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+              // Play button in the center
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withOpacity(0.3),
+                        Colors.white.withOpacity(0.15),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.4),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+              ),
+              // Glass user info at the bottom
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(20),
+                  ),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.white.withOpacity(0.2),
+                            Colors.white.withOpacity(0.1),
+                          ],
+                        ),
+                        border: Border(
+                          top: BorderSide(
+                            color: Colors.white.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              shadows: [
+                                Shadow(color: Colors.black45, blurRadius: 4),
+                              ],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.5),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: CircleAvatar(
+                                  radius: 10,
+                                  backgroundImage: NetworkImage(userAvatarUrl),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  userName,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -982,77 +1062,147 @@ class _CategoryPostCard extends StatelessWidget {
   final String comments;
   final bool isReel;
 
+  void _openPostViewer(BuildContext context) {
+    final navVisibility = NavBarVisibilityScope.maybeOf(context);
+    navVisibility?.value = false;
+
+    // Create a mock post model
+    final post = profile_post.PostModel(
+      id: imageUrl,
+      type: profile_post.PostType.image,
+      mediaUrls: [imageUrl],
+      thumbnailUrl: imageUrl,
+      username: '@explorer',
+      userAvatar: 'https://i.pravatar.cc/150?img=10',
+      timestamp: DateTime.now(),
+      caption: 'Explore post',
+      likes: int.tryParse(likes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+      comments: int.tryParse(comments.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+      shares: 10,
+      views: 1000,
+    );
+
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (context) =>
+                PostViewerInstagramStyle(initialPost: post, allPosts: [post]),
+          ),
+        )
+        .whenComplete(() {
+          navVisibility?.value = true;
+        });
+  }
+
+  void _openReelPage(BuildContext context) {
+    // Create a ReelData object from the category post data
+    final reelData = ReelData(
+      id: 'category_${imageUrl.hashCode}',
+      userId: 'user_explorer_${imageUrl.hashCode}',
+      username: '@explorer',
+      profilePic: 'https://i.pravatar.cc/150?img=10',
+      caption: 'Amazing content! 🔥',
+      musicName: 'Trending Audio',
+      musicArtist: '@TrendingMusic',
+      videoUrl: imageUrl,
+      likes: int.tryParse(likes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 12400,
+      comments: int.tryParse(comments.replaceAll(RegExp(r'[^0-9]'), '')) ?? 856,
+      shares: 234,
+      views: 98000,
+      isLiked: false,
+      isSaved: false,
+      isFollowing: false,
+      location: null,
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            ReelsPageNew(initialReel: reelData, initialIndex: 0),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.network(imageUrl, fit: BoxFit.cover),
-          // Dark gradient overlay
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+    return GestureDetector(
+      onTap: () {
+        if (isReel) {
+          _openReelPage(context);
+        } else {
+          _openPostViewer(context);
+        }
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(imageUrl, fit: BoxFit.cover),
+            // Dark gradient overlay
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                  ),
                 ),
               ),
             ),
-          ),
-          // Reel icon if it's a reel
-          if (isReel)
-            const Positioned(
-              top: 8,
+            // Reel icon if it's a reel
+            if (isReel)
+              const Positioned(
+                top: 8,
+                right: 8,
+                child: Icon(
+                  Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            // Stats at bottom
+            Positioned(
+              bottom: 8,
+              left: 8,
               right: 8,
-              child: Icon(
-                Icons.play_arrow_rounded,
-                color: Colors.white,
-                size: 24,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.favorite, color: Colors.white, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        likes,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      const Icon(Icons.comment, color: Colors.white, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        comments,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-          // Stats at bottom
-          Positioned(
-            bottom: 8,
-            left: 8,
-            right: 8,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.favorite, color: Colors.white, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      likes,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    const Icon(Icons.comment, color: Colors.white, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      comments,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

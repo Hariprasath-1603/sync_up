@@ -11,6 +11,7 @@ import 'models/post_model.dart' as profile_post;
 import 'pages/post_viewer_instagram_style.dart';
 import 'pages/profile_photo_viewer.dart';
 import 'highlight_viewer.dart';
+import '../settings/settings_home_page.dart';
 
 class MyProfilePage extends StatefulWidget {
   const MyProfilePage({super.key});
@@ -289,11 +290,14 @@ class _MyProfilePageState extends State<MyProfilePage>
           Positioned(
             top: 16,
             right: 16,
-            child: _buildGlassIconButton(
-              Icons.settings_outlined,
-              isDark,
-              () {},
-            ),
+            child: _buildGlassIconButton(Icons.settings_outlined, isDark, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SettingsHomePage(),
+                ),
+              );
+            }),
           ),
           // Avatar with Glass Effect
           Positioned(

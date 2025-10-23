@@ -4,7 +4,10 @@ import '../profile/pages/widgets/floating_reactions.dart';
 import '../profile/other_user_profile_page.dart';
 
 class ReelsPageNew extends StatefulWidget {
-  const ReelsPageNew({super.key});
+  final ReelData? initialReel;
+  final int? initialIndex;
+
+  const ReelsPageNew({super.key, this.initialReel, this.initialIndex});
 
   @override
   State<ReelsPageNew> createState() => _ReelsPageNewState();
@@ -118,6 +121,26 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
   // Current reels based on selected tab
   List<ReelData> get _currentReels {
     return _isFollowingTab ? _followingReels : _forYouReels;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    // If an initial reel is provided, add it to the beginning of the list
+    if (widget.initialReel != null) {
+      _forYouReels.insert(0, widget.initialReel!);
+    }
+
+    // If an initial index is provided, jump to that index
+    if (widget.initialIndex != null) {
+      _currentReelIndex = widget.initialIndex!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(widget.initialIndex!);
+        }
+      });
+    }
   }
 
   @override
@@ -436,9 +459,11 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
                   children: [
                     GestureDetector(
                       onTap: () {
-                        final navVisibility = NavBarVisibilityScope.maybeOf(context);
+                        final navVisibility = NavBarVisibilityScope.maybeOf(
+                          context,
+                        );
                         navVisibility?.value = false;
-                        
+
                         Navigator.of(context)
                             .push(
                               MaterialPageRoute(
@@ -549,9 +574,11 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
                 // Username - Clickable to navigate to profile
                 GestureDetector(
                   onTap: () {
-                    final navVisibility = NavBarVisibilityScope.maybeOf(context);
+                    final navVisibility = NavBarVisibilityScope.maybeOf(
+                      context,
+                    );
                     navVisibility?.value = false;
-                    
+
                     Navigator.of(context)
                         .push(
                           MaterialPageRoute(
