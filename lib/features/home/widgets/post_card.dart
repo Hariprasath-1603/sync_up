@@ -6,7 +6,7 @@ import '../../../core/scaffold_with_nav_bar.dart';
 import '../../../core/theme.dart';
 import '../models/post_model.dart';
 import '../../profile/models/post_model.dart' as profile_post;
-import '../../profile/pages/post_viewer_instagram_style.dart';
+import '../../profile/pages/post_viewer_page_v2.dart';
 import '../../profile/other_user_profile_page.dart';
 import 'floating_hearts_from_position.dart';
 
@@ -394,7 +394,7 @@ class _PostCardState extends State<PostCard> {
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => PostViewerInstagramStyle(
+        builder: (context) => PostViewerPageV2(
           initialPost: profilePost,
           allPosts: [profilePost],
         ),

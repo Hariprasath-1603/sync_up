@@ -340,7 +340,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                 ),
-                ...currentPosts.map((post) => PostCard(post: post)).toList(),
+                ...currentPosts.map((post) => PostCard(post: post)),
                 const SizedBox(height: 100),
               ],
             ),

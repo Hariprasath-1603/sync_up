@@ -1,23 +1,42 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/scaffold_with_nav_bar.dart';
+import '../../core/theme.dart';
 import '../profile/pages/widgets/floating_reactions.dart';
 import '../profile/other_user_profile_page.dart';
+
+// Global key for accessing ReelsPageNew state from anywhere
+final GlobalKey<_ReelsPageNewState> reelsPageKey =
+    GlobalKey<_ReelsPageNewState>();
 
 class ReelsPageNew extends StatefulWidget {
   final ReelData? initialReel;
   final int? initialIndex;
+  final bool shouldRefresh;
 
-  const ReelsPageNew({super.key, this.initialReel, this.initialIndex});
+  const ReelsPageNew({
+    super.key,
+    this.initialReel,
+    this.initialIndex,
+    this.shouldRefresh = false,
+  });
 
   @override
   State<ReelsPageNew> createState() => _ReelsPageNewState();
 }
 
-class _ReelsPageNewState extends State<ReelsPageNew> {
+class _ReelsPageNewState extends State<ReelsPageNew>
+    with SingleTickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentReelIndex = 0;
   bool _isFollowingTab = false;
   final GlobalKey<FloatingReactionsState> _reactionsKey = GlobalKey();
+
+  // Video progress tracking
+  late AnimationController _progressController;
+  bool _isLongPressing = false;
+  bool _isRefreshing = false;
+  bool _autoScroll = true; // Auto-scroll feature (on by default)
 
   // For You Reels (all reels)
   final List<ReelData> _forYouReels = [
@@ -111,6 +130,285 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
       isFollowing: false,
       location: 'Mumbai, India',
     ),
+    ReelData(
+      id: 'r12350',
+      userId: 'user_tech_006',
+      username: '@tech_guru',
+      profilePic: 'https://i.pravatar.cc/150?img=6',
+      caption:
+          'iPhone 16 Pro Max Unboxing! 📱 This camera is insane! #tech #apple',
+      musicName: 'Tech Talk',
+      musicArtist: '@TechBeats',
+      videoUrl: 'https://picsum.photos/seed/reel6/1080/1920',
+      likes: 34500,
+      comments: 9876,
+      shares: 5432,
+      views: 290000,
+      isLiked: false,
+      isSaved: false,
+      isFollowing: true,
+      location: 'San Francisco, CA',
+    ),
+    ReelData(
+      id: 'r12351',
+      userId: 'user_artist_007',
+      username: '@art_by_emma',
+      profilePic: 'https://i.pravatar.cc/150?img=7',
+      caption:
+          'Time-lapse of my latest painting 🎨 What do you think? #art #painting',
+      musicName: 'Creative Flow',
+      musicArtist: '@ArtistVibes',
+      videoUrl: 'https://picsum.photos/seed/reel7/1080/1920',
+      likes: 23400,
+      comments: 6543,
+      shares: 3210,
+      views: 180000,
+      isLiked: false,
+      isSaved: true,
+      isFollowing: false,
+      location: 'Paris, France',
+    ),
+    ReelData(
+      id: 'r12352',
+      userId: 'user_pet_008',
+      username: '@cute_pets',
+      profilePic: 'https://i.pravatar.cc/150?img=8',
+      caption: 'My dog learned a new trick! 🐕 Cutest thing ever! #pets #dogs',
+      musicName: 'Happy Puppy',
+      musicArtist: '@PetSounds',
+      videoUrl: 'https://picsum.photos/seed/reel8/1080/1920',
+      likes: 89000,
+      comments: 21000,
+      shares: 12000,
+      views: 650000,
+      isLiked: true,
+      isSaved: false,
+      isFollowing: true,
+      location: 'London, UK',
+    ),
+    ReelData(
+      id: 'r12353',
+      userId: 'user_comedy_009',
+      username: '@funny_moments',
+      profilePic: 'https://i.pravatar.cc/150?img=9',
+      caption:
+          'When your friend says they paid for dinner 😂 #comedy #relatable',
+      musicName: 'Comedy Gold',
+      musicArtist: '@LaughTrack',
+      videoUrl: 'https://picsum.photos/seed/reel9/1080/1920',
+      likes: 145000,
+      comments: 34000,
+      shares: 23000,
+      views: 1200000,
+      isLiked: false,
+      isSaved: false,
+      isFollowing: false,
+      location: 'Toronto, Canada',
+    ),
+    ReelData(
+      id: 'r12354',
+      userId: 'user_nature_010',
+      username: '@nature_shots',
+      profilePic: 'https://i.pravatar.cc/150?img=10',
+      caption:
+          'Sunrise in the mountains 🏔️ Nature is beautiful! #nature #landscape',
+      musicName: 'Mountain Echo',
+      musicArtist: '@NatureSounds',
+      videoUrl: 'https://picsum.photos/seed/reel10/1080/1920',
+      likes: 56700,
+      comments: 13400,
+      shares: 7890,
+      views: 450000,
+      isLiked: false,
+      isSaved: true,
+      isFollowing: true,
+      location: 'Swiss Alps',
+    ),
+    ReelData(
+      id: 'r12355',
+      userId: 'user_fashion_011',
+      username: '@style_icon',
+      profilePic: 'https://i.pravatar.cc/150?img=11',
+      caption: 'OOTD: Street style vibes 👗 Links in bio! #fashion #style',
+      musicName: 'Fashion Week',
+      musicArtist: '@StyleBeats',
+      videoUrl: 'https://picsum.photos/seed/reel11/1080/1920',
+      likes: 43200,
+      comments: 11200,
+      shares: 6543,
+      views: 340000,
+      isLiked: false,
+      isSaved: false,
+      isFollowing: false,
+      location: 'Milan, Italy',
+    ),
+    ReelData(
+      id: 'r12356',
+      userId: 'user_gaming_012',
+      username: '@pro_gamer',
+      profilePic: 'https://i.pravatar.cc/150?img=12',
+      caption:
+          'Epic gaming moment! 🎮 Did you see that headshot? #gaming #esports',
+      musicName: 'Game On',
+      musicArtist: '@GamerMusic',
+      videoUrl: 'https://picsum.photos/seed/reel12/1080/1920',
+      likes: 78900,
+      comments: 19800,
+      shares: 10200,
+      views: 580000,
+      isLiked: true,
+      isSaved: true,
+      isFollowing: true,
+      location: 'Seoul, South Korea',
+    ),
+    ReelData(
+      id: 'r12357',
+      userId: 'user_music_013',
+      username: '@music_cover',
+      profilePic: 'https://i.pravatar.cc/150?img=13',
+      caption: 'Cover of my favorite song 🎵 Hope you like it! #music #cover',
+      musicName: 'Acoustic Dreams',
+      musicArtist: '@IndieArtist',
+      videoUrl: 'https://picsum.photos/seed/reel13/1080/1920',
+      likes: 34500,
+      comments: 8900,
+      shares: 4321,
+      views: 270000,
+      isLiked: false,
+      isSaved: false,
+      isFollowing: false,
+      location: 'Nashville, TN',
+    ),
+    ReelData(
+      id: 'r12358',
+      userId: 'user_diy_014',
+      username: '@diy_projects',
+      profilePic: 'https://i.pravatar.cc/150?img=14',
+      caption: 'Easy DIY home decor! 🏡 Save this for later! #diy #homedecor',
+      musicName: 'Crafty Vibes',
+      musicArtist: '@DIYMusic',
+      videoUrl: 'https://picsum.photos/seed/reel14/1080/1920',
+      likes: 29800,
+      comments: 7654,
+      shares: 5678,
+      views: 220000,
+      isLiked: false,
+      isSaved: true,
+      isFollowing: true,
+      location: 'Austin, TX',
+    ),
+    ReelData(
+      id: 'r12359',
+      userId: 'user_car_015',
+      username: '@car_enthusiast',
+      profilePic: 'https://i.pravatar.cc/150?img=15',
+      caption: 'New Tesla Model S! ⚡ Electric future is here! #cars #tesla',
+      musicName: 'Speed Drive',
+      musicArtist: '@CarBeats',
+      videoUrl: 'https://picsum.photos/seed/reel15/1080/1920',
+      likes: 61200,
+      comments: 15400,
+      shares: 8765,
+      views: 480000,
+      isLiked: false,
+      isSaved: false,
+      isFollowing: false,
+      location: 'Dubai, UAE',
+    ),
+    ReelData(
+      id: 'r12360',
+      userId: 'user_yoga_016',
+      username: '@yoga_daily',
+      profilePic: 'https://i.pravatar.cc/150?img=16',
+      caption: 'Morning yoga routine ☀️ Start your day right! #yoga #wellness',
+      musicName: 'Peaceful Mind',
+      musicArtist: '@YogaMusic',
+      videoUrl: 'https://picsum.photos/seed/reel16/1080/1920',
+      likes: 38900,
+      comments: 9876,
+      shares: 5432,
+      views: 310000,
+      isLiked: false,
+      isSaved: true,
+      isFollowing: true,
+      location: 'Bali, Indonesia',
+    ),
+    ReelData(
+      id: 'r12361',
+      userId: 'user_magic_017',
+      username: '@magic_tricks',
+      profilePic: 'https://i.pravatar.cc/150?img=17',
+      caption:
+          'Mind-blowing magic trick! ✨ Can you figure it out? #magic #illusion',
+      musicName: 'Mystery Box',
+      musicArtist: '@MagicSounds',
+      videoUrl: 'https://picsum.photos/seed/reel17/1080/1920',
+      likes: 92300,
+      comments: 23400,
+      shares: 14500,
+      views: 780000,
+      isLiked: true,
+      isSaved: false,
+      isFollowing: false,
+      location: 'Las Vegas, NV',
+    ),
+    ReelData(
+      id: 'r12362',
+      userId: 'user_dessert_018',
+      username: '@sweet_treats',
+      profilePic: 'https://i.pravatar.cc/150?img=18',
+      caption:
+          'Decadent chocolate cake recipe 🍰 So satisfying! #dessert #baking',
+      musicName: 'Sugar Rush',
+      musicArtist: '@BakingBeats',
+      videoUrl: 'https://picsum.photos/seed/reel18/1080/1920',
+      likes: 47600,
+      comments: 12100,
+      shares: 6890,
+      views: 370000,
+      isLiked: false,
+      isSaved: true,
+      isFollowing: true,
+      location: 'Paris, France',
+    ),
+    ReelData(
+      id: 'r12363',
+      userId: 'user_skate_019',
+      username: '@skate_life',
+      profilePic: 'https://i.pravatar.cc/150?img=19',
+      caption:
+          'Landed my first kickflip! 🛹 Practice makes perfect! #skateboarding #extreme',
+      musicName: 'Skate Punk',
+      musicArtist: '@SkateMusic',
+      videoUrl: 'https://picsum.photos/seed/reel19/1080/1920',
+      likes: 54300,
+      comments: 13200,
+      shares: 7543,
+      views: 420000,
+      isLiked: false,
+      isSaved: false,
+      isFollowing: false,
+      location: 'Venice Beach, CA',
+    ),
+    ReelData(
+      id: 'r12364',
+      userId: 'user_baby_020',
+      username: '@baby_moments',
+      profilePic: 'https://i.pravatar.cc/150?img=20',
+      caption:
+          'Baby\'s first steps! 👶 Such a precious moment! #baby #milestone',
+      musicName: 'Baby Love',
+      musicArtist: '@FamilyMusic',
+      videoUrl: 'https://picsum.photos/seed/reel20/1080/1920',
+      likes: 123000,
+      comments: 31000,
+      shares: 19000,
+      views: 950000,
+      isLiked: true,
+      isSaved: true,
+      isFollowing: true,
+      location: 'Sydney, Australia',
+    ),
   ];
 
   // Following Reels (only from followed users)
@@ -126,6 +424,30 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
   @override
   void initState() {
     super.initState();
+
+    // Initialize progress controller for video progress
+    _progressController =
+        AnimationController(
+            vsync: this,
+            duration: const Duration(seconds: 15), // Assume 15 seconds per reel
+          )
+          ..addListener(() {
+            setState(() {});
+          })
+          ..addStatusListener((status) {
+            // Auto-scroll to next reel when current one completes
+            if (status == AnimationStatus.completed && _autoScroll) {
+              if (_currentReelIndex < _currentReels.length - 1) {
+                _pageController.nextPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              }
+            }
+          });
+
+    // Start progress for first reel
+    _progressController.forward();
 
     // If an initial reel is provided, add it to the beginning of the list
     if (widget.initialReel != null) {
@@ -146,6 +468,7 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
   @override
   void dispose() {
     _pageController.dispose();
+    _progressController.dispose();
     super.dispose();
   }
 
@@ -154,7 +477,72 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
       _isFollowingTab = isFollowing;
       _currentReelIndex = 0;
       _pageController.jumpToPage(0);
+      _progressController.reset();
+      _progressController.forward();
     });
+  }
+
+  Future<void> refreshReels() async {
+    if (_isRefreshing) return;
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    // Simulate loading new reels with animation
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    // In a real app, you would fetch new reels from an API here
+    // For now, we'll shuffle the existing reels
+    setState(() {
+      _forYouReels.shuffle();
+      _isRefreshing = false;
+      _currentReelIndex = 0;
+      _progressController.reset();
+      _progressController.forward();
+    });
+
+    // Jump to first reel
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
+  }
+
+  void _onPageChanged(int index) {
+    setState(() {
+      _currentReelIndex = index;
+      _progressController.reset();
+      _progressController.forward();
+    });
+  }
+
+  void _seekBackward() {
+    // Go back 5 seconds (approximately 33% of 15 second video)
+    final newValue = (_progressController.value - 0.33).clamp(0.0, 1.0);
+    setState(() {
+      _progressController.value = newValue;
+    });
+    _progressController.forward(from: newValue);
+
+    // Show visual feedback
+    _showSeekFeedback('⏪ -5s', Icons.fast_rewind_rounded);
+  }
+
+  void _seekForward() {
+    // Go forward 5 seconds (approximately 33% of 15 second video)
+    final newValue = (_progressController.value + 0.33).clamp(0.0, 1.0);
+    setState(() {
+      _progressController.value = newValue;
+    });
+    _progressController.forward(from: newValue);
+
+    // Show visual feedback
+    _showSeekFeedback('⏩ +5s', Icons.fast_forward_rounded);
+  }
+
+  void _showSeekFeedback(String text, IconData icon) {
+    // Visual feedback removed per user request
+    // Seek happens silently now
   }
 
   void _toggleLike(int index) {
@@ -176,10 +564,28 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
     });
   }
 
-  void _toggleFollow(int index) {
-    setState(() {
-      _currentReels[index].isFollowing = !_currentReels[index].isFollowing;
-    });
+  void _toggleFollow(int index) async {
+    final reel = _currentReels[index];
+
+    // If already following, show confirmation dialog
+    if (reel.isFollowing) {
+      final shouldUnfollow = await showDialog<bool>(
+        context: context,
+        builder: (context) =>
+            _UnfollowConfirmationDialog(username: reel.username),
+      );
+
+      if (shouldUnfollow == true) {
+        setState(() {
+          _currentReels[index].isFollowing = false;
+        });
+      }
+    } else {
+      // If not following, just follow
+      setState(() {
+        _currentReels[index].isFollowing = true;
+      });
+    }
   }
 
   void _showCommentsModal(ReelData reel) {
@@ -226,6 +632,16 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
       useRootNavigator: true,
       builder: (context) => MoreOptionsSheet(
         reel: reel,
+        autoScroll: _autoScroll,
+        onAutoScrollChanged: (value) {
+          setState(() {
+            _autoScroll = value;
+          });
+        },
+        onSave: () {
+          Navigator.pop(context);
+          _toggleSave(index);
+        },
         onReport: () {
           Navigator.pop(context);
           ScaffoldMessenger.of(
@@ -272,96 +688,273 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Main Vertical Scrolling Reels
-          PageView.builder(
-            controller: _pageController,
-            scrollDirection: Axis.vertical,
-            itemCount: _currentReels.length,
-            onPageChanged: (index) {
-              setState(() {
-                _currentReelIndex = index;
-              });
+          // Main Vertical Scrolling Reels with Pull-to-Refresh
+          RefreshIndicator(
+            onRefresh: () async {
+              if (_currentReelIndex == 0) {
+                await refreshReels();
+              }
             },
-            itemBuilder: (context, index) {
-              return _buildReelItem(_currentReels[index], index);
-            },
+            color: Colors.white,
+            backgroundColor: Colors.black87,
+            displacement: 50,
+            child: PageView.builder(
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              itemCount: _currentReels.length,
+              onPageChanged: _onPageChanged,
+              itemBuilder: (context, index) {
+                return _buildReelItem(_currentReels[index], index);
+              },
+            ),
           ),
 
-          // Top Bar with Following/For You Toggle
+          // Enhanced Progress Indicator at the top - Shows current video progress
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Container(
+                height: 3,
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: Stack(
+                    children: [
+                      // Background - All reels indicator
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                      // Current video progress
+                      FractionallySizedBox(
+                        widthFactor: _progressController.value,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF4A6CF7),
+                                Color(0xFF7C3AED),
+                                Color(0xFFEC4899),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF4A6CF7).withOpacity(0.5),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Loading indicator when refreshing - Simple centered spinner
+          if (_isRefreshing)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    child: const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // Top Bar with Following/For You Toggle - Modern Glass Effect
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             child: SafeArea(
               child: Container(
+                margin: const EdgeInsets.all(12),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+                  horizontal: 12,
+                  vertical: 8,
                 ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.black.withOpacity(0.6), Colors.transparent],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white.withOpacity(0.2),
+                      Colors.white.withOpacity(0.1),
+                    ],
                   ),
+                  borderRadius: BorderRadius.circular(50),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.3),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Tab Toggle
-                    Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => _switchTab(true),
-                          child: Text(
-                            'Following',
-                            style: TextStyle(
-                              color: _isFollowingTab
-                                  ? Colors.white
-                                  : Colors.white.withOpacity(0.5),
-                              fontSize: 16,
-                              fontWeight: _isFollowingTab
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        GestureDetector(
-                          onTap: () => _switchTab(false),
-                          child: Text(
-                            'For You',
-                            style: TextStyle(
-                              color: !_isFollowingTab
-                                  ? Colors.white
-                                  : Colors.white.withOpacity(0.5),
-                              fontSize: 16,
-                              fontWeight: !_isFollowingTab
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // View Count
+                    // Tab Toggle with Glass Pills
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
+                      padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(40),
+                      ),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => _switchTab(true),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: _isFollowingTab
+                                    ? LinearGradient(
+                                        colors: [
+                                          Colors.white.withOpacity(0.4),
+                                          Colors.white.withOpacity(0.2),
+                                        ],
+                                      )
+                                    : null,
+                                borderRadius: BorderRadius.circular(40),
+                                border: _isFollowingTab
+                                    ? Border.all(
+                                        color: Colors.white.withOpacity(0.4),
+                                        width: 1,
+                                      )
+                                    : null,
+                              ),
+                              child: Text(
+                                'Following',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: _isFollowingTab
+                                      ? FontWeight.bold
+                                      : FontWeight.w500,
+                                  shadows: const [
+                                    Shadow(
+                                      color: Colors.black45,
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => _switchTab(false),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: !_isFollowingTab
+                                    ? LinearGradient(
+                                        colors: [
+                                          Colors.white.withOpacity(0.4),
+                                          Colors.white.withOpacity(0.2),
+                                        ],
+                                      )
+                                    : null,
+                                borderRadius: BorderRadius.circular(40),
+                                border: !_isFollowingTab
+                                    ? Border.all(
+                                        color: Colors.white.withOpacity(0.4),
+                                        width: 1,
+                                      )
+                                    : null,
+                              ),
+                              child: Text(
+                                'For You',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: !_isFollowingTab
+                                      ? FontWeight.bold
+                                      : FontWeight.w500,
+                                  shadows: const [
+                                    Shadow(
+                                      color: Colors.black45,
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // View Count with Glass Effect
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.black.withOpacity(0.4),
+                            Colors.black.withOpacity(0.2),
+                          ],
+                        ),
                         borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1,
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.remove_red_eye_rounded,
-                            color: Colors.white,
-                            size: 18,
+                          Icon(
+                            Icons.visibility_rounded,
+                            color: Colors.white.withOpacity(0.9),
+                            size: 16,
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -372,8 +965,11 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
                             ),
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              shadows: [
+                                Shadow(color: Colors.black45, blurRadius: 4),
+                              ],
                             ),
                           ),
                         ],
@@ -391,7 +987,43 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
 
   Widget _buildReelItem(ReelData reel, int index) {
     return GestureDetector(
-      onDoubleTap: () => _toggleLike(index),
+      onDoubleTapDown: (details) {
+        // Double tap regions:
+        // Left 25% = go back 5 seconds
+        // Center 50% = like the reel
+        // Right 25% = go forward 5 seconds
+        final screenWidth = MediaQuery.of(context).size.width;
+        final tapPosition = details.globalPosition.dx;
+
+        if (tapPosition < screenWidth * 0.25) {
+          // Left 25% - go back 5 seconds
+          _seekBackward();
+        } else if (tapPosition > screenWidth * 0.75) {
+          // Right 25% - go forward 5 seconds
+          _seekForward();
+        } else {
+          // Center 50% - like the reel
+          _toggleLike(index);
+        }
+      },
+      onLongPressStart: (details) {
+        // Long press for 2x speed
+        setState(() {
+          _isLongPressing = true;
+          // Speed up the animation to 2x
+          _progressController.duration = const Duration(
+            milliseconds: 7500,
+          ); // Half of 15 seconds
+        });
+      },
+      onLongPressEnd: (details) {
+        // Return to normal speed
+        setState(() {
+          _isLongPressing = false;
+          // Reset to normal speed
+          _progressController.duration = const Duration(seconds: 15);
+        });
+      },
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -445,6 +1077,58 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
           if (_currentReelIndex == index)
             Positioned.fill(child: FloatingReactions(key: _reactionsKey)),
 
+          // 2x Speed Indicator (when long pressing)
+          if (_isLongPressing && _currentReelIndex == index)
+            Positioned(
+              top: 100,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      kPrimary.withOpacity(0.9),
+                      kPrimary.withOpacity(0.7),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.5),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kPrimary.withOpacity(0.5),
+                      blurRadius: 15,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.fast_forward_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '2x',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Right Side Action Buttons
           Positioned(
             right: 12,
@@ -452,41 +1136,46 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Profile Picture with Follow Button
+                // Profile Picture with Follow Button - Enhanced Glass Effect
                 Stack(
                   clipBehavior: Clip.none,
                   alignment: Alignment.bottomCenter,
                   children: [
                     GestureDetector(
-                      onTap: () {
-                        final navVisibility = NavBarVisibilityScope.maybeOf(
-                          context,
-                        );
-                        navVisibility?.value = false;
-
-                        Navigator.of(context)
-                            .push(
-                              MaterialPageRoute(
-                                builder: (context) => OtherUserProfilePage(
-                                  userId: reel.userId,
-                                  username: reel.username,
-                                  avatarUrl: reel.profilePic,
-                                ),
-                              ),
-                            )
-                            .whenComplete(() {
-                              navVisibility?.value = true;
-                            });
-                      },
+                      onTap: () => _toggleFollow(index),
                       child: Container(
-                        width: 50,
-                        height: 50,
+                        width: 56,
+                        height: 56,
+                        padding: const EdgeInsets.all(3),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                          image: DecorationImage(
-                            image: NetworkImage(reel.profilePic),
-                            fit: BoxFit.cover,
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white.withOpacity(0.4),
+                              Colors.white.withOpacity(0.2),
+                            ],
+                          ),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.5),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            image: DecorationImage(
+                              image: NetworkImage(reel.profilePic),
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                       ),
@@ -497,14 +1186,26 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
                         child: GestureDetector(
                           onTap: () => _toggleFollow(index),
                           child: Container(
-                            width: 22,
-                            height: 22,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFFF3B5C),
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [kPrimary, kPrimary.withOpacity(0.8)],
+                              ),
                               shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: kPrimary.withOpacity(0.5),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
                             child: const Icon(
-                              Icons.add,
+                              Icons.add_rounded,
                               color: Colors.white,
                               size: 16,
                             ),
@@ -542,16 +1243,7 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
                 ),
                 const SizedBox(height: 24),
 
-                // Save Button
-                _buildActionButton(
-                  icon: reel.isSaved ? Icons.bookmark : Icons.bookmark_border,
-                  count: '',
-                  color: reel.isSaved ? Colors.yellow : Colors.white,
-                  onTap: () => _toggleSave(index),
-                ),
-                const SizedBox(height: 24),
-
-                // More Options (3 dots)
+                // More Options (3 dots) - Same size as other buttons
                 _buildActionButton(
                   icon: Icons.more_horiz,
                   count: '',
@@ -571,7 +1263,7 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Username - Clickable to navigate to profile
+                // Username with Glass Effect - Clickable to navigate to profile
                 GestureDetector(
                   onTap: () {
                     final navVisibility = NavBarVisibilityScope.maybeOf(
@@ -593,12 +1285,32 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
                           navVisibility?.value = true;
                         });
                   },
-                  child: Text(
-                    reel.username,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.white.withOpacity(0.2),
+                          Colors.white.withOpacity(0.1),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      reel.username,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                      ),
                     ),
                   ),
                 ),
@@ -608,72 +1320,133 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
                 _buildExpandableCaption(reel.caption),
                 const SizedBox(height: 10),
 
-                // Location Tag
+                // Location Tag with Glass Effect
                 if (reel.location != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          reel.location!,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                // Music Bar
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: GestureDetector(
-                    onTap: () => _showMusicPage(reel),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+                        horizontal: 10,
+                        vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.3),
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withOpacity(0.2),
+                            Colors.white.withOpacity(0.1),
+                          ],
+                        ),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withOpacity(0.3),
                           width: 1,
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.music_note,
-                            color: Colors.white,
-                            size: 16,
+                          Icon(
+                            Icons.location_on_rounded,
+                            color: Colors.red.shade300,
+                            size: 14,
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 4),
+                          Text(
+                            reel.location!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              shadows: [
+                                Shadow(color: Colors.black54, blurRadius: 4),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // Music Bar with Modern Glass Effect
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: GestureDetector(
+                    onTap: () => _showMusicPage(reel),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.white.withOpacity(0.25),
+                            Colors.white.withOpacity(0.15),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(25),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.4),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.pink.withOpacity(0.6),
+                                  Colors.purple.withOpacity(0.6),
+                                ],
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.music_note,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
                           Flexible(
                             child: Text(
                               '${reel.musicName} • ${reel.musicArtist}',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                shadows: [
+                                  Shadow(color: Colors.black54, blurRadius: 4),
+                                ],
                               ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Icon(
-                            Icons.chevron_right,
-                            color: Colors.white,
-                            size: 16,
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withOpacity(0.2),
+                            ),
+                            child: const Icon(
+                              Icons.chevron_right_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                           ),
                         ],
                       ),
@@ -698,15 +1471,52 @@ class _ReelsPageNewState extends State<ReelsPageNew> {
       onTap: onTap,
       child: Column(
         children: [
-          Icon(icon, color: color, size: 32),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withOpacity(0.25),
+                  Colors.white.withOpacity(0.1),
+                ],
+              ),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.3),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
           if (count.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              count,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                count,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                ),
               ),
             ),
           ],
@@ -1325,10 +2135,12 @@ class ShareSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1D24),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1D24) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
@@ -1343,31 +2155,40 @@ class ShareSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const Text(
+          Text(
             'Share',
             style: TextStyle(
-              color: Colors.white,
+              color: isDark ? Colors.white : Colors.black87,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 20),
-          _buildShareOption(Icons.person_add, 'Share to Story', () {}),
-          _buildShareOption(Icons.link, 'Copy Link', () {}),
+          _buildShareOption(context, Icons.person_add, 'Share to Story', () {}),
+          _buildShareOption(context, Icons.link, 'Copy Link', () {}),
           _buildShareOption(
+            context,
             Icons.chat_bubble_outline,
             'Send via Direct Message',
             () {},
           ),
-          _buildShareOption(Icons.video_library, 'Remix This Reel', () {}),
-          _buildShareOption(Icons.download, 'Save to Device', () {}),
-          _buildShareOption(Icons.qr_code, 'QR Code', () {}),
+          _buildShareOption(
+            context,
+            Icons.video_library,
+            'Remix This Reel',
+            () {},
+          ),
+          _buildShareOption(context, Icons.download, 'Save to Device', () {}),
+          _buildShareOption(context, Icons.qr_code, 'QR Code', () {}),
           const SizedBox(height: 20),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
+              style: TextStyle(
+                color: isDark ? Colors.grey : Colors.grey.shade600,
+                fontSize: 16,
+              ),
             ),
           ),
         ],
@@ -1375,18 +2196,30 @@ class ShareSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildShareOption(IconData icon, String label, VoidCallback onTap) {
+  Widget _buildShareOption(
+    BuildContext context,
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
-      leading: Icon(icon, color: Colors.white),
-      title: Text(label, style: const TextStyle(color: Colors.white)),
+      leading: Icon(icon, color: isDark ? Colors.white : Colors.black87),
+      title: Text(
+        label,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+      ),
       onTap: onTap,
     );
   }
 }
 
 // More Options Sheet
-class MoreOptionsSheet extends StatelessWidget {
+class MoreOptionsSheet extends StatefulWidget {
   final ReelData reel;
+  final bool autoScroll;
+  final ValueChanged<bool> onAutoScrollChanged;
+  final VoidCallback onSave;
   final VoidCallback onReport;
   final VoidCallback onNotInterested;
   final VoidCallback onCopyLink;
@@ -1394,61 +2227,162 @@ class MoreOptionsSheet extends StatelessWidget {
   const MoreOptionsSheet({
     super.key,
     required this.reel,
+    required this.autoScroll,
+    required this.onAutoScrollChanged,
+    required this.onSave,
     required this.onReport,
     required this.onNotInterested,
     required this.onCopyLink,
   });
 
   @override
+  State<MoreOptionsSheet> createState() => _MoreOptionsSheetState();
+}
+
+class _MoreOptionsSheetState extends State<MoreOptionsSheet> {
+  late bool _localAutoScroll;
+
+  @override
+  void initState() {
+    super.initState();
+    _localAutoScroll = widget.autoScroll;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1D24),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1D24) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(bottom: 20),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[600],
-              borderRadius: BorderRadius.circular(2),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[600],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Auto-scroll toggle
+                _buildSwitchOption(
+                  context,
+                  Icons.auto_awesome_motion_rounded,
+                  'Auto Scroll',
+                  'Automatically play next reel',
+                  _localAutoScroll,
+                  (value) {
+                    setState(() {
+                      _localAutoScroll = value;
+                    });
+                    widget.onAutoScrollChanged(value);
+                  },
+                ),
+                // Save option
+                _buildOption(
+                  context,
+                  widget.reel.isSaved ? Icons.bookmark : Icons.bookmark_border,
+                  widget.reel.isSaved ? 'Remove from Saved' : 'Save',
+                  widget.onSave,
+                ),
+                _buildOption(
+                  context,
+                  Icons.report_outlined,
+                  'Report',
+                  widget.onReport,
+                ),
+                _buildOption(
+                  context,
+                  Icons.not_interested_outlined,
+                  'Not Interested',
+                  widget.onNotInterested,
+                ),
+                _buildOption(context, Icons.link, 'Copy Link', widget.onCopyLink),
+                _buildOption(
+                  context,
+                  Icons.person_add_outlined,
+                  'About This Account',
+                  () {
+                    Navigator.pop(context);
+                  },
+                ),
+                _buildOption(context, Icons.share_outlined, 'Share Profile', () {
+                  Navigator.pop(context);
+                }),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: isDark ? Colors.grey : Colors.grey.shade600,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          _buildOption(Icons.report_outlined, 'Report', onReport),
-          _buildOption(
-            Icons.not_interested_outlined,
-            'Not Interested',
-            onNotInterested,
-          ),
-          _buildOption(Icons.link, 'Copy Link', onCopyLink),
-          _buildOption(Icons.person_add_outlined, 'About This Account', () {
-            Navigator.pop(context);
-          }),
-          _buildOption(Icons.share_outlined, 'Share Profile', () {
-            Navigator.pop(context);
-          }),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildOption(IconData icon, String label, VoidCallback onTap) {
+  Widget _buildSwitchOption(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String subtitle,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
-      leading: Icon(icon, color: Colors.white),
-      title: Text(label, style: const TextStyle(color: Colors.white)),
+      leading: Icon(icon, color: isDark ? Colors.white : Colors.black87),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isDark ? Colors.white : Colors.black87,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          color: isDark ? Colors.white60 : Colors.grey.shade600,
+          fontSize: 12,
+        ),
+      ),
+      trailing: Switch(
+        value: value,
+        onChanged: onChanged,
+        activeColor: kPrimary,
+      ),
+    );
+  }
+
+  Widget _buildOption(
+    BuildContext context,
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return ListTile(
+      leading: Icon(icon, color: isDark ? Colors.white : Colors.black87),
+      title: Text(
+        label,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+      ),
       onTap: onTap,
     );
   }
@@ -1567,6 +2501,165 @@ class MusicReelsPage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// Unfollow Confirmation Dialog
+class _UnfollowConfirmationDialog extends StatelessWidget {
+  final String username;
+
+  const _UnfollowConfirmationDialog({required this.username});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF1A1D24).withOpacity(0.95)
+                  : Colors.white.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Profile Icon
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        kPrimary.withOpacity(0.2),
+                        kPrimary.withOpacity(0.1),
+                      ],
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.person_remove_outlined,
+                    size: 32,
+                    color: kPrimary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Title
+                Text(
+                  'Unfollow $username?',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+
+                // Description
+                Text(
+                  'Their posts will no longer appear in your feed',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white70 : Colors.grey.shade600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+
+                // Buttons
+                Row(
+                  children: [
+                    // Cancel Button
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: (isDark ? Colors.white : Colors.black)
+                              .withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: (isDark ? Colors.white : Colors.black)
+                                .withOpacity(0.1),
+                            width: 1,
+                          ),
+                        ),
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Unfollow Button
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [kPrimary, kPrimary.withOpacity(0.8)],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: kPrimary.withOpacity(0.4),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Unfollow',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

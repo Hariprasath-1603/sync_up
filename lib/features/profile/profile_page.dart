@@ -237,8 +237,8 @@ class _MyProfilePageState extends State<MyProfilePage>
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildPostGrid(_posts, isDark),
-                    _buildPostGrid(_media, isDark),
+                    _buildPostGrid(context, _posts, isDark),
+                    _buildPostGrid(context, _media, isDark),
                   ],
                 ),
               ),
@@ -781,10 +781,18 @@ class _MyProfilePageState extends State<MyProfilePage>
     );
   }
 
-  Widget _buildPostGrid(List<String> images, bool isDark) {
+  Widget _buildPostGrid(
+    BuildContext context,
+    List<String> images,
+    bool isDark,
+  ) {
+    final bottomSafeArea = MediaQuery.of(context).padding.bottom;
+    // Add extra space so the last item clears the floating nav bar comfortably
+    final bottomPadding = bottomSafeArea + 210;
+
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
       itemCount: images.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,

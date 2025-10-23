@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme.dart';
 import '../../add/add_page.dart';
+import '../../reels/reels_page_new.dart';
 
 class AnimatedNavBar extends StatefulWidget {
   const AnimatedNavBar({super.key});
@@ -13,15 +14,37 @@ class AnimatedNavBar extends StatefulWidget {
 
 class _AnimatedNavBarState extends State<AnimatedNavBar> {
   final List<NavBarItem> _items = [
-    NavBarItem(outlinedIcon: Icons.home_outlined, filledIcon: Icons.home, path: '/home'),
-    NavBarItem(outlinedIcon: Icons.search_outlined, filledIcon: Icons.search, path: '/search'),
-    NavBarItem(outlinedIcon: Icons.add_circle_outline, filledIcon: Icons.add_circle, path: '/add'),
-    NavBarItem(outlinedIcon: Icons.smart_display_outlined, filledIcon: Icons.smart_display, path: '/reels'),
-    NavBarItem(outlinedIcon: Icons.person_outline, filledIcon: Icons.person, path: '/profile'),
+    NavBarItem(
+      outlinedIcon: Icons.home_outlined,
+      filledIcon: Icons.home,
+      path: '/home',
+    ),
+    NavBarItem(
+      outlinedIcon: Icons.search_outlined,
+      filledIcon: Icons.search,
+      path: '/search',
+    ),
+    NavBarItem(
+      outlinedIcon: Icons.add_circle_outline,
+      filledIcon: Icons.add_circle,
+      path: '/add',
+    ),
+    NavBarItem(
+      outlinedIcon: Icons.smart_display_outlined,
+      filledIcon: Icons.smart_display,
+      path: '/reels',
+    ),
+    NavBarItem(
+      outlinedIcon: Icons.person_outline,
+      filledIcon: Icons.person,
+      path: '/profile',
+    ),
   ];
 
   int _getSelectedIndex(BuildContext context) {
-    final String location = GoRouter.of(context).routerDelegate.currentConfiguration.fullPath;
+    final String location = GoRouter.of(
+      context,
+    ).routerDelegate.currentConfiguration.fullPath;
     final index = _items.indexWhere((item) => item.path == location);
     return index == -1 ? 0 : index;
   }
@@ -92,8 +115,10 @@ class _AnimatedNavBarState extends State<AnimatedNavBar> {
                       AnimatedPositioned(
                         duration: const Duration(milliseconds: 400),
                         curve: Curves.easeOutCubic,
-                        left: (screenWidth * 0.9 / _items.length) * selectedIndex + 
-                              (screenWidth * 0.9 / _items.length - 54) / 2,
+                        left:
+                            (screenWidth * 0.9 / _items.length) *
+                                selectedIndex +
+                            (screenWidth * 0.9 / _items.length - 54) / 2,
                         child: TweenAnimationBuilder<double>(
                           tween: Tween(begin: 0.0, end: 1.0),
                           duration: const Duration(milliseconds: 400),
@@ -149,17 +174,35 @@ class _AnimatedNavBarState extends State<AnimatedNavBar> {
                                   Navigator.of(context).push(
                                     PageRouteBuilder(
                                       opaque: false,
-                                      pageBuilder: (context, animation, secondaryAnimation) => const AddPage(),
-                                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                        return FadeTransition(
-                                          opacity: animation,
-                                          child: child,
-                                        );
-                                      },
+                                      pageBuilder:
+                                          (
+                                            context,
+                                            animation,
+                                            secondaryAnimation,
+                                          ) => const AddPage(),
+                                      transitionsBuilder:
+                                          (
+                                            context,
+                                            animation,
+                                            secondaryAnimation,
+                                            child,
+                                          ) {
+                                            return FadeTransition(
+                                              opacity: animation,
+                                              child: child,
+                                            );
+                                          },
                                     ),
                                   );
                                 } else {
                                   context.go(item.path);
+                                }
+                              },
+                              onDoubleTap: () {
+                                // Double tap on Reels icon (index 3) to refresh
+                                if (index == 3 && selectedIndex == 3) {
+                                  // Call the refresh method directly using global key
+                                  reelsPageKey.currentState?.refreshReels();
                                 }
                               },
                               behavior: HitTestBehavior.opaque,
@@ -180,16 +223,24 @@ class _AnimatedNavBarState extends State<AnimatedNavBar> {
                                       );
                                     },
                                     child: Icon(
-                                      isSelected ? item.filledIcon : item.outlinedIcon,
+                                      isSelected
+                                          ? item.filledIcon
+                                          : item.outlinedIcon,
                                       key: ValueKey<bool>(isSelected),
                                       size: 28,
                                       color: isSelected
                                           ? Colors.white
-                                          : (isDark ? Colors.white60 : Colors.black.withOpacity(0.6)),
+                                          : (isDark
+                                                ? Colors.white60
+                                                : Colors.black.withOpacity(
+                                                    0.6,
+                                                  )),
                                       shadows: isSelected
                                           ? [
                                               Shadow(
-                                                color: Colors.black.withOpacity(0.3),
+                                                color: Colors.black.withOpacity(
+                                                  0.3,
+                                                ),
                                                 blurRadius: 8,
                                               ),
                                             ]
@@ -219,7 +270,7 @@ class NavBarItem {
   final IconData outlinedIcon;
   final IconData filledIcon;
   final String path;
-  
+
   NavBarItem({
     required this.outlinedIcon,
     required this.filledIcon,

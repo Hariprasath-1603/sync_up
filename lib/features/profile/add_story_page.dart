@@ -5,7 +5,7 @@ import 'dart:io';
 import '../../core/theme.dart';
 
 class AddStoryPage extends StatefulWidget {
-  const AddStoryPage({Key? key}) : super(key: key);
+  const AddStoryPage({super.key});
 
   @override
   State<AddStoryPage> createState() => _AddStoryPageState();
@@ -44,10 +44,7 @@ class _AddStoryPageState extends State<AddStoryPage> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
@@ -79,7 +76,7 @@ class _AddStoryPageState extends State<AddStoryPage> {
     });
 
     _showSuccess();
-    
+
     // Return to previous page after posting
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
@@ -185,10 +182,7 @@ class _AddStoryPageState extends State<AddStoryPage> {
                       SizedBox(height: 2),
                       Text(
                         'Share your moment',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),
@@ -216,27 +210,17 @@ class _AddStoryPageState extends State<AddStoryPage> {
                 colors: [kPrimary.withOpacity(0.3), kPrimary.withOpacity(0.1)],
               ),
             ),
-            child: Icon(
-              Icons.image_outlined,
-              size: 80,
-              color: kPrimary,
-            ),
+            child: Icon(Icons.image_outlined, size: 80, color: kPrimary),
           ),
           const SizedBox(height: 32),
           const Text(
             'Add to Your Story',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           const Text(
             'Share a photo or video to your story',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 48),
@@ -288,15 +272,14 @@ class _AddStoryPageState extends State<AddStoryPage> {
               onTap: onTap,
               borderRadius: BorderRadius.circular(20),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 20,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      icon,
-                      color: kPrimary,
-                      size: 28,
-                    ),
+                    Icon(icon, color: kPrimary, size: 28),
                     const SizedBox(width: 16),
                     Text(
                       label,
@@ -330,10 +313,7 @@ class _AddStoryPageState extends State<AddStoryPage> {
                   // Image
                   AspectRatio(
                     aspectRatio: 9 / 16,
-                    child: Image.file(
-                      _selectedImage!,
-                      fit: BoxFit.cover,
-                    ),
+                    child: Image.file(_selectedImage!, fit: BoxFit.cover),
                   ),
                   // Change Image Button
                   Positioned(
@@ -461,17 +441,10 @@ class _AddStoryPageState extends State<AddStoryPage> {
               ),
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: Colors.grey,
-                size: 20,
-              ),
+              Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
             ],
           ),
         ),

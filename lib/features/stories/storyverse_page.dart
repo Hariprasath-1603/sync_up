@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1957,9 +1956,23 @@ class _StoryVerseViewerStage extends StatelessWidget {
         ignoring: transitioning,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
+          onTap: () {
+            // Single tap on close icon area (top right) to exit
+            // Otherwise handle segment navigation
+          },
           onTapUp: (details) {
             final width = MediaQuery.of(context).size.width;
-            if (details.localPosition.dx > width / 2) {
+            final tapX = details.localPosition.dx;
+            final tapY = details.localPosition.dy;
+            
+            // Check if tap is on close button area (top right)
+            if (tapX > width - 80 && tapY < 120) {
+              onClose();
+              return;
+            }
+            
+            // Otherwise handle left/right navigation
+            if (tapX > width / 2) {
               onNext();
             } else {
               onPrevious();
@@ -3325,10 +3338,10 @@ class _StoryBubble extends StatelessWidget {
                 colors: story.hasNewContent
                     ? [kPrimary, kPrimary.withOpacity(0.7)]
                     : [
-                        Theme.of(context).colorScheme.surfaceVariant,
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
                         Theme.of(
                           context,
-                        ).colorScheme.surfaceVariant.withOpacity(0.7),
+                        ).colorScheme.surfaceContainerHighest.withOpacity(0.7),
                       ],
               ),
             ),
@@ -3409,8 +3422,10 @@ class _StoryPreviewCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(26),
         gradient: LinearGradient(
           colors: [
-            Theme.of(context).colorScheme.surfaceVariant,
-            Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.8),
+            Theme.of(context).colorScheme.surfaceContainerHighest,
+            Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withOpacity(0.8),
           ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,

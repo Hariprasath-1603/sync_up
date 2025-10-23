@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
@@ -277,60 +279,232 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
       backgroundColor: isDark ? kDarkBackground : kLightBackground,
       body: CustomScrollView(
         slivers: [
-          // Glass App Bar
+          // Sleek modern app bar with parallax effect
           SliverAppBar(
-            expandedHeight: 120,
+            expandedHeight: 200,
             floating: false,
             pinned: true,
+            stretch: true,
             backgroundColor: Colors.transparent,
             elevation: 0,
-            leading: IconButton(
-              icon: Icon(
-                Icons.arrow_back_rounded,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-              onPressed: () => Navigator.pop(context),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                'Settings',
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black87,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                ),
-              ),
-              centerTitle: false,
-              titlePadding: const EdgeInsets.only(left: 60, bottom: 16),
-              background: ClipRRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: isDark
-                            ? [
-                                Colors.white.withOpacity(0.08),
-                                Colors.white.withOpacity(0.03),
-                              ]
-                            : [
-                                Colors.white.withOpacity(0.9),
-                                Colors.white.withOpacity(0.7),
-                              ],
+            automaticallyImplyLeading: false,
+            flexibleSpace: LayoutBuilder(
+              builder: (context, constraints) {
+                final double expandRatio =
+                    ((constraints.maxHeight - kToolbarHeight) /
+                            (200 - kToolbarHeight))
+                        .clamp(0.0, 1.0);
+
+                return FlexibleSpaceBar(
+                  stretchModes: const [
+                    StretchMode.zoomBackground,
+                    StretchMode.fadeTitle,
+                  ],
+                  background: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Animated gradient background
+                      ClipRRect(
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: isDark
+                                    ? [
+                                        Colors.purple.withOpacity(0.2),
+                                        Colors.blue.withOpacity(0.15),
+                                        Colors.transparent,
+                                      ]
+                                    : [
+                                        Colors.purple.withOpacity(0.1),
+                                        Colors.blue.withOpacity(0.08),
+                                        Colors.transparent,
+                                      ],
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+
+                      // Animated circles decoration
+                      Positioned(
+                        top: -50 + (expandRatio * 30),
+                        right: -30,
+                        child: Opacity(
+                          opacity: (expandRatio * 0.5).clamp(0.0, 1.0),
+                          child: Container(
+                            width: 150,
+                            height: 150,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  kPrimary.withOpacity(0.3),
+                                  kPrimary.withOpacity(0.0),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      Positioned(
+                        bottom: -40 + (expandRatio * 20),
+                        left: -40,
+                        child: Opacity(
+                          opacity: (expandRatio * 0.4).clamp(0.0, 1.0),
+                          child: Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  Colors.cyan.withOpacity(0.3),
+                                  Colors.cyan.withOpacity(0.0),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Large animated title in center
+                      Positioned.fill(
+                        child: SafeArea(
+                          child: Center(
+                            child: Opacity(
+                              opacity: expandRatio.clamp(0.0, 1.0),
+                              child: Transform.scale(
+                                scale: (0.8 + (expandRatio * 0.2)).clamp(
+                                  0.8,
+                                  1.0,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24.0,
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      // Settings icon with glow
+                                      Container(
+                                        padding: const EdgeInsets.all(20),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              kPrimary.withOpacity(0.8),
+                                              kPrimary.withOpacity(0.4),
+                                            ],
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: kPrimary.withOpacity(0.4),
+                                              blurRadius: 30,
+                                              spreadRadius: 5,
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Icon(
+                                          Icons.settings_rounded,
+                                          size: 40,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+
+                                      // Title
+                                      Text(
+                                        'Settings',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: isDark
+                                              ? Colors.white
+                                              : Colors.black87,
+                                          fontSize: 32,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: -0.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+
+                                      // Subtitle
+                                      Text(
+                                        'Customize your experience',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: isDark
+                                              ? Colors.white60
+                                              : Colors.black54,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Animated back button that hides on scroll
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        child: SafeArea(
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 200),
+                            opacity: expandRatio > 0.3 ? 1.0 : 0.0,
+                            child: AnimatedScale(
+                              duration: const Duration(milliseconds: 200),
+                              scale: expandRatio > 0.3 ? 1.0 : 0.0,
+                              child: Container(
+                                margin: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.white.withOpacity(0.1)
+                                      : Colors.black.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? Colors.white.withOpacity(0.2)
+                                        : Colors.black.withOpacity(0.1),
+                                  ),
+                                ),
+                                child: IconButton(
+                                  icon: Icon(
+                                    Icons.arrow_back_rounded,
+                                    color: isDark
+                                        ? Colors.white
+                                        : Colors.black87,
+                                  ),
+                                  onPressed: () => Navigator.pop(context),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
 
           // Search Bar
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: _buildSearchBar(isDark),
             ),
           ),
@@ -339,7 +513,7 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
           if (_isSearchFocused && _searchQuery.isEmpty)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -444,7 +618,7 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
           if (_searchQuery.isNotEmpty && _filteredOptions.isEmpty)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.fromLTRB(32, 32, 32, 100),
                 child: Center(
                   child: Column(
                     children: [

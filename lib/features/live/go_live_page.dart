@@ -2491,12 +2491,14 @@ class _EffectsSheetState extends State<EffectsSheet> {
                           )
                         : LinearGradient(
                             colors: [
-                              Theme.of(
-                                context,
-                              ).colorScheme.surfaceVariant.withOpacity(0.2),
-                              Theme.of(
-                                context,
-                              ).colorScheme.surfaceVariant.withOpacity(0.4),
+                              Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest
+                                  .withOpacity(0.2),
+                              Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest
+                                  .withOpacity(0.4),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,

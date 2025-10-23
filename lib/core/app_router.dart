@@ -78,7 +78,7 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: '/reels',
-          builder: (context, state) => const ReelsPageNew(),
+          builder: (context, state) => ReelsPageNew(key: reelsPageKey),
         ),
       ],
     ),

@@ -263,19 +263,38 @@ class _ExplorePageState extends State<ExplorePage>
         child: _selectedCategory == null
             ? CustomScrollView(
                 slivers: [
-                  SliverAppBar(
-                    floating: true,
-                    snap: true,
-                    pinned: false,
-                    toolbarHeight: 140,
-                    backgroundColor: Colors.transparent,
-                    elevation: 0,
-                    title: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                  // Modern Hero Header with Glass Effect
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SizedBox(height: 16),
+                          // Hero Title with Gradient
+                          ShaderMask(
+                            shaderCallback: (bounds) => LinearGradient(
+                              colors: [kPrimary, Colors.purple, Colors.blue],
+                            ).createShader(bounds),
+                            child: Text(
+                              'Explore',
+                              style: TextStyle(
+                                fontSize: 36,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: -1,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Discover amazing content',
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: isDark ? Colors.white60 : Colors.black54,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
                           const _SearchBar(),
                           const SizedBox(height: 16),
                           _CategoryChips(
@@ -285,17 +304,26 @@ class _ExplorePageState extends State<ExplorePage>
                       ),
                     ),
                   ),
+
+                  // Featured Card with Glass Effect
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: _FeaturedCard(isDark: isDark),
+                    ),
+                  ),
+
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
                       child: _SectionTitle(title: 'Trending Videos'),
                     ),
                   ),
                   const _TrendingVideoGrid(),
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: _SectionTitle(title: 'Explore'),
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+                      child: _SectionTitle(title: 'Explore More'),
                     ),
                   ),
                   const _ExploreGrid(),
@@ -484,6 +512,189 @@ class _ExplorePageState extends State<ExplorePage>
 
 // --- Helper Widgets for ExplorePage ---
 
+// Featured Card Widget with Glass Effect
+class _FeaturedCard extends StatelessWidget {
+  const _FeaturedCard({required this.isDark});
+
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: Container(
+          height: 160,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? [
+                      kPrimary.withOpacity(0.3),
+                      Colors.purple.withOpacity(0.2),
+                      Colors.blue.withOpacity(0.15),
+                    ]
+                  : [
+                      kPrimary.withOpacity(0.15),
+                      Colors.purple.withOpacity(0.1),
+                      Colors.blue.withOpacity(0.08),
+                    ],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withOpacity(0.2)
+                  : Colors.white.withOpacity(0.5),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: kPrimary.withOpacity(0.2),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Decorative circles
+              Positioned(
+                top: -30,
+                right: -30,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [kPrimary.withOpacity(0.3), Colors.transparent],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: -20,
+                left: -20,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        Colors.purple.withOpacity(0.3),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: kPrimary.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: kPrimary.withOpacity(0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.local_fire_department,
+                                      color: kPrimary,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'HOT',
+                                      style: TextStyle(
+                                        color: kPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'What\'s Trending',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Check out the hottest content right now',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? Colors.white70 : Colors.black54,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            kPrimary.withOpacity(0.8),
+                            kPrimary.withOpacity(0.6),
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: kPrimary.withOpacity(0.4),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.trending_up_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // Section Title Widget
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title});
@@ -493,14 +704,31 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 22,
-        fontWeight: FontWeight.bold,
-        color: isDark ? Colors.white : Colors.black87,
-        letterSpacing: 0.5,
-      ),
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 24,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [kPrimary, Colors.purple],
+            ),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black87,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -618,12 +846,12 @@ class _CategoryChips extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
-      height: 45,
+      height: 50,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 0),
         itemCount: categories.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 10),
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final category = categories[index];
           return GestureDetector(
@@ -634,55 +862,77 @@ class _CategoryChips extends StatelessWidget {
                 category['color'],
               );
             },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(25),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: (category['color'] as Color).withOpacity(0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: isDark
-                          ? [
-                              Colors.white.withOpacity(0.12),
-                              Colors.white.withOpacity(0.06),
-                            ]
-                          : [
-                              Colors.white.withOpacity(0.85),
-                              Colors.white.withOpacity(0.65),
-                            ],
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
                     ),
-                    borderRadius: BorderRadius.circular(25),
-                    border: Border.all(
-                      color: isDark
-                          ? Colors.white.withOpacity(0.2)
-                          : Colors.white.withOpacity(0.5),
-                      width: 1.2,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        category['icon'],
-                        color: category['color'],
-                        size: 20,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isDark
+                            ? [
+                                Colors.white.withOpacity(0.15),
+                                Colors.white.withOpacity(0.08),
+                              ]
+                            : [
+                                Colors.white.withOpacity(0.9),
+                                Colors.white.withOpacity(0.7),
+                              ],
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        category['label'],
-                        style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black87,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.25)
+                            : Colors.white.withOpacity(0.6),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: (category['color'] as Color).withOpacity(
+                              0.2,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            category['icon'],
+                            color: category['color'],
+                            size: 18,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        Text(
+                          category['label'],
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black87,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -796,55 +1046,146 @@ class _ExploreGrid extends StatelessWidget {
           crossAxisCount: 2,
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
-          childAspectRatio: 1.0,
+          childAspectRatio: 0.85,
         ),
         delegate: SliverChildBuilderDelegate((context, index) {
           return GestureDetector(
             onTap: () => _openPostViewer(context, exploreImages[index]),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Stack(
-                children: [
-                  // Background image
-                  Positioned.fill(
-                    child: Image.network(
-                      exploreImages[index],
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  // Gradient overlay
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.4),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Glass overlay on hover effect
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
-                          width: 1.5,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: kPrimary.withOpacity(0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   ),
                 ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Stack(
+                  children: [
+                    // Background image
+                    Positioned.fill(
+                      child: Image.network(
+                        exploreImages[index],
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    // Gradient overlay
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.6),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Glass border effect
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3),
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+                    ),
+                    // Glass info card at bottom
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(24),
+                          bottomRight: Radius.circular(24),
+                        ),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.white.withOpacity(0.25),
+                                  Colors.white.withOpacity(0.15),
+                                ],
+                              ),
+                              border: Border(
+                                top: BorderSide(
+                                  color: Colors.white.withOpacity(0.4),
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _GlassStatItem(
+                                  icon: Icons.favorite_rounded,
+                                  label: '${(index + 1) * 234}K',
+                                ),
+                                _GlassStatItem(
+                                  icon: Icons.comment_rounded,
+                                  label: '${(index + 1) * 45}',
+                                ),
+                                _GlassStatItem(
+                                  icon: Icons.share_rounded,
+                                  label: '${(index + 1) * 12}',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
         }, childCount: exploreImages.length),
       ),
+    );
+  }
+}
+
+// Glass Stat Item Widget
+class _GlassStatItem extends StatelessWidget {
+  const _GlassStatItem({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white, size: 16),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -896,19 +1237,19 @@ class _VideoCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => _openReelPage(context),
       child: Container(
-        width: 180,
+        width: 190,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+              color: kPrimary.withOpacity(0.15),
+              blurRadius: 25,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           child: Stack(
             children: [
               // Background image
@@ -924,36 +1265,61 @@ class _VideoCard extends StatelessWidget {
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        Colors.black.withOpacity(0.3),
-                        Colors.black.withOpacity(0.7),
+                        Colors.black.withOpacity(0.2),
+                        Colors.black.withOpacity(0.8),
                       ],
                     ),
                   ),
                 ),
               ),
-              // Play button in the center
-              Center(
+              // Glass border
+              Positioned.fill(
                 child: Container(
-                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.white.withOpacity(0.3),
-                        Colors.white.withOpacity(0.15),
-                      ],
-                    ),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.4),
-                      width: 2,
+                      color: Colors.white.withOpacity(0.3),
+                      width: 1.5,
                     ),
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 32,
+                ),
+              ),
+              // Play button in the center with glass effect
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(50),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.white.withOpacity(0.35),
+                            Colors.white.withOpacity(0.2),
+                          ],
+                        ),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.5),
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -964,26 +1330,26 @@ class _VideoCard extends StatelessWidget {
                 right: 0,
                 child: ClipRRect(
                   borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(20),
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
                   ),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                     child: Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            Colors.white.withOpacity(0.2),
-                            Colors.white.withOpacity(0.1),
+                            Colors.white.withOpacity(0.25),
+                            Colors.white.withOpacity(0.15),
                           ],
                         ),
                         border: Border(
                           top: BorderSide(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 1,
+                            color: Colors.white.withOpacity(0.4),
+                            width: 1.5,
                           ),
                         ),
                       ),
@@ -996,27 +1362,33 @@ class _VideoCard extends StatelessWidget {
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                              fontSize: 14,
                               shadows: [
-                                Shadow(color: Colors.black45, blurRadius: 4),
+                                Shadow(color: Colors.black54, blurRadius: 6),
                               ],
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Row(
                             children: [
                               Container(
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.5),
-                                    width: 1.5,
+                                    color: Colors.white.withOpacity(0.6),
+                                    width: 2,
                                   ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 8,
+                                    ),
+                                  ],
                                 ),
                                 child: CircleAvatar(
-                                  radius: 10,
+                                  radius: 12,
                                   backgroundImage: NetworkImage(userAvatarUrl),
                                 ),
                               ),
@@ -1026,8 +1398,14 @@ class _VideoCard extends StatelessWidget {
                                   userName,
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black45,
+                                        blurRadius: 4,
+                                      ),
+                                    ],
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
-import '../../core/scaffold_with_nav_bar.dart';
-import '../profile/other_user_profile_page.dart';
 
 class ReelsPage extends StatefulWidget {
   const ReelsPage({super.key});

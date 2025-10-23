@@ -236,7 +236,9 @@ class _MyStoryCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            colorScheme.surfaceVariant.withOpacity(isDark ? 0.45 : 0.35),
+            colorScheme.surfaceContainerHighest.withOpacity(
+              isDark ? 0.45 : 0.35,
+            ),
             colorScheme.surface.withOpacity(isDark ? 0.38 : 0.22),
           ],
         ),
@@ -302,10 +304,13 @@ class _StoryPreviewCard extends StatelessWidget {
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              Theme.of(context).colorScheme.surfaceVariant,
                               Theme.of(
                                 context,
-                              ).colorScheme.surfaceVariant.withOpacity(0.8),
+                              ).colorScheme.surfaceContainerHighest,
+                              Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest
+                                  .withOpacity(0.8),
                             ],
                           ),
                         ),

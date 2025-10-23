@@ -4,6 +4,7 @@ import '../../../core/theme.dart';
 import '../widgets/settings_base_page.dart';
 import '../widgets/settings_tile.dart';
 import '../widgets/settings_section.dart';
+import '../../profile/edit_profile_page.dart';
 
 class AccountPage extends StatelessWidget {
   const AccountPage({super.key});
@@ -21,7 +22,12 @@ class AccountPage extends StatelessWidget {
               title: 'Edit Profile',
               subtitle: 'Change name, bio, website',
               onTap: () {
-                // Navigate to edit profile
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const EditProfilePage(),
+                  ),
+                );
               },
             ),
             SettingsTile(

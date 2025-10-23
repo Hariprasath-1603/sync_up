@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/post_model.dart';
-import 'post_viewer_page.dart';
+import 'post_viewer_page_v2.dart';
 import 'widgets/long_press_menu.dart';
 
 /// Example: Enhanced profile grid with post interactions
@@ -110,7 +110,7 @@ class _ProfilePostsGridDemoState extends State<ProfilePostsGridDemo> {
       context,
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) {
-          return PostViewerPage(
+          return PostViewerPageV2(
             initialPost: _posts[index],
             allPosts: _posts,
             onPostChanged: (post) {
