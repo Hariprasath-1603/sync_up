@@ -6,7 +6,7 @@ import '../../../core/scaffold_with_nav_bar.dart';
 import '../../../core/theme.dart';
 import '../models/post_model.dart';
 import '../../profile/models/post_model.dart' as profile_post;
-import '../../profile/pages/post_viewer_page_v2.dart';
+import '../../profile/pages/post_viewer_instagram_style.dart';
 import '../../profile/other_user_profile_page.dart';
 import 'floating_hearts_from_position.dart';
 
@@ -376,9 +376,16 @@ class _PostCardState extends State<PostCard> {
   }
 
   void _openPostViewer(BuildContext context) {
+    final navVisibility = NavBarVisibilityScope.maybeOf(context);
+    navVisibility?.value = false;
+
     // Convert home Post model to profile PostModel
+    // Generate consistent userId from userHandle
+    final userId = 'user_${post.userHandle.replaceAll('@', '')}';
+
     final profilePost = profile_post.PostModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      userId: userId,
       type: profile_post.PostType.image,
       mediaUrls: [post.imageUrl],
       thumbnailUrl: post.imageUrl,
@@ -390,16 +397,19 @@ class _PostCardState extends State<PostCard> {
       comments: _commentCount,
       shares: _parseCount(post.shares),
       views: _likeCount * 10, // Estimate
+      location: null,
     );
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => PostViewerPageV2(
-          initialPost: profilePost,
-          allPosts: [profilePost],
-        ),
-      ),
-    );
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (context) => PostViewerInstagramStyle(
+              initialPost: profilePost,
+              allPosts: [profilePost],
+            ),
+          ),
+        )
+        .whenComplete(() => navVisibility?.value = true);
   }
 
   void _openUserProfile(BuildContext context) {

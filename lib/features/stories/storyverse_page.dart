@@ -1964,13 +1964,13 @@ class _StoryVerseViewerStage extends StatelessWidget {
             final width = MediaQuery.of(context).size.width;
             final tapX = details.localPosition.dx;
             final tapY = details.localPosition.dy;
-            
+
             // Check if tap is on close button area (top right)
             if (tapX > width - 80 && tapY < 120) {
               onClose();
               return;
             }
-            
+
             // Otherwise handle left/right navigation
             if (tapX > width / 2) {
               onNext();

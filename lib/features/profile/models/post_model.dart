@@ -10,6 +10,7 @@ enum DiscoverySource { feed, profile, explore, hashtag, location, share }
 class PostModel {
   PostModel({
     required this.id,
+    required this.userId,
     required this.type,
     required this.mediaUrls,
     required this.thumbnailUrl,
@@ -36,6 +37,7 @@ class PostModel {
   });
 
   final String id;
+  final String userId; // Owner's user ID
   final PostType type;
   final List<String> mediaUrls; // Can have multiple for carousel
   final String thumbnailUrl;
@@ -67,6 +69,7 @@ class PostModel {
 
   PostModel copyWith({
     String? id,
+    String? userId,
     PostType? type,
     List<String>? mediaUrls,
     String? thumbnailUrl,
@@ -93,6 +96,7 @@ class PostModel {
   }) {
     return PostModel(
       id: id ?? this.id,
+      userId: userId ?? this.userId,
       type: type ?? this.type,
       mediaUrls: mediaUrls ?? this.mediaUrls,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,

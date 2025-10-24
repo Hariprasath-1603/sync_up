@@ -1,5 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../core/providers/post_provider.dart';
 import '../../core/theme.dart';
 import '../../core/scaffold_with_nav_bar.dart';
 import 'edit_profile_page.dart';
@@ -24,21 +27,13 @@ class _MyProfilePageState extends State<MyProfilePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  final List<String> _posts = List.generate(
-    8,
-    (index) => 'https://picsum.photos/seed/post$index/400/600',
-  );
-  final List<String> _media = List.generate(
-    6,
-    (index) => 'https://picsum.photos/seed/media$index/600/400',
-  );
-
   // User's story collections grouped by category
   final Map<String, List<StoryVerseStory>> _userStoryCollections = {
     'Travel': [
       StoryVerseStory(
         id: 'travel_1',
-        ownerName: 'Jane Cooper',
+        // ownerName/ownerAvatar will be replaced at runtime using AuthProvider where needed
+        ownerName: '',
         ownerAvatar: 'https://i.pravatar.cc/150?img=1',
         mood: '✈️ Wanderlust',
         timestamp: DateTime.now().subtract(const Duration(hours: 3)),
@@ -62,7 +57,7 @@ class _MyProfilePageState extends State<MyProfilePage>
     'Food': [
       StoryVerseStory(
         id: 'food_1',
-        ownerName: 'Jane Cooper',
+        ownerName: '',
         ownerAvatar: 'https://i.pravatar.cc/150?img=1',
         mood: '🍕 Foodie',
         timestamp: DateTime.now().subtract(const Duration(hours: 5)),
@@ -80,7 +75,7 @@ class _MyProfilePageState extends State<MyProfilePage>
     'Friends': [
       StoryVerseStory(
         id: 'friends_1',
-        ownerName: 'Jane Cooper',
+        ownerName: '',
         ownerAvatar: 'https://i.pravatar.cc/150?img=1',
         mood: '👥 Squad',
         timestamp: DateTime.now().subtract(const Duration(hours: 8)),
@@ -98,7 +93,7 @@ class _MyProfilePageState extends State<MyProfilePage>
     'Hangout': [
       StoryVerseStory(
         id: 'hangout_1',
-        ownerName: 'Jane Cooper',
+        ownerName: '',
         ownerAvatar: 'https://i.pravatar.cc/150?img=1',
         mood: '🎉 Party',
         timestamp: DateTime.now().subtract(const Duration(hours: 12)),
@@ -135,13 +130,33 @@ class _MyProfilePageState extends State<MyProfilePage>
   void _openStoryCollection(String category) {
     final stories = _userStoryCollections[category];
     if (stories != null && stories.isNotEmpty) {
+      // Get current user data
+      final authProvider = context.read<AuthProvider>();
+      final currentUser = authProvider.currentUser;
+      final displayName =
+          currentUser?.displayName ?? currentUser?.username ?? 'You';
+      final avatarUrl =
+          currentUser?.photoURL ?? 'https://i.pravatar.cc/150?img=1';
+
+      // Update stories with current user info
+      final updatedStories = stories.map((story) {
+        return StoryVerseStory(
+          id: story.id,
+          ownerName: displayName,
+          ownerAvatar: avatarUrl,
+          mood: story.mood,
+          timestamp: story.timestamp,
+          clips: story.clips,
+        );
+      }).toList();
+
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => StoryVerseExperience(
             initialStage: StoryVerseStage.viewer,
-            initialStory: stories.first,
-            feedStories: stories,
+            initialStory: updatedStories.first,
+            feedStories: updatedStories,
             showEntryStage: false,
           ),
         ),
@@ -153,6 +168,17 @@ class _MyProfilePageState extends State<MyProfilePage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+
+    // Load user posts from Firestore
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = context.read<AuthProvider>();
+      final postProvider = context.read<PostProvider>();
+      final userId = authProvider.currentUserId;
+
+      if (userId != null) {
+        postProvider.loadUserPosts(userId);
+      }
+    });
   }
 
   @override
@@ -237,8 +263,8 @@ class _MyProfilePageState extends State<MyProfilePage>
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildPostGrid(context, _posts, isDark),
-                    _buildPostGrid(context, _media, isDark),
+                    _buildPostGridFromFirestore(context, isDark),
+                    _buildPostGridFromFirestore(context, isDark),
                   ],
                 ),
               ),
@@ -252,7 +278,14 @@ class _MyProfilePageState extends State<MyProfilePage>
   // Glassmorphic Header with Avatar and Actions
   Widget _buildGlassmorphicHeader(BuildContext context, bool isDark) {
     const coverUrl = 'https://picsum.photos/seed/cover/1200/400';
-    const avatarUrl = 'https://i.pravatar.cc/300?img=13';
+    final authProvider = context.watch<AuthProvider>();
+    final currentUser = authProvider.currentUser;
+    final avatarUrl =
+        currentUser?.photoURL ?? 'https://i.pravatar.cc/300?img=13';
+    final displayName =
+        currentUser?.displayName ?? currentUser?.username ?? 'Your Name';
+    final heroTag =
+        'profile_photo_${authProvider.currentUserId ?? displayName}';
 
     return SizedBox(
       height: 280,
@@ -343,8 +376,8 @@ class _MyProfilePageState extends State<MyProfilePage>
                     onLongPress: () =>
                         _openProfilePhotoViewer(context, avatarUrl),
                     child: Hero(
-                      tag: 'profile_photo_Jane Cooper',
-                      child: const CircleAvatar(
+                      tag: heroTag,
+                      child: CircleAvatar(
                         radius: 50,
                         backgroundImage: NetworkImage(avatarUrl),
                       ),
@@ -366,13 +399,18 @@ class _MyProfilePageState extends State<MyProfilePage>
     final navVisibility = NavBarVisibilityScope.maybeOf(context);
     navVisibility?.value = false;
 
+    final authProvider = context.read<AuthProvider>();
+    final currentUser = authProvider.currentUser;
+    final displayName =
+        currentUser?.displayName ?? currentUser?.username ?? 'You';
+
     Navigator.of(context)
         .push(
           MaterialPageRoute(
             builder: (context) => HighlightViewer(
               highlights: _myActiveStories,
               initialIndex: 0,
-              username: 'Jane Cooper',
+              username: displayName,
             ),
           ),
         )
@@ -385,6 +423,11 @@ class _MyProfilePageState extends State<MyProfilePage>
   void _openProfilePhotoViewer(BuildContext context, String photoUrl) {
     final navVisibility = NavBarVisibilityScope.maybeOf(context);
     navVisibility?.value = false; // Hide navigation bar
+    final authProvider = context.read<AuthProvider>();
+    final currentUser = authProvider.currentUser;
+    final displayName =
+        currentUser?.displayName ?? currentUser?.username ?? 'You';
+    final isOwn = true; // since this is MyProfilePage
 
     Navigator.of(context)
         .push(
@@ -394,20 +437,12 @@ class _MyProfilePageState extends State<MyProfilePage>
             pageBuilder: (context, animation, secondaryAnimation) {
               return ProfilePhotoViewer(
                 photoUrl: photoUrl,
-                username: 'Jane Cooper',
-                isOwnProfile: true, // Set based on your logic
-                onFollow: () {
-                  // Handle follow action
-                },
-                onShare: () {
-                  // Handle share action
-                },
-                onCopyLink: () {
-                  // Handle copy link action
-                },
-                onQRCode: () {
-                  // Handle QR code action
-                },
+                username: displayName,
+                isOwnProfile: isOwn,
+                onFollow: () {},
+                onShare: () {},
+                onCopyLink: () {},
+                onQRCode: () {},
               );
             },
             transitionsBuilder:
@@ -486,15 +521,20 @@ class _MyProfilePageState extends State<MyProfilePage>
   }
 
   Widget _buildStatsAndBio(BuildContext context, bool isDark) {
+    final authProvider = context.watch<AuthProvider>();
+    final currentUser = authProvider.currentUser;
+    final displayName =
+        currentUser?.displayName ?? currentUser?.username ?? 'Your Name';
+
     return Column(
       children: [
-        const Text(
-          'Jane Cooper',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        Text(
+          displayName,
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Text(
-          'Apple CEO, Auburn buke, National parks',
+          currentUser?.bio ?? 'Add a short bio about yourself',
           style: TextStyle(
             fontSize: 14,
             color: isDark ? Colors.white70 : Colors.grey[600],
@@ -509,7 +549,10 @@ class _MyProfilePageState extends State<MyProfilePage>
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
-            'bio.link.io/j.copr',
+            // Build a safe profile link fallback from username or displayName
+            (currentUser != null
+                ? 'bio.link.io/${currentUser.username}'
+                : 'bio.link.io/yourprofile'),
             style: TextStyle(
               color: kPrimary,
               fontSize: 14,
@@ -573,40 +616,57 @@ class _MyProfilePageState extends State<MyProfilePage>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildStatItem('103', 'Posts', isDark, () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const UserPostsPage()),
-              );
-            }),
+            _buildStatItem(
+              (currentUser?.postsCount ?? 0).toString(),
+              'Posts',
+              isDark,
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const UserPostsPage(),
+                  ),
+                );
+              },
+            ),
             Container(
               width: 1,
               height: 40,
               color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
             ),
-            _buildStatItem('870', 'Following', isDark, () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      const FollowersFollowingPage(initialTab: 1),
-                ),
-              );
-            }),
+            _buildStatItem(
+              (currentUser?.followingCount ?? 0).toString(),
+              'Following',
+              isDark,
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const FollowersFollowingPage(initialTab: 1),
+                  ),
+                );
+              },
+            ),
             Container(
               width: 1,
               height: 40,
               color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
             ),
-            _buildStatItem('120k', 'Followers', isDark, () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      const FollowersFollowingPage(initialTab: 0),
-                ),
-              );
-            }),
+            _buildStatItem(
+              (currentUser?.followersCount ?? 0).toString(),
+              'Followers',
+              isDark,
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const FollowersFollowingPage(initialTab: 0),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ],
@@ -781,19 +841,78 @@ class _MyProfilePageState extends State<MyProfilePage>
     );
   }
 
-  Widget _buildPostGrid(
-    BuildContext context,
-    List<String> images,
-    bool isDark,
-  ) {
+  Widget _buildPostGridFromFirestore(BuildContext context, bool isDark) {
     final bottomSafeArea = MediaQuery.of(context).padding.bottom;
-    // Add extra space so the last item clears the floating nav bar comfortably
     final bottomPadding = bottomSafeArea + 210;
+
+    final authProvider = context.watch<AuthProvider>();
+    final postProvider = context.watch<PostProvider>();
+    final userId = authProvider.currentUserId;
+
+    if (userId == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.person_off_outlined, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              Text(
+                'Please sign in to view your posts',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: isDark ? Colors.white60 : Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final userPosts = postProvider.getUserPosts(userId);
+
+    if (userPosts.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.photo_library_outlined,
+                size: 64,
+                color: isDark ? Colors.white24 : Colors.grey[300],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No posts yet',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Share your first photo or video',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.white60 : Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
-      itemCount: images.length,
+      itemCount: userPosts.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 12,
@@ -801,15 +920,27 @@ class _MyProfilePageState extends State<MyProfilePage>
         childAspectRatio: 0.75,
       ),
       itemBuilder: (context, index) {
+        final post = userPosts[index];
         return GestureDetector(
-          onTap: () => _openPostViewer(context, images, index),
+          onTap: () => _openFirestorePostViewer(context, userPosts, index),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.network(images[index], fit: BoxFit.cover),
-                // Glass overlay on hover effect
+                Image.network(
+                  post.thumbnailUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: isDark ? Colors.grey[800] : Colors.grey[200],
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      size: 48,
+                      color: isDark ? Colors.white24 : Colors.grey[400],
+                    ),
+                  ),
+                ),
+                // Glass overlay
                 Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -822,6 +953,40 @@ class _MyProfilePageState extends State<MyProfilePage>
                     ),
                   ),
                 ),
+                // Post stats overlay
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.favorite,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatCount(post.likes),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -830,34 +995,51 @@ class _MyProfilePageState extends State<MyProfilePage>
     );
   }
 
-  void _openPostViewer(
+  String _formatCount(int count) {
+    if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    } else if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    }
+    return count.toString();
+  }
+
+  void _openFirestorePostViewer(
     BuildContext context,
-    List<String> images,
+    List<dynamic> posts,
     int initialIndex,
   ) {
-    // Convert image URLs to PostModel list
-    final posts = images.map((imageUrl) {
+    // Convert Firestore PostModel to profile PostModel
+    final profilePosts = posts.map((post) {
       return profile_post.PostModel(
-        id: imageUrl,
+        id: post.id,
+        userId: post.userId,
         type: profile_post.PostType.image,
-        mediaUrls: [imageUrl],
-        thumbnailUrl: imageUrl,
-        username: 'Jane Cooper', // Current user
-        userAvatar: 'https://i.pravatar.cc/150?img=1',
-        timestamp: DateTime.now(),
-        caption: '',
-        likes: 1234,
-        comments: 56,
-        shares: 12,
-        views: 10000,
+        mediaUrls: post.mediaUrls,
+        thumbnailUrl: post.thumbnailUrl,
+        username: post.username,
+        userAvatar: post.userAvatar,
+        timestamp: post.timestamp,
+        caption: post.caption,
+        likes: post.likes,
+        comments: post.comments,
+        shares: post.shares,
+        views: post.views,
+        tags: post.tags,
+        location: post.location,
+        musicName: post.musicName,
+        musicArtist: post.musicArtist,
+        isLiked: post.isLiked,
+        isSaved: post.isSaved,
+        isFollowing: post.isFollowing,
       );
     }).toList();
 
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => PostViewerInstagramStyle(
-          initialPost: posts[initialIndex],
-          allPosts: posts,
+          initialPost: profilePosts[initialIndex],
+          allPosts: profilePosts,
         ),
       ),
     );

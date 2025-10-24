@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../core/providers/auth_provider.dart';
 import '../../core/theme.dart';
 
 class FollowersFollowingPage extends StatefulWidget {
@@ -179,13 +181,22 @@ class _FollowersFollowingPageState extends State<FollowersFollowingPage>
                       onPressed: () => Navigator.pop(context),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      'Jane Cooper',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
+                    Consumer<AuthProvider>(
+                      builder: (context, auth, _) {
+                        final currentUser = auth.currentUser;
+                        final name =
+                            currentUser?.displayName ??
+                            currentUser?.username ??
+                            'Profile';
+                        return Text(
+                          name,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

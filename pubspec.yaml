@@ -49,6 +49,8 @@ dependencies:
   firebase_core: ^2.27.0
   cloud_firestore: ^4.15.8
   firebase_storage: ^11.6.9
+  # Supabase for database and storage (NEW - will replace Firestore gradually)
+  supabase_flutter: ^2.3.4
   # For camera functionality
   camera: ^0.10.5+5
   image_picker: ^1.0.7

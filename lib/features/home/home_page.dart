@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/scaffold_with_nav_bar.dart';
 import '../../core/theme.dart';
+import '../../core/providers/post_provider.dart';
 import 'models/post_model.dart';
 import 'widgets/custom_header.dart';
 import 'widgets/stories_section_new.dart';
@@ -121,112 +123,25 @@ class _HomePageState extends State<HomePage> {
     ),
   ];
 
-  // For You posts (trending/recommended)
-  final List<Post> _forYouPosts = [
-    Post(
-      imageUrl: 'https://picsum.photos/seed/4/600/800',
-      userName: 'Savannah Nguyen',
-      userHandle: '@savannah',
-      userAvatarUrl: 'https://picsum.photos/seed/d/150',
-      likes: '120K',
-      comments: '96K',
-      shares: '36K',
-    ),
-    Post(
-      imageUrl: 'https://picsum.photos/seed/5/600/800',
-      userName: 'Brooklyn Simmons',
-      userHandle: '@brooklyn.sim007',
-      userAvatarUrl: 'https://picsum.photos/seed/e/150',
-      likes: '110K',
-      comments: '88K',
-      shares: '21K',
-    ),
-    Post(
-      imageUrl: 'https://picsum.photos/seed/6/600/800',
-      userName: 'Wade Warren',
-      userHandle: '@wade_w',
-      userAvatarUrl: 'https://picsum.photos/seed/f/150',
-      likes: '95K',
-      comments: '72K',
-      shares: '18K',
-    ),
-    Post(
-      imageUrl: 'https://picsum.photos/seed/7/600/800',
-      userName: 'Eleanor Pena',
-      userHandle: '@eleanor.p',
-      userAvatarUrl: 'https://picsum.photos/seed/g/150',
-      likes: '88K',
-      comments: '65K',
-      shares: '15K',
-    ),
-    Post(
-      imageUrl: 'https://picsum.photos/seed/8/600/800',
-      userName: 'Cameron Williamson',
-      userHandle: '@cam_will',
-      userAvatarUrl: 'https://picsum.photos/seed/h/150',
-      likes: '156K',
-      comments: '120K',
-      shares: '45K',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Load posts when page initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final postProvider = context.read<PostProvider>();
+      postProvider.loadForYouPosts();
+      postProvider.loadFollowingPosts();
+    });
+  }
 
-  // Following posts (people you follow)
-  final List<Post> _followingPosts = [
-    Post(
-      imageUrl: 'https://picsum.photos/seed/follow1/600/800',
-      userName: 'John Doe',
-      userHandle: '@johndoe',
-      userAvatarUrl: 'https://picsum.photos/seed/user1/150',
-      likes: '45K',
-      comments: '32K',
-      shares: '12K',
-    ),
-    Post(
-      imageUrl: 'https://picsum.photos/seed/follow2/600/800',
-      userName: 'Jane Smith',
-      userHandle: '@janesmith',
-      userAvatarUrl: 'https://picsum.photos/seed/user2/150',
-      likes: '67K',
-      comments: '48K',
-      shares: '19K',
-    ),
-    Post(
-      imageUrl: 'https://picsum.photos/seed/follow3/600/800',
-      userName: 'Mike Johnson',
-      userHandle: '@mikej',
-      userAvatarUrl: 'https://picsum.photos/seed/user3/150',
-      likes: '52K',
-      comments: '38K',
-      shares: '15K',
-    ),
-    Post(
-      imageUrl: 'https://picsum.photos/seed/follow4/600/800',
-      userName: 'Sarah Williams',
-      userHandle: '@sarah_w',
-      userAvatarUrl: 'https://picsum.photos/seed/user4/150',
-      likes: '78K',
-      comments: '56K',
-      shares: '23K',
-    ),
-    Post(
-      imageUrl: 'https://picsum.photos/seed/follow5/600/800',
-      userName: 'David Brown',
-      userHandle: '@david.brown',
-      userAvatarUrl: 'https://picsum.photos/seed/user5/150',
-      likes: '91K',
-      comments: '68K',
-      shares: '28K',
-    ),
-    Post(
-      imageUrl: 'https://picsum.photos/seed/follow6/600/800',
-      userName: 'Emily Davis',
-      userHandle: '@emily_d',
-      userAvatarUrl: 'https://picsum.photos/seed/user6/150',
-      likes: '63K',
-      comments: '45K',
-      shares: '17K',
-    ),
-  ];
+  String _formatCount(int count) {
+    if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    } else if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    }
+    return count.toString();
+  }
 
   void _openStoryCapture(StoryVerseMode mode) {
     setState(() {
@@ -278,11 +193,17 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final postProvider = context.watch<PostProvider>();
 
     // Get current posts based on selected tab
     final currentPosts = _selectedTabIndex == 0
-        ? _followingPosts
-        : _forYouPosts;
+        ? postProvider.followingPosts
+        : postProvider.forYouPosts;
+
+    final isLoading = _selectedTabIndex == 0
+        ? postProvider.isLoadingFollowing
+        : postProvider.isLoadingForYou;
+
     final sectionTitle = _selectedTabIndex == 0
         ? 'Latest from Following'
         : 'Trending';
@@ -308,41 +229,97 @@ class _HomePageState extends State<HomePage> {
       child: Stack(
         children: [
           SafeArea(
-            child: ListView(
-              children: [
-                CustomHeader(
-                  selectedIndex: _selectedTabIndex,
-                  onTabSelected: (index) {
-                    setState(() {
-                      _selectedTabIndex = index;
-                    });
-                  },
-                ),
-                if (_selectedTabIndex == 1)
-                  StoriesSection(
-                    stories: _stories,
-                    hasMyStory:
-                        false, // Change to true when user has active story
-                    myStoryImageUrl:
-                        null, // Set to user's story image when active
-                    onStartCapture: _openStoryCapture,
-                    onViewStory: _openStoryViewer,
+            child: RefreshIndicator(
+              onRefresh: () async {
+                if (_selectedTabIndex == 0) {
+                  postProvider.loadFollowingPosts();
+                } else {
+                  postProvider.loadForYouPosts();
+                }
+                // Wait a bit for the stream to update
+                await Future.delayed(const Duration(milliseconds: 500));
+              },
+              child: ListView(
+                children: [
+                  CustomHeader(
+                    selectedIndex: _selectedTabIndex,
+                    onTabSelected: (index) {
+                      setState(() {
+                        _selectedTabIndex = index;
+                      });
+                    },
                   ),
-                if (_selectedTabIndex == 1) const LiveSection(),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text(
-                    sectionTitle,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87,
+                  if (_selectedTabIndex == 1)
+                    StoriesSection(
+                      stories: _stories,
+                      hasMyStory:
+                          false, // Change to true when user has active story
+                      myStoryImageUrl:
+                          null, // Set to user's story image when active
+                      onStartCapture: _openStoryCapture,
+                      onViewStory: _openStoryViewer,
+                    ),
+                  if (_selectedTabIndex == 1) const LiveSection(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Text(
+                      sectionTitle,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
                     ),
                   ),
-                ),
-                ...currentPosts.map((post) => PostCard(post: post)),
-                const SizedBox(height: 100),
-              ],
+                  if (isLoading && currentPosts.isEmpty)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(40),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (currentPosts.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(40),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.photo_library_outlined,
+                              size: 64,
+                              color: isDark ? Colors.white30 : Colors.black26,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _selectedTabIndex == 0
+                                  ? 'No posts from people you follow yet.\nStart following users to see their posts!'
+                                  : 'No posts available yet.\nCheck back soon!',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: isDark ? Colors.white60 : Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    ...currentPosts.map((dynamicPost) {
+                      // Convert dynamic PostModel to home Post for PostCard
+                      final homePost = Post(
+                        imageUrl: dynamicPost.thumbnailUrl,
+                        userName: dynamicPost.username,
+                        userHandle: '@${dynamicPost.username.toLowerCase()}',
+                        userAvatarUrl: dynamicPost.userAvatar,
+                        likes: _formatCount(dynamicPost.likes),
+                        comments: _formatCount(dynamicPost.comments),
+                        shares: _formatCount(dynamicPost.shares),
+                      );
+                      return PostCard(post: homePost);
+                    }),
+                  const SizedBox(height: 100),
+                ],
+              ),
             ),
           ),
           Positioned.fill(

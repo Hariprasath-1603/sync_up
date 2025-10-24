@@ -33,6 +33,7 @@ class _ProfilePostsGridDemoState extends State<ProfilePostsGridDemo> {
 
       return PostModel(
         id: 'post_$i',
+        userId: 'demo_user', // Demo user ID
         type: isVideo
             ? PostType.reel
             : isCarousel
@@ -45,7 +46,7 @@ class _ProfilePostsGridDemoState extends State<ProfilePostsGridDemo> {
               )
             : ['https://picsum.photos/seed/post$i/1080/1920'],
         thumbnailUrl: 'https://picsum.photos/seed/post$i/400/600',
-        username: '@you',
+        username: '@you', // demo placeholder
         userAvatar: 'https://i.pravatar.cc/150?img=1',
         timestamp: DateTime.now().subtract(
           Duration(days: i, hours: random.nextInt(24)),

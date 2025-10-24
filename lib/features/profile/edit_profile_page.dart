@@ -1,6 +1,14 @@
 import 'dart:ui';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../core/services/supabase_storage_service.dart';
 import '../../core/theme.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -12,20 +20,48 @@ class EditProfilePage extends StatefulWidget {
 
 class _EditProfilePageState extends State<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController(text: 'John Doe');
-  final _usernameController = TextEditingController(text: '@johndoe');
-  final _bioController = TextEditingController(
-    text: 'Digital Creator | Travel Enthusiast 🌍\nLiving my best life! ✨',
-  );
-  final _emailController = TextEditingController(text: 'johndoe@example.com');
-  final _phoneController = TextEditingController(text: '+1 234 567 8900');
-  final _websiteController = TextEditingController(text: 'www.johndoe.com');
-  final _locationController = TextEditingController(text: 'New York, USA');
+  late final TextEditingController _nameController;
+  late final TextEditingController _usernameController;
+  late final TextEditingController _bioController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _websiteController;
+  late final TextEditingController _locationController;
 
   String _selectedGender = 'Male';
   bool _isPrivateAccount = false;
   bool _showActivityStatus = true;
   bool _allowMessagesFromEveryone = false;
+  bool _isUploadingPhoto = false;
+  File? _selectedImage;
+  final ImagePicker _imagePicker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize controllers with current user data
+    final authProvider = context.read<AuthProvider>();
+    final currentUser = authProvider.currentUser;
+
+    _nameController = TextEditingController(
+      text: currentUser?.displayName ?? '',
+    );
+    _usernameController = TextEditingController(
+      text: currentUser?.username ?? '',
+    );
+    _bioController = TextEditingController(text: currentUser?.bio ?? '');
+    _emailController = TextEditingController(text: currentUser?.email ?? '');
+    _phoneController = TextEditingController(text: currentUser?.phone ?? '');
+    _websiteController = TextEditingController(text: '');
+    _locationController = TextEditingController(
+      text: currentUser?.location ?? '',
+    );
+
+    // Set gender if available
+    if (currentUser?.gender != null) {
+      _selectedGender = currentUser!.gender!;
+    }
+  }
 
   @override
   void dispose() {
@@ -197,6 +233,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildProfilePhoto(bool isDark) {
+    final authProvider = context.watch<AuthProvider>();
+    final currentUser = authProvider.currentUser;
+    final avatarUrl = currentUser?.photoURL;
+
     return Center(
       child: Stack(
         children: [
@@ -214,10 +254,32 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 color: isDark ? kDarkBackground : kLightBackground,
                 shape: BoxShape.circle,
               ),
-              child: CircleAvatar(
-                radius: 60,
-                backgroundColor: kPrimary.withOpacity(0.2),
-                child: Icon(Icons.person_rounded, size: 60, color: kPrimary),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 60,
+                    backgroundColor: kPrimary.withOpacity(0.2),
+                    backgroundImage: avatarUrl != null
+                        ? NetworkImage(avatarUrl)
+                        : null,
+                    child: avatarUrl == null
+                        ? Icon(Icons.person_rounded, size: 60, color: kPrimary)
+                        : null,
+                  ),
+                  if (_isUploadingPhoto)
+                    Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -577,21 +639,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
           ],
         ),
         child: ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             if (_formKey.currentState!.validate()) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Profile updated successfully! ✓'),
-                  backgroundColor: Colors.green,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              );
-              Future.delayed(const Duration(seconds: 1), () {
-                if (mounted) context.pop();
-              });
+              await _saveProfileChanges();
             }
           },
           style: ElevatedButton.styleFrom(
@@ -613,6 +663,273 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ),
       ),
     );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1080,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+        await _uploadPhoto();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _uploadPhoto() async {
+    if (_selectedImage == null) return;
+
+    setState(() {
+      _isUploadingPhoto = true;
+    });
+
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final userId = authProvider.currentUserId;
+
+      if (userId == null) {
+        throw Exception('User not authenticated. Please sign in again.');
+      }
+
+      print('DEBUG: Starting photo upload for user: $userId');
+
+      // Upload to Supabase Storage
+      print('DEBUG: Uploading to Supabase Storage...');
+      final photoURL = await SupabaseStorageService.uploadProfilePhoto(
+        _selectedImage!,
+        userId,
+      );
+
+      if (photoURL == null) {
+        throw Exception('Failed to upload photo to Supabase');
+      }
+
+      print('DEBUG: Photo URL: $photoURL');
+
+      // Update Supabase user table
+      print('DEBUG: Updating Supabase user document...');
+      await Supabase.instance.client
+          .from('users')
+          .update({
+            'photo_url': photoURL,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('uid', userId);
+      print('DEBUG: Supabase updated successfully');
+
+      // Update Firestore user document (so profile page shows it)
+      print('DEBUG: Updating Firestore user document...');
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'photoURL': photoURL,
+        'lastActive': Timestamp.now(),
+      });
+      print('DEBUG: Firestore updated successfully');
+
+      // Update Firebase Auth profile (optional but recommended)
+      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        await firebaseUser.updatePhotoURL(photoURL);
+        print('DEBUG: Firebase Auth profile updated');
+      }
+
+      // Reload user data
+      print('DEBUG: Reloading user data...');
+      await authProvider.reloadUserData();
+      print('DEBUG: User data reloaded');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Profile photo updated successfully! ✓'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print('ERROR: Photo upload failed: $e');
+      if (mounted) {
+        String errorMessage = 'Error uploading photo';
+
+        if (e.toString().contains('permission-denied')) {
+          errorMessage = 'Permission denied. Check Firebase Storage rules.';
+        } else if (e.toString().contains('not authenticated')) {
+          errorMessage = 'Please sign in again to upload photo.';
+        } else if (e.toString().contains('network')) {
+          errorMessage = 'Network error. Check your internet connection.';
+        } else {
+          errorMessage = 'Error uploading photo: ${e.toString()}';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingPhoto = false;
+          _selectedImage = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _removePhoto() async {
+    final authProvider = context.read<AuthProvider>();
+    final userId = authProvider.currentUserId;
+
+    if (userId == null) return;
+
+    try {
+      // Delete from Supabase Storage
+      await SupabaseStorageService.deleteProfilePhoto(userId);
+
+      // Remove from Supabase database
+      await Supabase.instance.client
+          .from('users')
+          .update({'photo_url': null})
+          .eq('uid', userId);
+
+      // Reload user data
+      await authProvider.reloadUserData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Profile photo removed'),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error removing photo: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveProfileChanges() async {
+    final authProvider = context.read<AuthProvider>();
+    final userId = authProvider.currentUserId;
+
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please sign in to update profile'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Update Supabase user table with all fields
+      await Supabase.instance.client
+          .from('users')
+          .update({
+            'display_name': _nameController.text.trim(),
+            'username': _usernameController.text.trim(),
+            'bio': _bioController.text.trim(),
+            'phone': _phoneController.text.trim(),
+            'location': _locationController.text.trim(),
+            'gender': _selectedGender,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('uid', userId);
+
+      // Also update Firestore user table (for backwards compatibility)
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'displayName': _nameController.text.trim(),
+        'username': _usernameController.text.trim(),
+        'bio': _bioController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        'location': _locationController.text.trim(),
+        'gender': _selectedGender,
+        'lastActive': Timestamp.now(),
+      });
+
+      // Reload user data to reflect changes
+      await authProvider.reloadUserData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Profile updated successfully! ✓'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+
+        // Navigate back after a short delay
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) context.pop();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating profile: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
   }
 
   void _showPhotoOptions() {
@@ -650,15 +967,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               title: const Text('Take Photo'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Camera opened'),
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                );
+                _pickImage(ImageSource.camera);
               },
             ),
             ListTile(
@@ -676,15 +985,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               title: const Text('Choose from Gallery'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Gallery opened'),
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                );
+                _pickImage(ImageSource.gallery);
               },
             ),
             ListTile(
@@ -702,15 +1003,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               title: const Text('Remove Photo'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Photo removed'),
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                );
+                _removePhoto();
               },
             ),
             const SizedBox(height: 10),

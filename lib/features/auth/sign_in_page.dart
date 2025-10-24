@@ -2,9 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/services/preferences_service.dart';
 import '../../core/services/database_service.dart';
 import 'auth_service.dart';
+
+// Import OAuthProvider enum
+import 'package:supabase_flutter/supabase_flutter.dart' show OAuthProvider;
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -113,6 +117,50 @@ class _SignInPageState extends State<SignInPage> {
       });
 
       if (user != null) {
+        // Check if user exists in Supabase (they must have signed up properly)
+        try {
+          final supabaseUser = await Supabase.instance.client
+              .from('users')
+              .select()
+              .eq('uid', user.uid)
+              .maybeSingle();
+
+          if (supabaseUser == null) {
+            // User exists in Firebase but not in Supabase - they used OAuth without signup
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.white),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Please sign up first with this email address before signing in.',
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: Colors.orange[700],
+                  duration: const Duration(seconds: 5),
+                  action: SnackBarAction(
+                    label: 'Sign Up',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      context.go('/signup');
+                    },
+                  ),
+                ),
+              );
+              await _authService.signOut();
+            }
+            return;
+          }
+        } catch (e) {
+          print('ERROR checking Supabase user: $e');
+          // Continue with login even if Supabase check fails
+        }
+
         // Check if email is verified
         if (!user.emailVerified) {
           if (mounted) {
@@ -179,74 +227,130 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
-  // Google Sign-In
+  // Google Sign-In with Supabase OAuth
   Future<void> _signInWithGoogle() async {
-    if (_isLoading) return; // Prevent multiple clicks
+    if (_isLoading) return;
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      print('Starting Google Sign-In...');
-      final user = await _authService.signInWithGoogle();
-      print('Sign-in completed. User: ${user?.email}');
+      print('Starting Supabase Google OAuth...');
 
-      if (!mounted) return;
+      // Use Supabase OAuth for Google
+      // Don't specify redirectTo for mobile apps - Supabase handles it automatically
+      final response = await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        authScreenLaunchMode: LaunchMode.externalApplication,
+      );
 
+      if (!response) {
+        throw Exception('Google sign-in was cancelled');
+      }
+
+      // The OAuth flow will redirect to browser and back
+      // Listen for auth state changes to handle the callback
+      Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
+        final session = data.session;
+        if (session != null && mounted) {
+          print('Google OAuth successful! User: ${session.user.email}');
+
+          final user = session.user;
+
+          // Check if user exists in databases, if not create them
+          try {
+            var supabaseUser = await Supabase.instance.client
+                .from('users')
+                .select()
+                .eq('uid', user.id)
+                .maybeSingle();
+
+            if (supabaseUser == null) {
+              // Create new user in both databases
+              print('Creating new user from Google OAuth...');
+
+              // Extract username from email
+              String username =
+                  user.email?.split('@')[0] ??
+                  'user${DateTime.now().millisecondsSinceEpoch}';
+
+              // Save to Supabase
+              await Supabase.instance.client.from('users').insert({
+                'uid': user.id,
+                'username': username.toLowerCase(),
+                'username_display': username,
+                'email': user.email?.toLowerCase() ?? '',
+                'display_name': user.userMetadata?['full_name'] ?? username,
+                'photo_url': user.userMetadata?['avatar_url'],
+                'bio': '',
+                'followers_count': 0,
+                'following_count': 0,
+                'posts_count': 0,
+                'followers': [],
+                'following': [],
+                'created_at': DateTime.now().toIso8601String(),
+                'last_active': DateTime.now().toIso8601String(),
+              });
+            }
+          } catch (e) {
+            print('Error checking/creating user: $e');
+          }
+
+          setState(() {
+            _isLoading = false;
+          });
+
+          // Save session
+          await PreferencesService.saveUserSession(
+            userId: user.id,
+            email: user.email ?? '',
+            name: user.userMetadata?['full_name'] ?? user.email,
+          );
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Welcome ${user.userMetadata?['full_name'] ?? user.email}!',
+                ),
+                backgroundColor: Colors.green,
+              ),
+            );
+            context.go('/home');
+          }
+        }
+      });
+    } catch (e) {
       setState(() {
         _isLoading = false;
       });
-
-      if (user != null) {
-        print('User signed in successfully: ${user.email}');
-
-        // Save user session
-        await PreferencesService.saveUserSession(
-          userId: user.uid,
-          email: user.email ?? '',
-          name: user.displayName,
-        );
-
+      print('Google OAuth error: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Welcome ${user.displayName ?? user.email}!'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-        // Navigate to home
-        context.go('/home');
-      } else {
-        print('User is null - sign-in was canceled');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Google sign-in was canceled'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 2),
+            content: Text('Google sign-in failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      print('Error during Google Sign-In: $e');
-      if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sign-in error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
     }
   }
 
-  // Microsoft Sign-In
+  // Microsoft Sign-In (Disabled - needs Azure OAuth setup)
   Future<void> _signInWithMicrosoft() async {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Microsoft sign-in is not configured yet'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+    return;
+
+    // TODO: Set up Azure OAuth in Supabase first
+    /*
     setState(() {
       _isLoading = true;
     });
@@ -291,10 +395,23 @@ class _SignInPageState extends State<SignInPage> {
         );
       }
     }
+    */ // End of commented Microsoft OAuth code
   }
 
-  // Apple Sign-In
+  // Apple Sign-In (Disabled - needs Apple Developer setup)
   Future<void> _signInWithApple() async {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Apple sign-in is not configured yet'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+    return;
+
+    // TODO: Set up Apple OAuth in Supabase first
+    /*
     setState(() {
       _isLoading = true;
     });
@@ -339,6 +456,7 @@ class _SignInPageState extends State<SignInPage> {
         );
       }
     }
+    */ // End of commented Apple OAuth code
   }
 
   InputDecoration _buildInputDecoration({

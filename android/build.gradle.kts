@@ -8,6 +8,11 @@ allprojects {
             }
         }
         mavenCentral()
+        // Add explicit maven repository as fallback
+        maven { 
+            url = uri("https://maven.google.com")
+            isAllowInsecureProtocol = false
+        }
         // Fallback to jcenter for legacy dependencies
         maven { url = uri("https://jcenter.bintray.com") }
     }

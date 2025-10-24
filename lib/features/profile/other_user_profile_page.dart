@@ -752,21 +752,34 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage>
     List<String> images,
     int initialIndex,
   ) {
+    // Sample captions for testing
+    final sampleCaptions = [
+      'Living my best life! ✨ This moment was absolutely perfect. Can\'t believe how beautiful everything turned out. Feeling grateful for these amazing experiences and memories! 🌟💫',
+      'Beautiful sunset at the beach! 🌅 The colors were absolutely breathtaking today. Nature never fails to amaze me with its stunning displays.',
+      'Amazing day with friends! 💙 These are the moments that make life worth living. Grateful for such incredible people in my life.',
+      'Just perfect! ❤️',
+      'New adventures await! 🎊 Excited for what\'s coming next. Life is full of beautiful surprises and I\'m here for all of it!',
+      'Enjoying every moment 🌸',
+    ];
+
     // Convert image URLs to PostModel list
-    final posts = images.map((imageUrl) {
+    final posts = images.asMap().entries.map((entry) {
+      final index = entry.key;
+      final imageUrl = entry.value;
       return profile_post.PostModel(
         id: imageUrl,
+        userId: widget.userId, // Other user's ID
         type: profile_post.PostType.image,
         mediaUrls: [imageUrl],
         thumbnailUrl: imageUrl,
         username: widget.username,
         userAvatar: widget.avatarUrl ?? 'https://i.pravatar.cc/150?img=5',
-        timestamp: DateTime.now(),
-        caption: '',
-        likes: 1234,
-        comments: 56,
-        shares: 12,
-        views: 10000,
+        timestamp: DateTime.now().subtract(Duration(hours: index * 2)),
+        caption: sampleCaptions[index % sampleCaptions.length],
+        likes: 1234 + (index * 234),
+        comments: 56 + (index * 12),
+        shares: 12 + (index * 3),
+        views: 10000 + (index * 1500),
       );
     }).toList();
 

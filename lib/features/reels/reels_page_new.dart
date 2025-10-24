@@ -1673,7 +1673,8 @@ class _CommentsModalState extends State<CommentsModal> {
     setState(() {
       final replies = _replies[_replyingToIndex!] ?? [];
       replies.add({
-        'username': '@you',
+        'username':
+            '@you', // placeholder kept; UI will be updated dynamically at runtime
         'text': _replyController.text.trim(),
         'time': 'Just now',
         'avatar': 'https://i.pravatar.cc/150?img=1',
@@ -2306,7 +2307,12 @@ class _MoreOptionsSheetState extends State<MoreOptionsSheet> {
                   'Not Interested',
                   widget.onNotInterested,
                 ),
-                _buildOption(context, Icons.link, 'Copy Link', widget.onCopyLink),
+                _buildOption(
+                  context,
+                  Icons.link,
+                  'Copy Link',
+                  widget.onCopyLink,
+                ),
                 _buildOption(
                   context,
                   Icons.person_add_outlined,
@@ -2315,9 +2321,14 @@ class _MoreOptionsSheetState extends State<MoreOptionsSheet> {
                     Navigator.pop(context);
                   },
                 ),
-                _buildOption(context, Icons.share_outlined, 'Share Profile', () {
-                  Navigator.pop(context);
-                }),
+                _buildOption(
+                  context,
+                  Icons.share_outlined,
+                  'Share Profile',
+                  () {
+                    Navigator.pop(context);
+                  },
+                ),
                 const SizedBox(height: 10),
                 TextButton(
                   onPressed: () => Navigator.pop(context),

@@ -208,12 +208,7 @@ class _PostViewerPageV2State extends State<PostViewerPageV2>
                 Icons.favorite,
                 color: Colors.red,
                 size: 80,
-                shadows: [
-                  Shadow(
-                    color: Colors.black45,
-                    blurRadius: 20,
-                  ),
-                ],
+                shadows: [Shadow(color: Colors.black45, blurRadius: 20)],
               ),
             ),
           ),
@@ -583,10 +578,7 @@ class _PostViewerPageV2State extends State<PostViewerPageV2>
         errorBuilder: (_, __, ___) => Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Colors.blue.shade900,
-                Colors.purple.shade900,
-              ],
+              colors: [Colors.blue.shade900, Colors.purple.shade900],
             ),
           ),
           child: const Center(
@@ -630,10 +622,7 @@ class _PostViewerPageV2State extends State<PostViewerPageV2>
           errorBuilder: (_, __, ___) => Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  Colors.blue.shade900,
-                  Colors.purple.shade900,
-                ],
+                colors: [Colors.blue.shade900, Colors.purple.shade900],
               ),
             ),
             child: const Center(

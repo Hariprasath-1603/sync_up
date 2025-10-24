@@ -830,6 +830,7 @@ class _ExploreSearchPageState extends State<ExploreSearchPage>
       onTap: () {
         final postModel = profile_post.PostModel(
           id: post['id'],
+          userId: 'user_${post['username']}', // Generate from username
           type: profile_post.PostType.image,
           mediaUrls: [post['thumbnail']],
           thumbnailUrl: post['thumbnail'],

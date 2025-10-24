@@ -14,7 +14,7 @@ class _ReelsPageState extends State<ReelsPage> {
   final List<ReelData> _reels = [
     ReelData(
       videoUrl: 'https://picsum.photos/seed/reel1/400/800',
-      username: 'john_doe',
+      username: 'user_john',
       description: 'Amazing sunset vibes 🌅 #nature #sunset #beautiful',
       avatarUrl: 'https://i.pravatar.cc/100?img=10',
       likes: 1234,

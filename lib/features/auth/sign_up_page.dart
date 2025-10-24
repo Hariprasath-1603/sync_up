@@ -4,6 +4,7 @@ import 'package:lottie/lottie.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/services/database_service.dart';
 import '../../core/models/user_model.dart';
 import 'auth_service.dart';
@@ -27,6 +28,7 @@ class _SignUpPageState extends State<SignUpPage> {
   final _confirmPasswordController = TextEditingController();
   final _dobController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _otpController = TextEditingController();
   final _locationController = TextEditingController();
 
   final DatabaseService _databaseService = DatabaseService();
@@ -37,6 +39,13 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
+
+  // Phone verification states
+  bool _isOtpSent = false;
+  bool _isPhoneVerified = false;
+  bool _isSendingOtp = false;
+  bool _isVerifyingOtp = false;
+  String? _phoneError;
 
   // Username validation states
   bool _isCheckingUsername = false;
@@ -53,6 +62,7 @@ class _SignUpPageState extends State<SignUpPage> {
     _confirmPasswordController.dispose();
     _dobController.dispose();
     _phoneController.dispose();
+    _otpController.dispose();
     _locationController.dispose();
     _usernameDebounce?.cancel();
     super.dispose();
@@ -95,6 +105,17 @@ class _SignUpPageState extends State<SignUpPage> {
 
   void _goToNextPage() {
     if (_page1FormKey.currentState!.validate()) {
+      // Check if phone is verified before moving to next page
+      if (_phoneController.text.isNotEmpty && !_isPhoneVerified) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please verify your phone number before continuing'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeIn,
@@ -107,6 +128,130 @@ class _SignUpPageState extends State<SignUpPage> {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
     );
+  }
+
+  // Send OTP via Twilio through Supabase Edge Function
+  Future<void> _sendOTP() async {
+    if (_phoneController.text.isEmpty) {
+      setState(() {
+        _phoneError = 'Please enter a phone number';
+      });
+      return;
+    }
+
+    if (_phoneController.text.length < 7) {
+      setState(() {
+        _phoneError = 'Please enter a valid phone number';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSendingOtp = true;
+      _phoneError = null;
+    });
+
+    try {
+      final phoneNumber = '+$_countryCode${_phoneController.text.trim()}';
+
+      // Call Supabase Edge Function to send OTP via Twilio
+      final response = await Supabase.instance.client.functions.invoke(
+        'send-otp',
+        body: {'phone': phoneNumber},
+      );
+
+      if (response.status == 200) {
+        setState(() {
+          _isOtpSent = true;
+          _isSendingOtp = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('OTP sent successfully! Check your phone.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to send OTP');
+      }
+    } catch (e) {
+      print('Error sending OTP: $e');
+      setState(() {
+        _isSendingOtp = false;
+        _phoneError = 'Failed to send OTP. Please try again.';
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Verify OTP via Twilio through Supabase Edge Function
+  Future<void> _verifyOTP() async {
+    if (_otpController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter the OTP code'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isVerifyingOtp = true;
+    });
+
+    try {
+      final phoneNumber = '+$_countryCode${_phoneController.text.trim()}';
+
+      // Call Supabase Edge Function to verify OTP via Twilio
+      final response = await Supabase.instance.client.functions.invoke(
+        'verify-otp',
+        body: {'phone': phoneNumber, 'code': _otpController.text.trim()},
+      );
+
+      if (response.status == 200) {
+        setState(() {
+          _isPhoneVerified = true;
+          _isVerifyingOtp = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Phone verified successfully! ✓'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Invalid OTP code');
+      }
+    } catch (e) {
+      print('Error verifying OTP: $e');
+      setState(() {
+        _isVerifyingOtp = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid OTP. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _onSignUp() async {
@@ -161,7 +306,8 @@ class _SignUpPageState extends State<SignUpPage> {
               : null,
         );
 
-        print('DEBUG: User model created, saving to Firestore...');
+        print('DEBUG: User model created, saving to databases...');
+
         // Save user to Firestore
         final success = await _databaseService.createUser(userModel);
 
@@ -178,6 +324,45 @@ class _SignUpPageState extends State<SignUpPage> {
         }
 
         print('SUCCESS: User document saved to Firestore');
+
+        // Also save to Supabase database
+        print('DEBUG: Saving user to Supabase...');
+        try {
+          await Supabase.instance.client.from('users').insert({
+            'uid': firebaseUser.uid,
+            'username': _usernameController.text.trim().toLowerCase(),
+            'username_display': _usernameController.text.trim(),
+            'email': _emailController.text.trim().toLowerCase(),
+            'display_name': _usernameController.text.trim(),
+            'bio': '',
+            'date_of_birth': _dobController.text.isNotEmpty
+                ? _dobController.text
+                : null,
+            'gender': _selectedGender,
+            'phone': _phoneController.text.isNotEmpty
+                ? '+$_countryCode${_phoneController.text.trim()}'
+                : null,
+            'phone_verified':
+                _isPhoneVerified, // Save phone verification status
+            'location': _locationController.text.trim().isNotEmpty
+                ? _locationController.text.trim()
+                : null,
+            'photo_url': null,
+            'followers_count': 0,
+            'following_count': 0,
+            'posts_count': 0,
+            'followers': [],
+            'following': [],
+            'created_at': DateTime.now().toIso8601String(),
+            'last_active': DateTime.now().toIso8601String(),
+          });
+          print('SUCCESS: User saved to Supabase database');
+        } catch (supabaseError) {
+          print('ERROR: Supabase save failed: $supabaseError');
+          // Don't fail signup if Supabase fails, just log it
+        }
+
+        print('SUCCESS: User document saved to databases');
 
         if (!mounted) return;
 
@@ -740,12 +925,16 @@ class _SignUpPageState extends State<SignUpPage> {
                   value == null ? 'Please select a gender' : null,
             ),
             const SizedBox(height: 20),
+
+            // Phone Number with OTP Verification
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 InkWell(
                   onTap: () {
                     showCountryPicker(
                       context: context,
+                      showPhoneCode: true,
                       onSelect: (Country country) {
                         setState(() {
                           _countryCode = country.phoneCode;
@@ -775,21 +964,118 @@ class _SignUpPageState extends State<SignUpPage> {
                   child: TextFormField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
-                    decoration: _buildInputDecoration(hintText: 'Phone Number'),
+                    enabled: !_isPhoneVerified, // Disable after verification
+                    decoration: _buildInputDecoration(hintText: 'Phone Number')
+                        .copyWith(
+                          suffixIcon: _isPhoneVerified
+                              ? const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                )
+                              : null,
+                          errorText: _phoneError,
+                        ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter a phone number';
                       }
-                      // This is the new validation logic
                       if (value.length < 7 || value.length > 15) {
                         return 'Please enter a valid phone number';
                       }
+                      if (!_isPhoneVerified) {
+                        return 'Please verify your phone number';
+                      }
                       return null;
+                    },
+                    onChanged: (value) {
+                      // Reset verification when phone changes
+                      if (_isPhoneVerified || _isOtpSent) {
+                        setState(() {
+                          _isPhoneVerified = false;
+                          _isOtpSent = false;
+                          _otpController.clear();
+                        });
+                      }
                     },
                   ),
                 ),
+                const SizedBox(width: 10),
+                // Get OTP Button
+                if (!_isPhoneVerified)
+                  ElevatedButton(
+                    onPressed: _isSendingOtp || _isOtpSent ? null : _sendOTP,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isSendingOtp
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(_isOtpSent ? 'Sent' : 'Get OTP'),
+                  ),
               ],
             ),
+
+            // OTP Input Field (shown after OTP is sent)
+            if (_isOtpSent && !_isPhoneVerified) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _otpController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      decoration: _buildInputDecoration(
+                        hintText: 'Enter OTP Code',
+                        prefixIcon: Icons.lock_outline,
+                      ).copyWith(counterText: ''),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: _isVerifyingOtp ? null : _verifyOTP,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      backgroundColor: Colors.green,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isVerifyingOtp
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Verify',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _isSendingOtp ? null : _sendOTP,
+                child: const Text('Resend OTP'),
+              ),
+            ],
+
             const SizedBox(height: 20),
 
             // Reverted Location Field

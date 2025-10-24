@@ -7,6 +7,7 @@ import '../features/auth/reset_confirmation_page.dart';
 import '../features/auth/sign_in_page.dart';
 import '../features/auth/sign_up_page.dart';
 import '../features/auth/email_verification_page.dart';
+import '../features/auth/phone_verification_page.dart';
 import '../features/home/home_page.dart';
 import '../features/onboarding/onboarding_page.dart';
 import '../features/profile/profile_page.dart';
@@ -48,6 +49,14 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final email = state.uri.queryParameters['email'] ?? '';
         return EmailVerificationPage(email: email);
+      },
+    ),
+    GoRoute(
+      path: '/phone-verification',
+      builder: (context, state) {
+        final phone = state.uri.queryParameters['phone'] ?? '';
+        final userId = state.uri.queryParameters['userId'] ?? '';
+        return PhoneVerificationPage(phoneNumber: phone, userId: userId);
       },
     ),
     GoRoute(

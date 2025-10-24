@@ -1012,10 +1012,11 @@ class _ExploreGrid extends StatelessWidget {
     // Create a mock post model
     final post = profile_post.PostModel(
       id: imageUrl,
+      userId: 'explorer_user', // Demo user ID
       type: profile_post.PostType.image,
       mediaUrls: [imageUrl],
       thumbnailUrl: imageUrl,
-      username: '@explorer',
+      username: '@explorer', // demo placeholder; real data comes from posts
       userAvatar: 'https://i.pravatar.cc/150?img=10',
       timestamp: DateTime.now(),
       caption: 'Explore post',
@@ -1447,6 +1448,7 @@ class _CategoryPostCard extends StatelessWidget {
     // Create a mock post model
     final post = profile_post.PostModel(
       id: imageUrl,
+      userId: 'explorer_user', // Demo user ID
       type: profile_post.PostType.image,
       mediaUrls: [imageUrl],
       thumbnailUrl: imageUrl,
