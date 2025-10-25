@@ -27,143 +27,6 @@ class _MyProfilePageState extends State<MyProfilePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // User's story collections grouped by category
-  final Map<String, List<StoryVerseStory>> _userStoryCollections = {
-    'Travel': [
-      StoryVerseStory(
-        id: 'travel_1',
-        // ownerName/ownerAvatar will be replaced at runtime using AuthProvider where needed
-        ownerName: '',
-        ownerAvatar: 'https://i.pravatar.cc/150?img=1',
-        mood: '✈️ Wanderlust',
-        timestamp: DateTime.now().subtract(const Duration(hours: 3)),
-        clips: [
-          StoryVerseClip(
-            id: 'clip_travel_1',
-            mode: StoryVerseMode.photo,
-            duration: const Duration(seconds: 5),
-            caption: 'Beautiful sunset at the beach! 🌅',
-            mood: '✈️ Wanderlust',
-          ),
-          StoryVerseClip(
-            id: 'clip_travel_2',
-            mode: StoryVerseMode.photo,
-            duration: const Duration(seconds: 5),
-            caption: 'Mountain views 🏔️',
-          ),
-        ],
-      ),
-    ],
-    'Food': [
-      StoryVerseStory(
-        id: 'food_1',
-        ownerName: '',
-        ownerAvatar: 'https://i.pravatar.cc/150?img=1',
-        mood: '🍕 Foodie',
-        timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-        clips: [
-          StoryVerseClip(
-            id: 'clip_food_1',
-            mode: StoryVerseMode.photo,
-            duration: const Duration(seconds: 5),
-            caption: 'Delicious pasta! 🍝',
-            mood: '🍕 Foodie',
-          ),
-        ],
-      ),
-    ],
-    'Friends': [
-      StoryVerseStory(
-        id: 'friends_1',
-        ownerName: '',
-        ownerAvatar: 'https://i.pravatar.cc/150?img=1',
-        mood: '👥 Squad',
-        timestamp: DateTime.now().subtract(const Duration(hours: 8)),
-        clips: [
-          StoryVerseClip(
-            id: 'clip_friends_1',
-            mode: StoryVerseMode.photo,
-            duration: const Duration(seconds: 5),
-            caption: 'Best day with the squad! 💙',
-            mood: '👥 Squad',
-          ),
-        ],
-      ),
-    ],
-    'Hangout': [
-      StoryVerseStory(
-        id: 'hangout_1',
-        ownerName: '',
-        ownerAvatar: 'https://i.pravatar.cc/150?img=1',
-        mood: '🎉 Party',
-        timestamp: DateTime.now().subtract(const Duration(hours: 12)),
-        clips: [
-          StoryVerseClip(
-            id: 'clip_hangout_1',
-            mode: StoryVerseMode.photo,
-            duration: const Duration(seconds: 5),
-            caption: 'Fun times! 🎊',
-            mood: '🎉 Party',
-          ),
-        ],
-      ),
-    ],
-  };
-
-  // User's active stories (set to empty list for no stories)
-  final List<Map<String, String>> _myActiveStories = [
-    {'url': 'https://picsum.photos/seed/mystory1/400/600', 'title': 'Today'},
-    {'url': 'https://picsum.photos/seed/mystory2/400/600', 'title': 'Work'},
-    {'url': 'https://picsum.photos/seed/mystory3/400/600', 'title': 'Fun'},
-  ];
-
-  bool get hasActiveStories => _myActiveStories.isNotEmpty;
-
-  final List<Map<String, String?>> _stories = [
-    {'title': 'Add', 'url': null},
-    {'title': 'Travel', 'url': 'https://picsum.photos/seed/s1/200'},
-    {'title': 'Food', 'url': 'https://picsum.photos/seed/s2/200'},
-    {'title': 'Friends', 'url': 'https://picsum.photos/seed/s3/200'},
-    {'title': 'Hangout', 'url': 'https://picsum.photos/seed/s4/200'},
-  ];
-
-  void _openStoryCollection(String category) {
-    final stories = _userStoryCollections[category];
-    if (stories != null && stories.isNotEmpty) {
-      // Get current user data
-      final authProvider = context.read<AuthProvider>();
-      final currentUser = authProvider.currentUser;
-      final displayName =
-          currentUser?.displayName ?? currentUser?.username ?? 'You';
-      final avatarUrl =
-          currentUser?.photoURL ?? 'https://i.pravatar.cc/150?img=1';
-
-      // Update stories with current user info
-      final updatedStories = stories.map((story) {
-        return StoryVerseStory(
-          id: story.id,
-          ownerName: displayName,
-          ownerAvatar: avatarUrl,
-          mood: story.mood,
-          timestamp: story.timestamp,
-          clips: story.clips,
-        );
-      }).toList();
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => StoryVerseExperience(
-            initialStage: StoryVerseStage.viewer,
-            initialStory: updatedStories.first,
-            feedStories: updatedStories,
-            showEntryStage: false,
-          ),
-        ),
-      );
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -228,8 +91,6 @@ class _MyProfilePageState extends State<MyProfilePage>
                   ),
                 ),
               ),
-              // Stories Section
-              SliverToBoxAdapter(child: _buildStories(context, isDark)),
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
               // Tab Bar in Glass
               SliverPersistentHeader(
@@ -343,21 +204,14 @@ class _MyProfilePageState extends State<MyProfilePage>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: hasActiveStories
-                        ? [
-                            Colors.blue.withOpacity(0.8),
-                            Colors.blueAccent.withOpacity(0.6),
-                          ]
-                        : [
-                            kPrimary.withOpacity(0.8),
-                            kPrimary.withOpacity(0.4),
-                          ],
+                    colors: [
+                      kPrimary.withOpacity(0.8),
+                      kPrimary.withOpacity(0.4),
+                    ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: hasActiveStories
-                          ? Colors.blue.withOpacity(0.3)
-                          : kPrimary.withOpacity(0.3),
+                      color: kPrimary.withOpacity(0.3),
                       blurRadius: 20,
                       spreadRadius: 2,
                     ),
@@ -370,11 +224,7 @@ class _MyProfilePageState extends State<MyProfilePage>
                     color: isDark ? kDarkBackground : Colors.white,
                   ),
                   child: GestureDetector(
-                    onTap: hasActiveStories
-                        ? () => _openMyStories(context)
-                        : null,
-                    onLongPress: () =>
-                        _openProfilePhotoViewer(context, avatarUrl),
+                    onTap: () => _openProfilePhotoViewer(context, avatarUrl),
                     child: Hero(
                       tag: heroTag,
                       child: CircleAvatar(
@@ -390,33 +240,6 @@ class _MyProfilePageState extends State<MyProfilePage>
         ],
       ),
     );
-  }
-
-  // Open My Active Stories
-  void _openMyStories(BuildContext context) {
-    if (_myActiveStories.isEmpty) return;
-
-    final navVisibility = NavBarVisibilityScope.maybeOf(context);
-    navVisibility?.value = false;
-
-    final authProvider = context.read<AuthProvider>();
-    final currentUser = authProvider.currentUser;
-    final displayName =
-        currentUser?.displayName ?? currentUser?.username ?? 'You';
-
-    Navigator.of(context)
-        .push(
-          MaterialPageRoute(
-            builder: (context) => HighlightViewer(
-              highlights: _myActiveStories,
-              initialIndex: 0,
-              username: displayName,
-            ),
-          ),
-        )
-        .whenComplete(() {
-          navVisibility?.value = true;
-        });
   }
 
   // Open Profile Photo Viewer
@@ -708,137 +531,6 @@ class _MyProfilePageState extends State<MyProfilePage>
     }
 
     return statWidget;
-  }
-
-  Widget _buildStories(BuildContext context, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Stories',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => StoriesArchivePage(
-                        storyCollections: _userStoryCollections,
-                      ),
-                    ),
-                  );
-                },
-                child: Text(
-                  'View all',
-                  style: TextStyle(
-                    color: kPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 100,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _stories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                final s = _stories[index];
-                return _buildStoryItem(s, isDark);
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStoryItem(Map<String, String?> story, bool isDark) {
-    return Column(
-      children: [
-        if (story['url'] == null)
-          // Add Story Button - Now opens Stories Archive
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => StoriesArchivePage(
-                    storyCollections: _userStoryCollections,
-                  ),
-                ),
-              );
-            },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        kPrimary.withOpacity(0.6),
-                        kPrimary.withOpacity(0.3),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: kPrimary.withOpacity(0.3),
-                      width: 2,
-                    ),
-                  ),
-                  child: const Icon(Icons.add, color: Colors.white, size: 32),
-                ),
-              ),
-            ),
-          )
-        else
-          // Story with Glass Border - Clickable
-          GestureDetector(
-            onTap: () {
-              final category = story['title']!;
-              _openStoryCollection(category);
-            },
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                gradient: LinearGradient(
-                  colors: [
-                    kPrimary.withOpacity(0.8),
-                    kPrimary.withOpacity(0.4),
-                  ],
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(17),
-                child: Image.network(
-                  story['url']!,
-                  width: 70,
-                  height: 70,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-          ),
-        const SizedBox(height: 6),
-        Text(
-          story['title']!,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-        ),
-      ],
-    );
   }
 
   Widget _buildPostGridFromFirestore(BuildContext context, bool isDark) {

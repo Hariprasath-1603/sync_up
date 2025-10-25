@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'scaffold_with_nav_bar.dart';
 import 'services/preferences_service.dart';
 import '../features/auth/forgot_password_page.dart';
@@ -8,9 +9,14 @@ import '../features/auth/sign_in_page.dart';
 import '../features/auth/sign_up_page.dart';
 import '../features/auth/email_verification_page.dart';
 import '../features/auth/phone_verification_page.dart';
+import '../features/auth/otp_verification_page.dart';
+import '../features/auth/setup_profile_picture_page.dart';
+import '../features/auth/setup_bio_page.dart';
 import '../features/home/home_page.dart';
 import '../features/onboarding/onboarding_page.dart';
 import '../features/profile/profile_page.dart';
+import '../features/profile/edit_profile_page.dart';
+import '../features/profile/change_username_page.dart';
 import '../features/explore/explore_page.dart';
 import '../features/reels/reels_page_new.dart';
 import '../features/chat/chat_page.dart';
@@ -19,17 +25,27 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 // Determine initial location based on user state
 String _getInitialLocation() {
-  // Check if user is logged in
+  // Check if user has active Supabase session (most reliable)
+  final session = Supabase.instance.client.auth.currentSession;
+  if (session != null) {
+    print('✅ User session found: ${session.user.email}');
+    return '/home';
+  }
+
+  // Check if user is logged in via preferences (backup)
   if (PreferencesService.isLoggedIn()) {
+    print('✅ User logged in via preferences');
     return '/home';
   }
 
   // Check if user has seen onboarding
   if (PreferencesService.hasSeenOnboarding()) {
+    print('👋 Returning user - show sign in');
     return '/signin';
   }
 
   // Show onboarding for first-time users
+  print('🎉 First time user - show onboarding');
   return '/onboarding';
 }
 
@@ -52,11 +68,26 @@ final appRouter = GoRouter(
       },
     ),
     GoRoute(
+      path: '/otp-verification',
+      builder: (context, state) {
+        final email = state.uri.queryParameters['email'] ?? '';
+        final phone = state.uri.queryParameters['phone'] ?? '';
+
+        // userData will be fetched from Supabase auth user in the verification page
+        Map<String, dynamic> userData = {};
+
+        return OtpVerificationPage(
+          email: email,
+          phone: phone,
+          userData: userData,
+        );
+      },
+    ),
+    GoRoute(
       path: '/phone-verification',
       builder: (context, state) {
-        final phone = state.uri.queryParameters['phone'] ?? '';
-        final userId = state.uri.queryParameters['userId'] ?? '';
-        return PhoneVerificationPage(phoneNumber: phone, userId: userId);
+        // Phone verification temporarily disabled
+        return const PhoneVerificationPage();
       },
     ),
     GoRoute(
@@ -67,8 +98,26 @@ final appRouter = GoRouter(
       path: '/reset-email-sent',
       builder: (context, state) => const ResetConfirmationPage(),
     ),
+    GoRoute(
+      path: '/setup-profile-picture',
+      builder: (context, state) => const SetupProfilePicturePage(),
+    ),
+    GoRoute(
+      path: '/setup-bio',
+      builder: (context, state) => const SetupBioPage(),
+    ),
     // Chat page (standalone, no nav bar)
     GoRoute(path: '/chat', builder: (context, state) => const ChatPage()),
+
+    // Profile management pages (standalone, no nav bar)
+    GoRoute(
+      path: '/edit-profile',
+      builder: (context, state) => const EditProfilePage(),
+    ),
+    GoRoute(
+      path: '/change-username',
+      builder: (context, state) => const ChangeUsernamePage(),
+    ),
 
     // ShellRoute for all pages that HAVE the navigation bar
     ShellRoute(

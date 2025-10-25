@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 
 class EmailVerificationPage extends StatefulWidget {
@@ -33,9 +33,13 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
     });
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null && !user.emailVerified) {
-        await user.sendEmailVerification();
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        // Resend verification email using Supabase
+        await Supabase.instance.client.auth.resend(
+          type: OtpType.signup,
+          email: widget.email,
+        );
 
         if (!mounted) return;
 

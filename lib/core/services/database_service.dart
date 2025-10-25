@@ -1,56 +1,41 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 
+/// Simplified DatabaseService for Supabase
+/// TODO: This is a minimal implementation to make the app compile
+/// Full Firestore to Supabase migration for complex features is pending
 class DatabaseService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  // Collection references
-  CollectionReference get _usersCollection => _firestore.collection('users');
+  final SupabaseClient _supabase = Supabase.instance.client;
 
   // ==================== USERNAME VALIDATION ====================
 
-  /// Check if username is available (case-insensitive)
   Future<bool> isUsernameAvailable(String username) async {
     try {
-      final normalizedUsername = username.toLowerCase().trim();
-
-      // Query for username (case-insensitive)
-      final querySnapshot = await _usersCollection
-          .where('username', isEqualTo: normalizedUsername)
-          .limit(1)
-          .get();
-
-      return querySnapshot.docs.isEmpty;
+      final result = await _supabase
+          .from('users')
+          .select('username')
+          .eq('username', username.toLowerCase().trim())
+          .maybeSingle();
+      return result == null;
     } catch (e) {
-      print('Error checking username availability: $e');
+      print('Error checking username: $e');
       return false;
     }
   }
 
-  /// Validate username format
   String? validateUsernameFormat(String username) {
-    if (username.isEmpty) {
-      return 'Username cannot be empty';
-    }
-    if (username.length < 3) {
-      return 'Username must be at least 3 characters';
-    }
-    if (username.length > 30) {
-      return 'Username must be less than 30 characters';
-    }
-    // Only allow alphanumeric, underscore, and period
+    if (username.isEmpty) return 'Username cannot be empty';
+    if (username.length < 3) return 'Username must be at least 3 characters';
+    if (username.length > 30) return 'Username must be less than 30 characters';
     if (!RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(username)) {
       return 'Username can only contain letters, numbers, dots, and underscores';
     }
-    // Must start with a letter or number
     if (!RegExp(r'^[a-zA-Z0-9]').hasMatch(username)) {
       return 'Username must start with a letter or number';
     }
-    // Cannot end with a period or underscore
     if (username.endsWith('.') || username.endsWith('_')) {
       return 'Username cannot end with a dot or underscore';
     }
-    // Cannot have consecutive periods or underscores
     if (username.contains('..') || username.contains('__')) {
       return 'Username cannot have consecutive dots or underscores';
     }
@@ -59,18 +44,15 @@ class DatabaseService {
 
   // ==================== USER CRUD OPERATIONS ====================
 
-  /// Create a new user in Firestore
   Future<bool> createUser(UserModel user) async {
     try {
-      // Check if username is available
       final isAvailable = await isUsernameAvailable(user.username);
       if (!isAvailable) {
         print('Username ${user.username} is already taken');
         return false;
       }
 
-      // Create user document
-      await _usersCollection.doc(user.uid).set(user.toMap());
+      await _supabase.from('users').insert(user.toMap());
       print('User created successfully: ${user.username}');
       return true;
     } catch (e) {
@@ -79,69 +61,42 @@ class DatabaseService {
     }
   }
 
-  /// Get user by UID
   Future<UserModel?> getUserByUid(String uid) async {
     try {
-      final doc = await _usersCollection.doc(uid).get();
-      if (doc.exists) {
-        return UserModel.fromMap(doc.data() as Map<String, dynamic>);
-      }
-      return null;
+      final data = await _supabase
+          .from('users')
+          .select()
+          .eq('uid', uid)
+          .maybeSingle();
+
+      return data != null ? UserModel.fromMap(data) : null;
     } catch (e) {
-      print('Error getting user by UID: $e');
+      print('Error getting user: $e');
       return null;
     }
   }
 
-  /// Get user by username (case-insensitive)
   Future<UserModel?> getUserByUsername(String username) async {
     try {
-      final normalizedUsername = username.toLowerCase().trim();
-      final querySnapshot = await _usersCollection
-          .where('username', isEqualTo: normalizedUsername)
-          .limit(1)
-          .get();
+      final data = await _supabase
+          .from('users')
+          .select()
+          .eq('username', username.toLowerCase().trim())
+          .maybeSingle();
 
-      if (querySnapshot.docs.isNotEmpty) {
-        return UserModel.fromMap(
-          querySnapshot.docs.first.data() as Map<String, dynamic>,
-        );
-      }
-      return null;
+      return data != null ? UserModel.fromMap(data) : null;
     } catch (e) {
       print('Error getting user by username: $e');
       return null;
     }
   }
 
-  /// Get user by email (case-insensitive)
-  Future<UserModel?> getUserByEmail(String email) async {
-    try {
-      final normalizedEmail = email.toLowerCase().trim();
-      final querySnapshot = await _usersCollection
-          .where('email', isEqualTo: normalizedEmail)
-          .limit(1)
-          .get();
-
-      if (querySnapshot.docs.isNotEmpty) {
-        return UserModel.fromMap(
-          querySnapshot.docs.first.data() as Map<String, dynamic>,
-        );
-      }
-      return null;
-    } catch (e) {
-      print('Error getting user by email: $e');
-      return null;
-    }
-  }
-
-  /// Update user profile
   Future<bool> updateUser(String uid, Map<String, dynamic> updates) async {
     try {
-      // Add lastActive timestamp
-      updates['lastActive'] = Timestamp.now();
-
-      await _usersCollection.doc(uid).update(updates);
+      await _supabase
+          .from('users')
+          .update({...updates, 'last_active': DateTime.now().toIso8601String()})
+          .eq('uid', uid);
       return true;
     } catch (e) {
       print('Error updating user: $e');
@@ -149,10 +104,9 @@ class DatabaseService {
     }
   }
 
-  /// Delete user
   Future<bool> deleteUser(String uid) async {
     try {
-      await _usersCollection.doc(uid).delete();
+      await _supabase.from('users').delete().eq('uid', uid);
       return true;
     } catch (e) {
       print('Error deleting user: $e');
@@ -160,74 +114,46 @@ class DatabaseService {
     }
   }
 
-  /// Update last active timestamp
   Future<void> updateLastActive(String uid) async {
     try {
-      await _usersCollection.doc(uid).update({'lastActive': Timestamp.now()});
+      await _supabase
+          .from('users')
+          .update({'last_active': DateTime.now().toIso8601String()})
+          .eq('uid', uid);
     } catch (e) {
       print('Error updating last active: $e');
     }
   }
 
-  // ==================== SEARCH OPERATIONS ====================
+  // ==================== FOLLOW/UNFOLLOW ====================
 
-  /// Search users by username prefix (for autocomplete)
-  Future<List<UserModel>> searchUsersByUsername(String query) async {
-    try {
-      final normalizedQuery = query.toLowerCase().trim();
-
-      // Firestore doesn't support full-text search, so we use range query
-      final querySnapshot = await _usersCollection
-          .where('username', isGreaterThanOrEqualTo: normalizedQuery)
-          .where('username', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
-          .limit(20)
-          .get();
-
-      return querySnapshot.docs
-          .map((doc) => UserModel.fromMap(doc.data() as Map<String, dynamic>))
-          .toList();
-    } catch (e) {
-      print('Error searching users: $e');
-      return [];
-    }
-  }
-
-  // ==================== FORGOT PASSWORD OPERATIONS ====================
-
-  /// Check if user exists by email or username
-  Future<UserModel?> findUserForPasswordReset(String identifier) async {
-    try {
-      final normalizedIdentifier = identifier.toLowerCase().trim();
-
-      // First check if it's an email
-      if (normalizedIdentifier.contains('@')) {
-        return await getUserByEmail(normalizedIdentifier);
-      }
-
-      // Otherwise check if it's a username
-      return await getUserByUsername(normalizedIdentifier);
-    } catch (e) {
-      print('Error finding user for password reset: $e');
-      return null;
-    }
-  }
-
-  // ==================== FOLLOW/UNFOLLOW OPERATIONS ====================
-
-  /// Follow a user
   Future<bool> followUser(String currentUserId, String targetUserId) async {
     try {
-      // Update current user's following list
-      await _usersCollection.doc(currentUserId).update({
-        'following': FieldValue.arrayUnion([targetUserId]),
-        'followingCount': FieldValue.increment(1),
-      });
+      // Get current user data
+      final currentUser = await getUserByUid(currentUserId);
+      final targetUser = await getUserByUid(targetUserId);
 
-      // Update target user's followers list
-      await _usersCollection.doc(targetUserId).update({
-        'followers': FieldValue.arrayUnion([currentUserId]),
-        'followersCount': FieldValue.increment(1),
-      });
+      if (currentUser == null || targetUser == null) return false;
+
+      // Update following list
+      final newFollowing = [...currentUser.following, targetUserId];
+      await _supabase
+          .from('users')
+          .update({
+            'following': newFollowing,
+            'following_count': newFollowing.length,
+          })
+          .eq('uid', currentUserId);
+
+      // Update followers list
+      final newFollowers = [...targetUser.followers, currentUserId];
+      await _supabase
+          .from('users')
+          .update({
+            'followers': newFollowers,
+            'followers_count': newFollowers.length,
+          })
+          .eq('uid', targetUserId);
 
       return true;
     } catch (e) {
@@ -236,20 +162,37 @@ class DatabaseService {
     }
   }
 
-  /// Unfollow a user
   Future<bool> unfollowUser(String currentUserId, String targetUserId) async {
     try {
-      // Update current user's following list
-      await _usersCollection.doc(currentUserId).update({
-        'following': FieldValue.arrayRemove([targetUserId]),
-        'followingCount': FieldValue.increment(-1),
-      });
+      // Get current user data
+      final currentUser = await getUserByUid(currentUserId);
+      final targetUser = await getUserByUid(targetUserId);
 
-      // Update target user's followers list
-      await _usersCollection.doc(targetUserId).update({
-        'followers': FieldValue.arrayRemove([currentUserId]),
-        'followersCount': FieldValue.increment(-1),
-      });
+      if (currentUser == null || targetUser == null) return false;
+
+      // Update following list
+      final newFollowing = currentUser.following
+          .where((id) => id != targetUserId)
+          .toList();
+      await _supabase
+          .from('users')
+          .update({
+            'following': newFollowing,
+            'following_count': newFollowing.length,
+          })
+          .eq('uid', currentUserId);
+
+      // Update followers list
+      final newFollowers = targetUser.followers
+          .where((id) => id != currentUserId)
+          .toList();
+      await _supabase
+          .from('users')
+          .update({
+            'followers': newFollowers,
+            'followers_count': newFollowers.length,
+          })
+          .eq('uid', targetUserId);
 
       return true;
     } catch (e) {
@@ -258,15 +201,22 @@ class DatabaseService {
     }
   }
 
-  // ==================== STREAM OPERATIONS ====================
+  // ==================== SEARCH ====================
 
-  /// Stream user data
-  Stream<UserModel?> streamUser(String uid) {
-    return _usersCollection.doc(uid).snapshots().map((doc) {
-      if (doc.exists) {
-        return UserModel.fromMap(doc.data() as Map<String, dynamic>);
-      }
-      return null;
-    });
+  Future<List<UserModel>> searchUsers(String query, {int limit = 20}) async {
+    try {
+      final results = await _supabase
+          .from('users')
+          .select()
+          .or('username.ilike.%$query%,display_name.ilike.%$query%')
+          .limit(limit);
+
+      return (results as List)
+          .map((data) => UserModel.fromMap(data as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      print('Error searching users: $e');
+      return [];
+    }
   }
 }

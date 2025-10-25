@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'core/theme.dart';
@@ -8,19 +7,18 @@ import 'core/services/preferences_service.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/post_provider.dart';
 import 'core/config/supabase_config.dart';
-import 'firebase_options.dart';
 
 Future<void> main() async {
   // Ensure Flutter is ready
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase (for Auth only)
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // Initialize Supabase (for Database and Storage)
+  // Initialize Supabase (for Authentication, Database and Storage)
   await Supabase.initialize(
     url: SupabaseConfig.supabaseUrl,
     anonKey: SupabaseConfig.supabaseAnonKey,
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+    ),
   );
 
   // Initialize Shared Preferences

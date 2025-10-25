@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
-import 'auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/services/database_service.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -13,7 +14,7 @@ class ForgotPasswordPage extends StatefulWidget {
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final _identifierController = TextEditingController();
-  final AuthService _authService = AuthService();
+  final DatabaseService _databaseService = DatabaseService();
   bool _isLoading = false;
   bool _useEmail = true; // Toggle between email and username
 
@@ -27,49 +28,69 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
-        // Use the new method that supports both email and username
-        final error = await _authService.sendPasswordResetByIdentifier(
-          _identifierController.text.trim(),
+        final identifier = _identifierController.text.trim();
+        String? email;
+
+        // Check if it's an email or username
+        if (identifier.contains('@')) {
+          email = identifier;
+        } else {
+          // Look up email by username
+          final userData = await _databaseService.getUserByUsername(identifier);
+          email = userData?.email;
+
+          if (email == null) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Username not found'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 4),
+              ),
+            );
+            setState(() => _isLoading = false);
+            return;
+          }
+        }
+
+        // Send password reset email using Supabase
+        await Supabase.instance.client.auth.resetPasswordForEmail(
+          email,
+          redirectTo: 'com.example.sync_up://reset-password',
         );
 
         if (!mounted) return;
 
-        if (error == null) {
-          // Success - show success dialog
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              icon: const Icon(
-                Icons.check_circle,
-                color: Colors.green,
-                size: 60,
-              ),
-              title: const Text('Email Sent!'),
-              content: Text(
-                'A password reset link has been sent to your email address.\n\nPlease check your inbox and follow the instructions.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              actions: [
-                FilledButton(
-                  onPressed: () {
-                    context.go('/signin');
-                  },
-                  child: const Text('OK'),
-                ),
-              ],
+        // Success - show success dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            icon: const Icon(Icons.check_circle, color: Colors.green, size: 60),
+            title: const Text('Email Sent!'),
+            content: Text(
+              'A password reset link has been sent to your email address.\n\nPlease check your inbox and follow the instructions.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-          );
-        } else {
-          // Show error
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
+            actions: [
+              FilledButton(
+                onPressed: () {
+                  context.go('/signin');
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } on AuthException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

@@ -1,327 +1,351 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 
-/// Service for handling post-related operations
+/// Service for creating and managing posts
 class PostService {
   static final PostService _instance = PostService._internal();
   factory PostService() => _instance;
   PostService._internal();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final AuthService _authService = AuthService();
+  final SupabaseClient _supabase = Supabase.instance.client;
+
+  /// Create a new post
+  Future<String?> createPost({
+    required String userId,
+    required String caption,
+    required List<String> mediaUrls,
+    String? location,
+    List<String>? tags,
+    String postType = 'image', // 'image', 'video', 'carousel'
+  }) async {
+    try {
+      final postData = {
+        'user_id': userId,
+        'caption': caption,
+        'media_urls': mediaUrls,
+        'location': location,
+        'tags': tags ?? [],
+        'post_type': postType,
+        'likes_count': 0,
+        'comments_count': 0,
+        'shares_count': 0,
+        'views_count': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      final result = await _supabase
+          .from('posts')
+          .insert(postData)
+          .select('id')
+          .single();
+
+      // Increment user's post count
+      await _incrementPostCount(userId);
+
+      print('✅ Post created successfully: ${result['id']}');
+      return result['id'];
+    } catch (e) {
+      print('❌ Error creating post: $e');
+      return null;
+    }
+  }
+
+  /// Upload media file to Supabase Storage
+  Future<String?> uploadMedia(XFile file, String userId) async {
+    try {
+      final bytes = await file.readAsBytes();
+      final fileExt = file.path.split('.').last;
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${userId}.$fileExt';
+      final filePath = '$userId/$fileName';
+
+      await _supabase.storage.from('posts').uploadBinary(
+            filePath,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: file.mimeType ?? 'image/jpeg',
+            ),
+          );
+
+      final publicUrl = _supabase.storage.from('posts').getPublicUrl(filePath);
+      
+      print('✅ Media uploaded successfully: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      print('❌ Error uploading media: $e');
+      return null;
+    }
+  }
+
+  /// Get posts for user feed (following + recommended)
+  Future<List<Map<String, dynamic>>> getFeedPosts(String userId, {int limit = 20}) async {
+    try {
+      // Get user's following list
+      final followingResult = await _supabase
+          .from('followers')
+          .select('following_id')
+          .eq('follower_id', userId);
+
+      final followingIds = (followingResult as List)
+          .map((e) => e['following_id'] as String)
+          .toList();
+
+      // Add user's own ID to see their posts too
+      followingIds.add(userId);
+
+      // Fetch posts from following + some recommended posts
+      final result = await _supabase
+          .from('posts')
+          .select('''
+            *,
+            users!posts_user_id_fkey(
+              uid,
+              username,
+              username_display,
+              display_name,
+              full_name,
+              photo_url
+            )
+          ''')
+          .inFilter('user_id', followingIds)
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      return _formatPosts(result as List);
+    } catch (e) {
+      print('❌ Error fetching feed posts: $e');
+      return [];
+    }
+  }
+
+  /// Get user's own posts
+  Future<List<Map<String, dynamic>>> getUserPosts(String userId) async {
+    try {
+      final result = await _supabase
+          .from('posts')
+          .select('''
+            *,
+            users!posts_user_id_fkey(
+              uid,
+              username,
+              username_display,
+              display_name,
+              full_name,
+              photo_url
+            )
+          ''')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+
+      return _formatPosts(result as List);
+    } catch (e) {
+      print('❌ Error fetching user posts: $e');
+      return [];
+    }
+  }
+
+  /// Get explore posts (trending/popular)
+  Future<List<Map<String, dynamic>>> getExplorePosts({int limit = 30}) async {
+    try {
+      final result = await _supabase
+          .from('posts')
+          .select('''
+            *,
+            users!posts_user_id_fkey(
+              uid,
+              username,
+              username_display,
+              display_name,
+              full_name,
+              photo_url
+            )
+          ''')
+          .order('likes_count', ascending: false)
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      return _formatPosts(result as List);
+    } catch (e) {
+      print('❌ Error fetching explore posts: $e');
+      return [];
+    }
+  }
 
   /// Like a post
-  Future<bool> likePost(String postId) async {
-    final userId = _authService.currentUserId;
-    if (userId == null) return false;
-
+  Future<bool> likePost(String postId, [String? userId]) async {
     try {
-      // Add to post's likes collection
-      await _firestore
-          .collection('posts')
-          .doc(postId)
-          .collection('likes')
-          .doc(userId)
-          .set({'userId': userId, 'timestamp': FieldValue.serverTimestamp()});
+      final currentUserId = userId ?? _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return false;
+
+      // Check if already liked
+      final existing = await _supabase
+          .from('post_likes')
+          .select()
+          .eq('post_id', postId)
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+
+      if (existing != null) {
+        return false; // Already liked
+      }
+
+      // Add like
+      await _supabase.from('post_likes').insert({
+        'post_id': postId,
+        'user_id': currentUserId,
+        'created_at': DateTime.now().toIso8601String(),
+      });
 
       // Increment like count
-      await _firestore.collection('posts').doc(postId).update({
-        'likes': FieldValue.increment(1),
-      });
+      await _supabase.rpc('increment_post_likes', params: {'post_id_input': postId});
 
       return true;
     } catch (e) {
-      print('Error liking post: $e');
+      print('❌ Error liking post: $e');
       return false;
     }
   }
 
   /// Unlike a post
-  Future<bool> unlikePost(String postId) async {
-    final userId = _authService.currentUserId;
-    if (userId == null) return false;
-
+  Future<bool> unlikePost(String postId, [String? userId]) async {
     try {
-      // Remove from post's likes collection
-      await _firestore
-          .collection('posts')
-          .doc(postId)
-          .collection('likes')
-          .doc(userId)
-          .delete();
+      final currentUserId = userId ?? _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return false;
+
+      await _supabase
+          .from('post_likes')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', currentUserId);
 
       // Decrement like count
-      await _firestore.collection('posts').doc(postId).update({
-        'likes': FieldValue.increment(-1),
+      await _supabase.rpc('decrement_post_likes', params: {'post_id_input': postId});
+
+      return true;
+    } catch (e) {
+      print('❌ Error unliking post: $e');
+      return false;
+    }
+  }
+
+  /// Save a post
+  Future<bool> savePost(String postId, [String? userId]) async {
+    try {
+      final currentUserId = userId ?? _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return false;
+
+      // Check if already saved
+      final existing = await _supabase
+          .from('saved_posts')
+          .select()
+          .eq('post_id', postId)
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+
+      if (existing != null) {
+        return false; // Already saved
+      }
+
+      await _supabase.from('saved_posts').insert({
+        'post_id': postId,
+        'user_id': currentUserId,
+        'created_at': DateTime.now().toIso8601String(),
       });
 
       return true;
     } catch (e) {
-      print('Error unliking post: $e');
+      print('❌ Error saving post: $e');
       return false;
     }
   }
 
-  /// Save/bookmark a post
-  Future<bool> savePost(String postId) async {
-    final userId = _authService.currentUserId;
-    if (userId == null) return false;
-
+  /// Unsave a post
+  Future<bool> unsavePost(String postId, [String? userId]) async {
     try {
-      // Add to user's saved posts collection
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('savedPosts')
-          .doc(postId)
-          .set({'postId': postId, 'timestamp': FieldValue.serverTimestamp()});
+      final currentUserId = userId ?? _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return false;
 
-      // Increment save count
-      await _firestore.collection('posts').doc(postId).update({
-        'saves': FieldValue.increment(1),
-      });
+      await _supabase
+          .from('saved_posts')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', currentUserId);
 
       return true;
     } catch (e) {
-      print('Error saving post: $e');
+      print('❌ Error unsaving post: $e');
       return false;
     }
   }
 
-  /// Unsave/unbookmark a post
-  Future<bool> unsavePost(String postId) async {
-    final userId = _authService.currentUserId;
-    if (userId == null) return false;
-
+  /// Delete a post
+  Future<void> deletePost(String postId, [String? userId]) async {
     try {
-      // Remove from user's saved posts collection
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('savedPosts')
-          .doc(postId)
-          .delete();
+      final currentUserId = userId ?? _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return;
 
-      // Decrement save count
-      await _firestore.collection('posts').doc(postId).update({
-        'saves': FieldValue.increment(-1),
-      });
+      await _supabase
+          .from('posts')
+          .delete()
+          .eq('id', postId)
+          .eq('user_id', currentUserId);
 
-      return true;
+      await _decrementPostCount(currentUserId);
     } catch (e) {
-      print('Error unsaving post: $e');
-      return false;
+      print('❌ Error deleting post: $e');
     }
   }
 
-  /// Check if post is liked by current user
-  Future<bool> isPostLiked(String postId) async {
-    final userId = _authService.currentUserId;
-    if (userId == null) return false;
-
+  /// Update a post
+  Future<void> updatePost(String postId, Map<String, dynamic> updates) async {
     try {
-      final doc = await _firestore
-          .collection('posts')
-          .doc(postId)
-          .collection('likes')
-          .doc(userId)
-          .get();
-
-      return doc.exists;
+      await _supabase.from('posts').update(updates).eq('id', postId);
     } catch (e) {
-      print('Error checking if post is liked: $e');
-      return false;
+      print('❌ Error updating post: $e');
     }
   }
 
-  /// Check if post is saved by current user
-  Future<bool> isPostSaved(String postId) async {
-    final userId = _authService.currentUserId;
-    if (userId == null) return false;
-
-    try {
-      final doc = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('savedPosts')
-          .doc(postId)
-          .get();
-
-      return doc.exists;
-    } catch (e) {
-      print('Error checking if post is saved: $e');
-      return false;
-    }
-  }
-
-  /// Delete a post (owner only)
-  Future<bool> deletePost(String postId, String postOwnerId) async {
-    final userId = _authService.currentUserId;
-    if (userId == null || userId != postOwnerId) return false;
-
-    try {
-      // Delete post document
-      await _firestore.collection('posts').doc(postId).delete();
-
-      // TODO: Delete associated media from storage
-      // TODO: Delete subcollections (likes, comments, etc.)
-
-      // Decrement user's posts count
-      await _firestore.collection('users').doc(userId).update({
-        'postsCount': FieldValue.increment(-1),
-      });
-
-      return true;
-    } catch (e) {
-      print('Error deleting post: $e');
-      return false;
-    }
-  }
-
-  /// Update post caption
-  Future<bool> updatePostCaption(String postId, String newCaption) async {
-    final userId = _authService.currentUserId;
-    if (userId == null) return false;
-
-    try {
-      await _firestore.collection('posts').doc(postId).update({
-        'caption': newCaption,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      return true;
-    } catch (e) {
-      print('Error updating post caption: $e');
-      return false;
-    }
-  }
-
-  /// Archive a post
-  Future<bool> archivePost(String postId) async {
-    final userId = _authService.currentUserId;
-    if (userId == null) return false;
-
-    try {
-      await _firestore.collection('posts').doc(postId).update({
-        'isArchived': true,
-        'archivedAt': FieldValue.serverTimestamp(),
-      });
-
-      return true;
-    } catch (e) {
-      print('Error archiving post: $e');
-      return false;
-    }
-  }
-
-  /// Unarchive a post
-  Future<bool> unarchivePost(String postId) async {
-    final userId = _authService.currentUserId;
-    if (userId == null) return false;
-
-    try {
-      await _firestore.collection('posts').doc(postId).update({
-        'isArchived': false,
-        'archivedAt': null,
-      });
-
-      return true;
-    } catch (e) {
-      print('Error unarchiving post: $e');
-      return false;
-    }
-  }
-
-  /// Pin a post to profile
-  Future<bool> pinPost(String postId) async {
-    final userId = _authService.currentUserId;
-    if (userId == null) return false;
-
-    try {
-      await _firestore.collection('posts').doc(postId).update({
-        'isPinned': true,
-        'pinnedAt': FieldValue.serverTimestamp(),
-      });
-
-      return true;
-    } catch (e) {
-      print('Error pinning post: $e');
-      return false;
-    }
-  }
-
-  /// Unpin a post from profile
-  Future<bool> unpinPost(String postId) async {
-    final userId = _authService.currentUserId;
-    if (userId == null) return false;
-
-    try {
-      await _firestore.collection('posts').doc(postId).update({
-        'isPinned': false,
-        'pinnedAt': null,
-      });
-
-      return true;
-    } catch (e) {
-      print('Error unpinning post: $e');
-      return false;
-    }
-  }
-
-  /// Report a post
-  Future<bool> reportPost({
-    required String postId,
-    required String reason,
-    String? description,
-  }) async {
-    final userId = _authService.currentUserId;
-    if (userId == null) return false;
-
-    try {
-      await _firestore.collection('reports').add({
-        'postId': postId,
-        'reportedBy': userId,
-        'reason': reason,
-        'description': description,
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': 'pending',
-        'type': 'post',
-      });
-
-      return true;
-    } catch (e) {
-      print('Error reporting post: $e');
-      return false;
-    }
-  }
-
-  /// Block a user
-  Future<bool> blockUser(String userId) async {
-    final currentUserId = _authService.currentUserId;
-    if (currentUserId == null) return false;
-
-    try {
-      // Add to blocked users collection
-      await _firestore
-          .collection('users')
-          .doc(currentUserId)
-          .collection('blockedUsers')
-          .doc(userId)
-          .set({'userId': userId, 'timestamp': FieldValue.serverTimestamp()});
-
-      // Unfollow if following
-      await _authService.unfollowUser(userId);
-
-      return true;
-    } catch (e) {
-      print('Error blocking user: $e');
-      return false;
-    }
-  }
-
-  /// Get post link
   String getPostLink(String postId) {
-    // TODO: Use actual app domain and deep link structure
     return 'https://syncup.app/post/$postId';
   }
+
+  // Helper methods
+  List<Map<String, dynamic>> _formatPosts(List posts) {
+    return posts.map((post) {
+      final user = post['users'];
+      return {
+        'id': post['id'],
+        'user_id': post['user_id'],
+        'username': user['username_display'] ?? user['username'],
+        'display_name': user['display_name'] ?? user['full_name'],
+        'user_avatar': user['photo_url'],
+        'caption': post['caption'],
+        'media_urls': post['media_urls'] as List? ?? [],
+        'location': post['location'],
+        'tags': post['tags'] as List? ?? [],
+        'post_type': post['post_type'],
+        'likes_count': post['likes_count'] ?? 0,
+        'comments_count': post['comments_count'] ?? 0,
+        'shares_count': post['shares_count'] ?? 0,
+        'views_count': post['views_count'] ?? 0,
+        'created_at': post['created_at'],
+      };
+    }).toList();
+  }
+
+  Future<void> _incrementPostCount(String userId) async {
+    try {
+      await _supabase.rpc('increment_posts_count', params: {'user_id': userId});
+    } catch (e) {
+      print('Error incrementing post count: $e');
+    }
+  }
+
+  Future<void> _decrementPostCount(String userId) async {
+    try {
+      await _supabase.rpc('decrement_posts_count', params: {'user_id': userId});
+    } catch (e) {
+      print('Error decrementing post count: $e');
+    }
+  }
 }
+

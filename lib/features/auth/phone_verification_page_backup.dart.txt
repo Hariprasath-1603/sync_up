@@ -1,0 +1,2 @@
+// This file has been temporarily disabled during Firebase to Supabase migration
+// Phone verification will be re-implemented using Supabase + Twilio Edge Functions

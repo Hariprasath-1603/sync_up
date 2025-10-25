@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "792629822847",
+    "firebase_url": "https://syncup-social-app-2025-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "syncup-social-app-2025",
     "storage_bucket": "syncup-social-app-2025.firebasestorage.app"
   },
@@ -14,11 +15,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "792629822847-t6752qvd32g5punbd1kboc3bc7j48knq.apps.googleusercontent.com",
+          "client_id": "792629822847-38sj0tgv1kg3uj4kdme44q5e8lkao37l.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.sync_up",
-            "certificate_hash": "94524464895e2de3f68e738233b7bde59d4a5ef0"
+            "certificate_hash": "faf9443332ee4ce8c1d19fb380954235b828a040"
           }
         },
         {

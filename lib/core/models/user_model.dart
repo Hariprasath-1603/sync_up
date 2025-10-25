@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class UserModel {
   final String uid;
   final String username;
@@ -18,6 +16,9 @@ class UserModel {
   final int postsCount;
   final List<String> followers;
   final List<String> following;
+  final bool isPrivate;
+  final bool showActivityStatus;
+  final bool allowMessagesFromEveryone;
 
   UserModel({
     required this.uid,
@@ -37,6 +38,9 @@ class UserModel {
     this.postsCount = 0,
     this.followers = const [],
     this.following = const [],
+    this.isPrivate = false,
+    this.showActivityStatus = true,
+    this.allowMessagesFromEveryone = false,
   });
 
   // Convert UserModel to Map for Firestore
@@ -54,13 +58,16 @@ class UserModel {
       'gender': gender,
       'phone': phone,
       'location': location,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'lastActive': Timestamp.fromDate(lastActive),
+      'createdAt': createdAt.toIso8601String(),
+      'lastActive': lastActive.toIso8601String(),
       'followersCount': followersCount,
       'followingCount': followingCount,
       'postsCount': postsCount,
       'followers': followers,
       'following': following,
+      'isPrivate': isPrivate,
+      'showActivityStatus': showActivityStatus,
+      'allowMessagesFromEveryone': allowMessagesFromEveryone,
     };
   }
 
@@ -68,22 +75,37 @@ class UserModel {
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
       uid: map['uid'] ?? '',
-      username: map['usernameDisplay'] ?? map['username'] ?? '',
+      username:
+          map['usernameDisplay'] ??
+          map['username_display'] ??
+          map['username'] ??
+          '',
       email: map['email'] ?? '',
-      displayName: map['displayName'],
-      photoURL: map['photoURL'],
+      displayName: map['displayName'] ?? map['display_name'],
+      photoURL: map['photoURL'] ?? map['photo_url'],
       bio: map['bio'],
-      dateOfBirth: map['dateOfBirth'],
+      dateOfBirth: map['dateOfBirth'] ?? map['date_of_birth'],
       gender: map['gender'],
       phone: map['phone'],
       location: map['location'],
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      lastActive: (map['lastActive'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      followersCount: map['followersCount'] ?? 0,
-      followingCount: map['followingCount'] ?? 0,
-      postsCount: map['postsCount'] ?? 0,
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'] as String)
+          : map['created_at'] != null
+          ? DateTime.parse(map['created_at'] as String)
+          : DateTime.now(),
+      lastActive: map['lastActive'] != null
+          ? DateTime.parse(map['lastActive'] as String)
+          : map['last_active'] != null
+          ? DateTime.parse(map['last_active'] as String)
+          : DateTime.now(),
+      followersCount: map['followersCount'] ?? map['followers_count'] ?? 0,
+      followingCount: map['followingCount'] ?? map['following_count'] ?? 0,
+      postsCount: map['postsCount'] ?? map['posts_count'] ?? 0,
       followers: List<String>.from(map['followers'] ?? []),
       following: List<String>.from(map['following'] ?? []),
+      isPrivate: map['isPrivate'] ?? map['is_private'] ?? false,
+      showActivityStatus: map['showActivityStatus'] ?? map['show_activity_status'] ?? true,
+      allowMessagesFromEveryone: map['allowMessagesFromEveryone'] ?? map['allow_messages_from_everyone'] ?? false,
     );
   }
 
@@ -133,6 +155,9 @@ class UserModel {
     int? postsCount,
     List<String>? followers,
     List<String>? following,
+    bool? isPrivate,
+    bool? showActivityStatus,
+    bool? allowMessagesFromEveryone,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -152,6 +177,9 @@ class UserModel {
       postsCount: postsCount ?? this.postsCount,
       followers: followers ?? this.followers,
       following: following ?? this.following,
+      isPrivate: isPrivate ?? this.isPrivate,
+      showActivityStatus: showActivityStatus ?? this.showActivityStatus,
+      allowMessagesFromEveryone: allowMessagesFromEveryone ?? this.allowMessagesFromEveryone,
     );
   }
 }

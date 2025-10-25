@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/services/preferences_service.dart';
-import '../../core/services/database_service.dart';
-import 'auth_service.dart';
 
 // Import OAuthProvider enum
 import 'package:supabase_flutter/supabase_flutter.dart' show OAuthProvider;
@@ -21,11 +20,99 @@ class _SignInPageState extends State<SignInPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailOrUsernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  final AuthService _authService = AuthService();
-  final DatabaseService _databaseService = DatabaseService();
 
   bool _isPasswordVisible = false;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupAuthListener();
+  }
+
+  void _setupAuthListener() {
+    // Listen for OAuth callback
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final event = data.event;
+      if (event == AuthChangeEvent.signedIn) {
+        final session = data.session;
+        if (session != null && mounted) {
+          _handleOAuthSuccess(session);
+        }
+      }
+    });
+  }
+
+  Future<void> _handleOAuthSuccess(Session session) async {
+    print('OAuth successful! User: ${session.user.email}');
+
+    final user = session.user;
+
+    try {
+      // Check if user exists in Supabase
+      var supabaseUser = await Supabase.instance.client
+          .from('users')
+          .select()
+          .eq('uid', user.id)
+          .maybeSingle();
+
+      if (supabaseUser == null) {
+        // Create new user
+        print('Creating new user from OAuth...');
+
+        String username =
+            user.email?.split('@')[0] ??
+            'user${DateTime.now().millisecondsSinceEpoch}';
+
+        await Supabase.instance.client.from('users').insert({
+          'uid': user.id,
+          'username': username.toLowerCase(),
+          'username_display': username,
+          'email': user.email?.toLowerCase() ?? '',
+          'display_name': user.userMetadata?['full_name'] ?? username,
+          'photo_url': user.userMetadata?['avatar_url'],
+          'bio': '',
+          'followers_count': 0,
+          'following_count': 0,
+          'posts_count': 0,
+          'followers': [],
+          'following': [],
+          'phone_verified': false,
+          'created_at': DateTime.now().toIso8601String(),
+          'last_active': DateTime.now().toIso8601String(),
+        });
+      }
+
+      // Save session
+      await PreferencesService.saveUserSession(
+        userId: user.id,
+        email: user.email ?? '',
+        name: user.userMetadata?['full_name'] ?? user.email,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Welcome ${user.userMetadata?['full_name'] ?? user.email}!',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+        context.go('/home');
+      }
+    } catch (e) {
+      print('Error in OAuth callback: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -44,89 +131,88 @@ class _SignInPageState extends State<SignInPage> {
       });
 
       String? email;
+      bool isUsername = false;
 
-      // Check if input is email or username
-      if (emailOrUsername.contains('@')) {
-        // It's an email
-        email = emailOrUsername;
-      } else {
-        // It's a username - look up the email
-        try {
-          final userModel = await _databaseService.getUserByUsername(
-            emailOrUsername,
-          );
-          if (userModel != null) {
-            email = userModel.email;
+      try {
+        // Check if input is email or username
+        if (emailOrUsername.contains('@')) {
+          // It's an email
+          print('📧 Login with email: $emailOrUsername');
+          email = emailOrUsername;
+        } else {
+          // It's a username - look up the email from Supabase
+          print('👤 Login with username: $emailOrUsername');
+          isUsername = true;
+
+          final result = await Supabase.instance.client
+              .from('users')
+              .select('email')
+              .eq('username', emailOrUsername.toLowerCase())
+              .maybeSingle();
+
+          if (result != null) {
+            email = result['email'] as String;
+            print('✅ Username found, email: $email');
           } else {
             // Username not found
+            print('❌ Username not found: $emailOrUsername');
             setState(() {
               _isLoading = false;
             });
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                SnackBar(
                   content: Row(
                     children: [
-                      Icon(Icons.error_outline, color: Colors.white),
-                      SizedBox(width: 12),
+                      const Icon(Icons.error_outline, color: Colors.white),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Username not found. Please check and try again.',
+                          'Username "$emailOrUsername" not found. Please check and try again.',
                         ),
                       ),
                     ],
                   ),
                   backgroundColor: Colors.red,
-                  duration: Duration(seconds: 4),
+                  duration: const Duration(seconds: 4),
                 ),
               );
             }
             return;
           }
-        } catch (e) {
-          setState(() {
-            _isLoading = false;
-          });
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.error_outline, color: Colors.white),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text('Error: ${e.toString()}')),
-                  ],
-                ),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 4),
-              ),
-            );
-          }
-          return;
         }
-      }
 
-      // Now sign in with the email
-      final user = await _authService.signInWithEmailAndPassword(
-        email,
-        password,
-      );
+        // Sign in with email and password using Supabase Auth
+        print('🔐 Attempting sign in with email: $email');
+        final authResponse = await Supabase.instance.client.auth
+            .signInWithPassword(email: email, password: password);
 
-      setState(() {
-        _isLoading = false;
-      });
+        // Debug: print what we received from Supabase
+        print('🔍 authResponse.user?.email: ${authResponse.user?.email}');
+        print(
+          '🔍 authResponse.session?.user.email: ${authResponse.session?.user.email}',
+        );
 
-      if (user != null) {
-        // Check if user exists in Supabase (they must have signed up properly)
-        try {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Handle both possible places for the signed-in user
+        final user = authResponse.user ?? authResponse.session?.user;
+        if (user != null) {
+          print('✅ Sign in successful! User: ${user.email}');
+
+          // Check if user exists in Supabase database
           final supabaseUser = await Supabase.instance.client
               .from('users')
               .select()
-              .eq('uid', user.uid)
+              .eq('uid', user.id)
               .maybeSingle();
 
+          print('👤 User profile found: ${supabaseUser != null}');
+
           if (supabaseUser == null) {
-            // User exists in Firebase but not in Supabase - they used OAuth without signup
+            // User authenticated but no profile - prompt sign up
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -136,7 +222,7 @@ class _SignInPageState extends State<SignInPage> {
                       SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Please sign up first with this email address before signing in.',
+                          'User profile not found. Please sign up first.',
                         ),
                       ),
                     ],
@@ -152,74 +238,103 @@ class _SignInPageState extends State<SignInPage> {
                   ),
                 ),
               );
-              await _authService.signOut();
             }
+            await Supabase.instance.client.auth.signOut();
             return;
           }
-        } catch (e) {
-          print('ERROR checking Supabase user: $e');
-          // Continue with login even if Supabase check fails
-        }
 
-        // Check if email is verified
-        if (!user.emailVerified) {
+          // Save user session
+          await PreferencesService.saveUserSession(
+            userId: user.id,
+            email: user.email ?? email,
+            name: user.userMetadata?['display_name'] as String?,
+          );
+
+          if (mounted) {
+            context.go('/home');
+          }
+        } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.white),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Please verify your email before signing in. Check your inbox for the verification link.',
-                      ),
-                    ),
-                  ],
-                ),
-                backgroundColor: Colors.orange[700],
-                duration: const Duration(seconds: 5),
-                action: SnackBarAction(
-                  label: 'Resend',
-                  textColor: Colors.white,
-                  onPressed: () async {
-                    try {
-                      await user.sendEmailVerification();
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Verification email sent!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      print('Error resending email: $e');
-                    }
-                  },
-                ),
+              const SnackBar(
+                content: Text('Sign-in failed. Please check your credentials.'),
+                backgroundColor: Colors.red,
               ),
             );
-
-            // Sign out the user since email is not verified
-            await _authService.signOut();
           }
-          return;
         }
+      } on AuthException catch (e) {
+        setState(() {
+          _isLoading = false;
+        });
 
-        // Email is verified, proceed with login
-        await PreferencesService.saveUserSession(
-          userId: user.uid,
-          email: user.email ?? email,
-          name: user.displayName,
-        );
-        if (mounted) context.go('/home');
-      } else {
+        print('❌ Auth error: ${e.message}');
+        print('❌ Status code: ${e.statusCode}');
+        print('❌ Was using username: $isUsername');
+
+        if (mounted) {
+          String errorMessage = 'Sign-in failed. Please try again.';
+
+          // More specific error handling
+          if (e.message.toLowerCase().contains('invalid') ||
+              e.message.toLowerCase().contains('credentials') ||
+              e.statusCode == '400') {
+            // Provide more context if they used username
+            if (isUsername) {
+              errorMessage =
+                  'Incorrect password for username "$emailOrUsername". Please try again.';
+            } else {
+              errorMessage =
+                  'Incorrect email or password. Please check and try again.';
+            }
+          } else if (e.message.toLowerCase().contains('email not confirmed') ||
+              e.message.toLowerCase().contains('not verified')) {
+            errorMessage =
+                'Please verify your email before signing in. Check your inbox for verification code.';
+          } else if (e.message.toLowerCase().contains('network') ||
+              e.message.toLowerCase().contains('timeout')) {
+            errorMessage = 'Network error. Please check your connection.';
+          } else if (e.message.toLowerCase().contains('too many requests')) {
+            errorMessage =
+                'Too many attempts. Please try again in a few minutes.';
+          } else {
+            // Show the actual error message
+            errorMessage = e.message;
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(errorMessage)),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        print('❌ Unexpected error: $e');
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Sign-in failed. Please check your credentials.'),
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text('Error: ${e.toString()}')),
+                ],
+              ),
               backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
             ),
           );
         }
@@ -227,7 +342,7 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
-  // Google Sign-In with Supabase OAuth
+  // Native Google Sign-In (In-App Experience)
   Future<void> _signInWithGoogle() async {
     if (_isLoading) return;
 
@@ -236,101 +351,135 @@ class _SignInPageState extends State<SignInPage> {
     });
 
     try {
-      print('Starting Supabase Google OAuth...');
+      print('🔐 Starting Native Google Sign-In...');
 
-      // Use Supabase OAuth for Google
-      // Don't specify redirectTo for mobile apps - Supabase handles it automatically
-      final response = await Supabase.instance.client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        authScreenLaunchMode: LaunchMode.externalApplication,
+      // IMPORTANT: After updating Google Cloud Console with your SHA-1,
+      // you MUST re-download google-services.json from Firebase Console
+
+      // Initialize Google Sign-In with your Web Client ID
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        // This is your Web Client ID from google-services.json (client_type: 3)
+        serverClientId:
+            '792629822847-9n8v8dn8pbdnmn5njp17r6seld6bd4lv.apps.googleusercontent.com',
+        scopes: ['email', 'profile'],
       );
 
-      if (!response) {
-        throw Exception('Google sign-in was cancelled');
+      // Step 1: Trigger native Google account picker (IN-APP!)
+      print('📱 Opening Google account picker...');
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        setState(() => _isLoading = false);
+        print('❌ User cancelled Google Sign-In');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Google sign-in was cancelled'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
       }
 
-      // The OAuth flow will redirect to browser and back
-      // Listen for auth state changes to handle the callback
-      Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
-        final session = data.session;
-        if (session != null && mounted) {
-          print('Google OAuth successful! User: ${session.user.email}');
+      print('✅ Got Google account: ${googleUser.email}');
 
-          final user = session.user;
+      // Step 2: Get authentication tokens
+      print('🔑 Getting auth tokens...');
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
+      final String? accessToken = googleAuth.accessToken;
 
-          // Check if user exists in databases, if not create them
-          try {
-            var supabaseUser = await Supabase.instance.client
-                .from('users')
-                .select()
-                .eq('uid', user.id)
-                .maybeSingle();
+      if (idToken == null) {
+        throw Exception('Failed to get ID token from Google');
+      }
 
-            if (supabaseUser == null) {
-              // Create new user in both databases
-              print('Creating new user from Google OAuth...');
+      print('✅ Got ID token, checking if user is registered...');
 
-              // Extract username from email
-              String username =
-                  user.email?.split('@')[0] ??
-                  'user${DateTime.now().millisecondsSinceEpoch}';
+      // Step 3: Check if user with this email exists in Supabase
+      final email = googleUser.email;
 
-              // Save to Supabase
-              await Supabase.instance.client.from('users').insert({
-                'uid': user.id,
-                'username': username.toLowerCase(),
-                'username_display': username,
-                'email': user.email?.toLowerCase() ?? '',
-                'display_name': user.userMetadata?['full_name'] ?? username,
-                'photo_url': user.userMetadata?['avatar_url'],
-                'bio': '',
-                'followers_count': 0,
-                'following_count': 0,
-                'posts_count': 0,
-                'followers': [],
-                'following': [],
-                'created_at': DateTime.now().toIso8601String(),
-                'last_active': DateTime.now().toIso8601String(),
-              });
-            }
-          } catch (e) {
-            print('Error checking/creating user: $e');
-          }
+      // Check if user exists in the users table
+      final existingUsers = await Supabase.instance.client
+          .from('users')
+          .select('uid, email')
+          .eq('email', email)
+          .limit(1);
 
-          setState(() {
-            _isLoading = false;
-          });
+      if (existingUsers.isEmpty) {
+        // User NOT registered - require sign up first
+        setState(() => _isLoading = false);
 
-          // Save session
-          await PreferencesService.saveUserSession(
-            userId: user.id,
-            email: user.email ?? '',
-            name: user.userMetadata?['full_name'] ?? user.email,
+        // Sign out from Google
+        await googleSignIn.signOut();
+
+        print('❌ User not registered: $email');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                '⚠️ Account not found. Please sign up first before using Google Sign-In.',
+              ),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'Sign Up',
+                textColor: Colors.white,
+                onPressed: () {
+                  context.go('/sign-up');
+                },
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      print('✅ User is registered! Authenticating with Supabase...');
+
+      // Step 4: Sign in to Supabase using the Google ID token
+      final AuthResponse response = await Supabase.instance.client.auth
+          .signInWithIdToken(
+            provider: OAuthProvider.google,
+            idToken: idToken,
+            accessToken: accessToken,
           );
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Welcome ${user.userMetadata?['full_name'] ?? user.email}!',
-                ),
-                backgroundColor: Colors.green,
-              ),
-            );
-            context.go('/home');
-          }
-        }
-      });
+      if (response.user != null) {
+        print('🎉 Successfully signed in! User ID: ${response.user!.id}');
+        // The auth state listener in initState will handle navigation
+      } else {
+        throw Exception('Supabase authentication failed');
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      print('Google OAuth error: $e');
+      setState(() => _isLoading = false);
+      print('❌ Google Sign-In error: $e');
+
+      String errorMessage = 'Google sign-in failed';
+
+      // Provide helpful error messages
+      if (e.toString().contains('sign_in_failed')) {
+        errorMessage =
+            'Google sign-in failed. Please update your SHA-1 fingerprint in Google Cloud Console.';
+      } else if (e.toString().contains('network_error')) {
+        errorMessage =
+            'Network error. Please check your internet connection and ensure SHA-1 is configured correctly.';
+      } else if (e.toString().contains('ApiException: 10')) {
+        errorMessage =
+            'Configuration error. Please re-download google-services.json from Firebase Console.';
+      } else {
+        errorMessage = 'Error: ${e.toString()}';
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Google sign-in failed: ${e.toString()}'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }

@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/services/supabase_storage_service.dart';
@@ -61,6 +59,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (currentUser?.gender != null) {
       _selectedGender = currentUser!.gender!;
     }
+
+    // Initialize privacy settings from user data
+    _isPrivateAccount = currentUser?.isPrivate ?? false;
+    _showActivityStatus = currentUser?.showActivityStatus ?? true;
+    _allowMessagesFromEveryone = currentUser?.allowMessagesFromEveryone ?? false;
   }
 
   @override
@@ -114,13 +117,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           isDark: isDark,
                         ),
                         const SizedBox(height: 16),
-                        _buildTextField(
-                          controller: _usernameController,
-                          label: 'Username',
-                          icon: Icons.alternate_email_rounded,
-                          isDark: isDark,
-                          prefixText: '@',
-                        ),
+                        _buildClickableUsernameField(isDark),
                         const SizedBox(height: 16),
                         _buildTextField(
                           controller: _bioController,
@@ -141,6 +138,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           icon: Icons.email_outlined,
                           isDark: isDark,
                           keyboardType: TextInputType.emailAddress,
+                          enabled: false, // Gray out email field
                         ),
                         const SizedBox(height: 16),
                         _buildTextField(
@@ -149,11 +147,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           icon: Icons.phone_outlined,
                           isDark: isDark,
                           keyboardType: TextInputType.phone,
+                          enabled: false, // Gray out phone field
                         ),
                         const SizedBox(height: 16),
                         _buildTextField(
                           controller: _websiteController,
-                          label: 'Website',
+                          label: 'URL',
                           icon: Icons.link_rounded,
                           isDark: isDark,
                           keyboardType: TextInputType.url,
@@ -164,6 +163,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           label: 'Location',
                           icon: Icons.location_on_outlined,
                           isDark: isDark,
+                          enabled: false, // Gray out location field
                         ),
                         const SizedBox(height: 32),
                         _buildSectionTitle('Privacy Settings', isDark),
@@ -333,6 +333,82 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
+  Widget _buildClickableUsernameField(bool isDark) {
+    final authProvider = context.watch<AuthProvider>();
+    final currentUsername = authProvider.currentUser?.username ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Username',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: (isDark ? Colors.white60 : Colors.grey.shade600),
+          ),
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: InkWell(
+              onTap: () {
+                // Navigate to change username page
+                context.push('/change-username');
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: (isDark ? Colors.white : Colors.black).withOpacity(
+                    0.05,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: (isDark ? Colors.white : Colors.black).withOpacity(
+                      0.1,
+                    ),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.alternate_email_rounded,
+                      color: kPrimary,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        currentUsername.isNotEmpty
+                            ? '@$currentUsername'
+                            : 'Set username',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: (isDark ? Colors.white : Colors.black).withOpacity(
+                        0.4,
+                      ),
+                      size: 16,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -342,6 +418,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     int? maxLength,
     String? prefixText,
     TextInputType? keyboardType,
+    bool enabled = true,
   }) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
@@ -349,10 +426,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           decoration: BoxDecoration(
-            color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+            color: enabled
+                ? (isDark ? Colors.white : Colors.black).withOpacity(0.05)
+                : (isDark ? Colors.white : Colors.black).withOpacity(0.02),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
+              color: (isDark ? Colors.white : Colors.black).withOpacity(
+                enabled ? 0.1 : 0.05,
+              ),
               width: 1,
             ),
           ),
@@ -361,19 +442,32 @@ class _EditProfilePageState extends State<EditProfilePage> {
             maxLines: maxLines,
             maxLength: maxLength,
             keyboardType: keyboardType,
+            enabled: enabled,
             style: TextStyle(
-              color: isDark ? Colors.white : Colors.black87,
+              color: enabled
+                  ? (isDark ? Colors.white : Colors.black87)
+                  : (isDark ? Colors.white38 : Colors.black38),
               fontSize: 15,
             ),
             decoration: InputDecoration(
               labelText: label,
               labelStyle: TextStyle(
-                color: isDark ? Colors.white60 : Colors.grey.shade600,
+                color: enabled
+                    ? (isDark ? Colors.white60 : Colors.grey.shade600)
+                    : (isDark ? Colors.white30 : Colors.grey.shade400),
               ),
-              prefixIcon: Icon(icon, color: kPrimary, size: 22),
+              prefixIcon: Icon(
+                icon,
+                color: enabled
+                    ? kPrimary
+                    : (isDark ? Colors.white30 : Colors.grey.shade400),
+                size: 22,
+              ),
               prefixText: prefixText,
               prefixStyle: TextStyle(
-                color: isDark ? Colors.white : Colors.black87,
+                color: enabled
+                    ? (isDark ? Colors.white : Colors.black87)
+                    : (isDark ? Colors.white38 : Colors.black38),
                 fontSize: 15,
               ),
               border: InputBorder.none,
@@ -384,8 +478,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
               counterStyle: TextStyle(
                 color: isDark ? Colors.white60 : Colors.grey.shade600,
               ),
+              suffixIcon: !enabled
+                  ? Icon(
+                      Icons.lock_outline,
+                      color: isDark ? Colors.white30 : Colors.grey.shade400,
+                      size: 18,
+                    )
+                  : null,
             ),
             validator: (value) {
+              if (!enabled) return null; // Skip validation for disabled fields
               if (value == null || value.isEmpty) {
                 return 'This field is required';
               }
@@ -737,21 +839,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
           .eq('uid', userId);
       print('DEBUG: Supabase updated successfully');
 
-      // Update Firestore user document (so profile page shows it)
-      print('DEBUG: Updating Firestore user document...');
-      await FirebaseFirestore.instance.collection('users').doc(userId).update({
-        'photoURL': photoURL,
-        'lastActive': Timestamp.now(),
-      });
-      print('DEBUG: Firestore updated successfully');
-
-      // Update Firebase Auth profile (optional but recommended)
-      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
-      if (firebaseUser != null) {
-        await firebaseUser.updatePhotoURL(photoURL);
-        print('DEBUG: Firebase Auth profile updated');
-      }
-
       // Reload user data
       print('DEBUG: Reloading user data...');
       await authProvider.reloadUserData();
@@ -870,40 +957,72 @@ class _EditProfilePageState extends State<EditProfilePage> {
       return;
     }
 
+    // Show loading indicator
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Text('Saving changes...'),
+            ],
+          ),
+          duration: const Duration(seconds: 10),
+          backgroundColor: Colors.blue,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
+
     try {
-      // Update Supabase user table with all fields
+      // Update Supabase user table with all editable fields
       await Supabase.instance.client
           .from('users')
           .update({
             'display_name': _nameController.text.trim(),
+            'full_name': _nameController.text.trim(), // Also update full_name
             'username': _usernameController.text.trim(),
             'bio': _bioController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'location': _locationController.text.trim(),
+            'website': _websiteController.text.trim(),
             'gender': _selectedGender,
+            'is_private': _isPrivateAccount,
+            'show_activity_status': _showActivityStatus,
+            'allow_messages_from_everyone': _allowMessagesFromEveryone,
             'updated_at': DateTime.now().toIso8601String(),
+            // Note: phone, email, location are disabled and not updated
           })
           .eq('uid', userId);
 
-      // Also update Firestore user table (for backwards compatibility)
-      await FirebaseFirestore.instance.collection('users').doc(userId).update({
-        'displayName': _nameController.text.trim(),
-        'username': _usernameController.text.trim(),
-        'bio': _bioController.text.trim(),
-        'phone': _phoneController.text.trim(),
-        'location': _locationController.text.trim(),
-        'gender': _selectedGender,
-        'lastActive': Timestamp.now(),
-      });
-
-      // Reload user data to reflect changes
+      // Reload user data to reflect changes immediately
       await authProvider.reloadUserData();
 
       if (mounted) {
+        // Dismiss loading indicator
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Profile updated successfully! ✓'),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                const Text('Profile updated successfully!'),
+              ],
+            ),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -911,17 +1030,30 @@ class _EditProfilePageState extends State<EditProfilePage> {
           ),
         );
 
-        // Navigate back after a short delay
-        Future.delayed(const Duration(seconds: 1), () {
+        // Navigate back after a short delay to show success message
+        Future.delayed(const Duration(milliseconds: 1500), () {
           if (mounted) context.pop();
         });
       }
     } catch (e) {
       if (mounted) {
+        // Dismiss loading indicator
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+        // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error updating profile: ${e.toString()}'),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('Error updating profile: ${e.toString()}'),
+                ),
+              ],
+            ),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),

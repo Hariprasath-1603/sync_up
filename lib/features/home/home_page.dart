@@ -25,103 +25,9 @@ class _HomePageState extends State<HomePage> {
   StoryVerseStory? _storyToView;
   ValueNotifier<bool>? _navVisibility;
 
-  // Stories data for the StoryVerse experience
-  final List<StoryVerseStory> _stories = [
-    StoryVerseStory(
-      id: 'story-guy',
-      ownerName: 'Guy Hawkins',
-      ownerAvatar: 'https://picsum.photos/seed/a/150',
-      mood: 'Hyped',
-      timestamp: DateTime.now().subtract(const Duration(minutes: 12)),
-      hasNewContent: true,
-      clips: [
-        StoryVerseClip(
-          id: 'clip-guy-1',
-          mode: StoryVerseMode.video,
-          duration: const Duration(seconds: 12),
-          mood: 'Hyped',
-        ),
-      ],
-      music: const StoryVerseMusicTrack(
-        id: 'track-live',
-        title: 'Midnight Crowd',
-        artist: 'Analog Pulse',
-        artworkUrl:
-            'https://images.unsplash.com/photo-1506157786151-b8491531f063',
-      ),
-    ),
-    StoryVerseStory(
-      id: 'story-robert',
-      ownerName: 'Robert Fox',
-      ownerAvatar: 'https://picsum.photos/seed/b/150',
-      mood: 'Premiere night',
-      timestamp: DateTime.now().subtract(const Duration(hours: 2, minutes: 20)),
-      hasNewContent: true,
-      clips: [
-        StoryVerseClip(
-          id: 'clip-robert-1',
-          mode: StoryVerseMode.photo,
-          duration: const Duration(seconds: 8),
-          mood: 'Cinematic',
-        ),
-        StoryVerseClip(
-          id: 'clip-robert-2',
-          mode: StoryVerseMode.photo,
-          duration: const Duration(seconds: 7),
-          mood: 'Backstage',
-        ),
-      ],
-    ),
-    StoryVerseStory(
-      id: 'story-bessie',
-      ownerName: 'Bessie Cooper',
-      ownerAvatar: 'https://picsum.photos/seed/c/150',
-      mood: 'Travel vibes',
-      timestamp: DateTime.now().subtract(const Duration(hours: 5, minutes: 15)),
-      hasNewContent: false,
-      clips: [
-        StoryVerseClip(
-          id: 'clip-bessie-1',
-          mode: StoryVerseMode.photo,
-          duration: const Duration(seconds: 6),
-          mood: 'Golden hour',
-        ),
-      ],
-    ),
-    StoryVerseStory(
-      id: 'story-jenny',
-      ownerName: 'Jenny Wilson',
-      ownerAvatar: 'https://picsum.photos/seed/j/150',
-      mood: 'New drop',
-      timestamp: DateTime.now().subtract(const Duration(hours: 8)),
-      hasNewContent: true,
-      clips: [
-        StoryVerseClip(
-          id: 'clip-jenny-1',
-          mode: StoryVerseMode.text,
-          duration: const Duration(seconds: 7),
-          caption: 'Swipe up for the latest collection',
-          mood: 'Bold',
-        ),
-      ],
-    ),
-    StoryVerseStory(
-      id: 'story-kristin',
-      ownerName: 'Kristin Watson',
-      ownerAvatar: 'https://picsum.photos/seed/k/150',
-      mood: 'Wellness',
-      timestamp: DateTime.now().subtract(const Duration(hours: 13)),
-      hasNewContent: false,
-      clips: [
-        StoryVerseClip(
-          id: 'clip-kristin-1',
-          mode: StoryVerseMode.layout,
-          duration: const Duration(seconds: 9),
-          mood: 'Calm',
-        ),
-      ],
-    ),
-  ];
+  // Stories data - Load from database
+  // TODO: Implement story loading service
+  final List<StoryVerseStory> _stories = [];
 
   @override
   void initState() {
@@ -131,6 +37,7 @@ class _HomePageState extends State<HomePage> {
       final postProvider = context.read<PostProvider>();
       postProvider.loadForYouPosts();
       postProvider.loadFollowingPosts();
+      // TODO: Load stories from database
     });
   }
 

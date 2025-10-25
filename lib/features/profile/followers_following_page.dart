@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/services/follow_service.dart';
 import '../../core/theme.dart';
 
 class FollowersFollowingPage extends StatefulWidget {
@@ -16,105 +17,12 @@ class FollowersFollowingPage extends StatefulWidget {
 class _FollowersFollowingPageState extends State<FollowersFollowingPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  // Sample followers data
-  final List<Map<String, dynamic>> _followers = [
-    {
-      'name': 'Sarah Wilson',
-      'username': '@sarahwilson',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=1',
-      'isFollowing': true,
-      'isVerified': true,
-    },
-    {
-      'name': 'Mike Johnson',
-      'username': '@mikej',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=2',
-      'isFollowing': false,
-      'isVerified': false,
-    },
-    {
-      'name': 'Emma Davis',
-      'username': '@emmad',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=3',
-      'isFollowing': true,
-      'isVerified': true,
-    },
-    {
-      'name': 'John Smith',
-      'username': '@johnsmith',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=4',
-      'isFollowing': false,
-      'isVerified': false,
-    },
-    {
-      'name': 'Lisa Anderson',
-      'username': '@lisaa',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=5',
-      'isFollowing': true,
-      'isVerified': false,
-    },
-    {
-      'name': 'David Brown',
-      'username': '@davidb',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=6',
-      'isFollowing': true,
-      'isVerified': true,
-    },
-    {
-      'name': 'Sophie Martinez',
-      'username': '@sophiem',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=7',
-      'isFollowing': false,
-      'isVerified': false,
-    },
-    {
-      'name': 'Alex Taylor',
-      'username': '@alextaylor',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=8',
-      'isFollowing': true,
-      'isVerified': true,
-    },
-  ];
-
-  // Sample following data
-  final List<Map<String, dynamic>> _following = [
-    {
-      'name': 'Emma Davis',
-      'username': '@emmad',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=3',
-      'isFollowing': true,
-      'isVerified': true,
-    },
-    {
-      'name': 'Sarah Wilson',
-      'username': '@sarahwilson',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=1',
-      'isFollowing': true,
-      'isVerified': true,
-    },
-    {
-      'name': 'Lisa Anderson',
-      'username': '@lisaa',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=5',
-      'isFollowing': true,
-      'isVerified': false,
-    },
-    {
-      'name': 'David Brown',
-      'username': '@davidb',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=6',
-      'isFollowing': true,
-      'isVerified': true,
-    },
-    {
-      'name': 'Alex Taylor',
-      'username': '@alextaylor',
-      'avatarUrl': 'https://i.pravatar.cc/150?img=8',
-      'isFollowing': true,
-      'isVerified': true,
-    },
-  ];
+  final FollowService _followService = FollowService();
+  
+  List<Map<String, dynamic>> _followers = [];
+  List<Map<String, dynamic>> _following = [];
+  bool _isLoadingFollowers = false;
+  bool _isLoadingFollowing = false;
 
   @override
   void initState() {
@@ -124,6 +32,34 @@ class _FollowersFollowingPageState extends State<FollowersFollowingPage>
       vsync: this,
       initialIndex: widget.initialTab,
     );
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final authProvider = context.read<AuthProvider>();
+    final currentUserId = authProvider.currentUserId;
+    
+    if (currentUserId == null) return;
+
+    setState(() {
+      _isLoadingFollowers = true;
+      _isLoadingFollowing = true;
+    });
+
+    // Load followers and following concurrently
+    final results = await Future.wait([
+      _followService.getFollowers(currentUserId),
+      _followService.getFollowing(currentUserId),
+    ]);
+
+    if (mounted) {
+      setState(() {
+        _followers = results[0];
+        _following = results[1];
+        _isLoadingFollowers = false;
+        _isLoadingFollowing = false;
+      });
+    }
   }
 
   @override
@@ -132,14 +68,20 @@ class _FollowersFollowingPageState extends State<FollowersFollowingPage>
     super.dispose();
   }
 
-  void _toggleFollow(int index, bool isFollowersTab) {
-    setState(() {
-      if (isFollowersTab) {
-        _followers[index]['isFollowing'] = !_followers[index]['isFollowing'];
-      } else {
-        _following[index]['isFollowing'] = !_following[index]['isFollowing'];
-      }
-    });
+  Future<void> _toggleFollow(String targetUserId, bool isCurrentlyFollowing) async {
+    final authProvider = context.read<AuthProvider>();
+    final currentUserId = authProvider.currentUserId;
+    
+    if (currentUserId == null) return;
+
+    if (isCurrentlyFollowing) {
+      await _followService.unfollowUser(currentUserId, targetUserId);
+    } else {
+      await _followService.followUser(currentUserId, targetUserId);
+    }
+
+    // Reload data to reflect changes
+    _loadData();
   }
 
   @override
@@ -286,8 +228,12 @@ class _FollowersFollowingPageState extends State<FollowersFollowingPage>
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildUserList(_followers, true, isDark),
-                    _buildUserList(_following, false, isDark),
+                    _isLoadingFollowers 
+                        ? const Center(child: CircularProgressIndicator())
+                        : _buildUserList(_followers, true, isDark),
+                    _isLoadingFollowing
+                        ? const Center(child: CircularProgressIndicator())
+                        : _buildUserList(_following, false, isDark),
                   ],
                 ),
               ),
@@ -399,8 +345,13 @@ class _FollowersFollowingPageState extends State<FollowersFollowingPage>
                     ),
                     // Follow/Following button
                     _buildFollowButton(
-                      user['isFollowing'],
-                      () => _toggleFollow(index, isFollowersTab),
+                      user['isFollowing'] ?? false,
+                      () {
+                        final userId = user['uid'] as String?;
+                        if (userId != null) {
+                          _toggleFollow(userId, user['isFollowing'] ?? false);
+                        }
+                      },
                       isDark,
                     ),
                   ],
