@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "792629822847",
+    "firebase_url": "https://syncup-social-app-2025-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "syncup-social-app-2025",
+    "storage_bucket": "syncup-social-app-2025.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:792629822847:android:94573d2c80018eafed864a",
+        "android_client_info": {
+          "package_name": "com.example.sync_up"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "792629822847-38sj0tgv1kg3uj4kdme44q5e8lkao37l.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.sync_up",
+            "certificate_hash": "faf9443332ee4ce8c1d19fb380954235b828a040"
+          }
+        },
+        {
+          "client_id": "792629822847-9n8v8dn8pbdnmn5njp17r6seld6bd4lv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5j4AHJnHyBUjHMSXVNxPQb-eG2JaZ-cY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "792629822847-9n8v8dn8pbdnmn5njp17r6seld6bd4lv.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "792629822847-o78s1pbpqtkr29olvi674h4ndmbs8bnm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.syncUp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

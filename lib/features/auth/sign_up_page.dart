@@ -196,12 +196,92 @@ class _SignUpPageState extends State<SignUpPage> {
 
         // Create user account with email and password, and send email OTP for verification
         print('DEBUG: Creating user account with email and password...');
-        final authResponse = await Supabase.instance.client.auth.signUp(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-          data: userMetadata, // Attach user metadata
-          emailRedirectTo: null,
-        );
+
+        AuthResponse? authResponse;
+        try {
+          authResponse = await Supabase.instance.client.auth.signUp(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+            data: userMetadata, // Attach user metadata
+            emailRedirectTo: null,
+          );
+        } on AuthException catch (signupError) {
+          // If user already exists but email not confirmed, resend OTP
+          if (signupError.message.contains('already registered') ||
+              signupError.message.contains('User already registered')) {
+            print('⚠️ ZOMBIE USER DETECTED: Email already registered in auth');
+            print('🔄 Attempting to sign in and resend OTP...');
+
+            try {
+              // Try to sign in the user first (they might have a password)
+              final signInResponse = await Supabase.instance.client.auth
+                  .signInWithPassword(
+                    email: _emailController.text.trim(),
+                    password: _passwordController.text.trim(),
+                  );
+
+              if (signInResponse.user != null) {
+                print('✅ Zombie user signed in successfully');
+
+                // Check if user exists in database
+                final dbUser = await Supabase.instance.client
+                    .from('users')
+                    .select('uid, username')
+                    .eq('uid', signInResponse.user!.id)
+                    .maybeSingle();
+
+                if (dbUser == null) {
+                  print(
+                    '⚠️ User in auth but NOT in database - zombie user confirmed',
+                  );
+                  print(
+                    '🔄 Redirecting to OTP verification to complete signup...',
+                  );
+
+                  // Navigate to OTP verification to complete the signup process
+                  if (!mounted) return;
+                  context.go(
+                    '/otp-verification?email=${Uri.encodeComponent(_emailController.text.trim())}&phone=${Uri.encodeComponent(phoneNumber)}',
+                  );
+                  return;
+                } else {
+                  print(
+                    '✅ User exists in both auth and database - fully registered',
+                  );
+                  throw AuthException(
+                    'This email is already registered and verified. Please sign in instead.',
+                  );
+                }
+              }
+            } catch (signInError) {
+              print('❌ Failed to sign in zombie user: $signInError');
+
+              // If sign in fails, try to resend OTP
+              try {
+                await Supabase.instance.client.auth.resend(
+                  type: OtpType.signup,
+                  email: _emailController.text.trim(),
+                );
+
+                print('✅ OTP resent to existing user');
+
+                if (!mounted) return;
+
+                // Navigate to OTP verification with existing user
+                context.go(
+                  '/otp-verification?email=${Uri.encodeComponent(_emailController.text.trim())}&phone=${Uri.encodeComponent(phoneNumber)}',
+                );
+                return;
+              } catch (resendError) {
+                print('❌ Failed to resend OTP: $resendError');
+                throw AuthException(
+                  'This email is already registered. Please try signing in or use password reset.',
+                );
+              }
+            }
+          }
+          rethrow; // Re-throw other auth exceptions
+        }
 
         if (authResponse.user == null) {
           throw Exception('Failed to create user account');

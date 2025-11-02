@@ -63,7 +63,10 @@ class OnboardingBottomBar extends StatelessWidget {
             width: 120, // Adjust width as needed for "Get Started"
             child: FilledButton(
               style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),

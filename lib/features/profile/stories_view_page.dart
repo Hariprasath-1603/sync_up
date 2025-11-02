@@ -11,69 +11,8 @@ class StoriesViewPage extends StatefulWidget {
 }
 
 class _StoriesViewPageState extends State<StoriesViewPage> {
-  // Extended stories list (without "Add" button)
-  final List<Map<String, dynamic>> _allStories = [
-    {
-      'title': 'Travel',
-      'url': 'https://picsum.photos/seed/s1/200',
-      'date': '2 days ago',
-      'views': 234,
-    },
-    {
-      'title': 'Food',
-      'url': 'https://picsum.photos/seed/s2/200',
-      'date': '5 days ago',
-      'views': 456,
-    },
-    {
-      'title': 'Friends',
-      'url': 'https://picsum.photos/seed/s3/200',
-      'date': '1 week ago',
-      'views': 789,
-    },
-    {
-      'title': 'Hangout',
-      'url': 'https://picsum.photos/seed/s4/200',
-      'date': '1 week ago',
-      'views': 321,
-    },
-    {
-      'title': 'Workout',
-      'url': 'https://picsum.photos/seed/s5/200',
-      'date': '2 weeks ago',
-      'views': 567,
-    },
-    {
-      'title': 'Nature',
-      'url': 'https://picsum.photos/seed/s6/200',
-      'date': '2 weeks ago',
-      'views': 890,
-    },
-    {
-      'title': 'Party',
-      'url': 'https://picsum.photos/seed/s7/200',
-      'date': '3 weeks ago',
-      'views': 1234,
-    },
-    {
-      'title': 'Beach',
-      'url': 'https://picsum.photos/seed/s8/200',
-      'date': '3 weeks ago',
-      'views': 678,
-    },
-    {
-      'title': 'Concert',
-      'url': 'https://picsum.photos/seed/s9/200',
-      'date': '1 month ago',
-      'views': 2345,
-    },
-    {
-      'title': 'Family',
-      'url': 'https://picsum.photos/seed/s10/200',
-      'date': '1 month ago',
-      'views': 543,
-    },
-  ];
+  // Stories will be loaded from database - TODO: Implement story fetching
+  final List<Map<String, dynamic>> _allStories = [];
 
   @override
   Widget build(BuildContext context) {

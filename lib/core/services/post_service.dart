@@ -55,10 +55,13 @@ class PostService {
     try {
       final bytes = await file.readAsBytes();
       final fileExt = file.path.split('.').last;
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${userId}.$fileExt';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_$userId.$fileExt';
       final filePath = '$userId/$fileName';
 
-      await _supabase.storage.from('posts').uploadBinary(
+      await _supabase.storage
+          .from('posts')
+          .uploadBinary(
             filePath,
             bytes,
             fileOptions: FileOptions(
@@ -67,7 +70,7 @@ class PostService {
           );
 
       final publicUrl = _supabase.storage.from('posts').getPublicUrl(filePath);
-      
+
       print('✅ Media uploaded successfully: $publicUrl');
       return publicUrl;
     } catch (e) {
@@ -77,7 +80,10 @@ class PostService {
   }
 
   /// Get posts for user feed (following + recommended)
-  Future<List<Map<String, dynamic>>> getFeedPosts(String userId, {int limit = 20}) async {
+  Future<List<Map<String, dynamic>>> getFeedPosts(
+    String userId, {
+    int limit = 20,
+  }) async {
     try {
       // Get user's following list
       final followingResult = await _supabase
@@ -196,7 +202,10 @@ class PostService {
       });
 
       // Increment like count
-      await _supabase.rpc('increment_post_likes', params: {'post_id_input': postId});
+      await _supabase.rpc(
+        'increment_post_likes',
+        params: {'post_id_input': postId},
+      );
 
       return true;
     } catch (e) {
@@ -218,7 +227,10 @@ class PostService {
           .eq('user_id', currentUserId);
 
       // Decrement like count
-      await _supabase.rpc('decrement_post_likes', params: {'post_id_input': postId});
+      await _supabase.rpc(
+        'decrement_post_likes',
+        params: {'post_id_input': postId},
+      );
 
       return true;
     } catch (e) {
@@ -348,4 +360,3 @@ class PostService {
     }
   }
 }
-

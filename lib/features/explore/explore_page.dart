@@ -1,11 +1,14 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme.dart';
-import '../../core/scaffold_with_nav_bar.dart';
-import '../profile/pages/post_viewer_instagram_style.dart';
-import '../profile/models/post_model.dart' as profile_post;
+import 'search_page.dart';
+import '../profile/models/post_model.dart';
+import '../profile/pages/post_viewer_page_v2.dart';
 import '../reels/reels_page_new.dart';
-import 'explore_search_page.dart';
+import '../profile/other_user_profile_page.dart';
+
+enum ContentFilter { all, posts, reels, people }
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
@@ -16,15 +19,36 @@ class ExplorePage extends StatefulWidget {
 
 class _ExplorePageState extends State<ExplorePage>
     with SingleTickerProviderStateMixin {
-  String? _selectedCategory;
-  IconData? _selectedCategoryIcon;
-  Color? _selectedCategoryColor;
   late TabController _tabController;
+  final SupabaseClient _supabase = Supabase.instance.client;
+
+  List<Map<String, dynamic>> _posts = [];
+  List<Map<String, dynamic>> _reels = [];
+  List<Map<String, dynamic>> _people = [];
+  bool _isLoadingPosts = true;
+  bool _isLoadingReels = true;
+  bool _isLoadingPeople = true;
+  int _selectedCategory = 0;
+  ContentFilter _selectedFilter = ContentFilter.all;
+
+  final List<Map<String, dynamic>> _categories = [
+    {'icon': Icons.explore_rounded, 'label': 'All'},
+    {'icon': Icons.trending_up_rounded, 'label': 'Trending'},
+    {'icon': Icons.people_rounded, 'label': 'People'},
+    {'icon': Icons.photo_camera_rounded, 'label': 'Photography'},
+    {'icon': Icons.sports_basketball_rounded, 'label': 'Sports'},
+    {'icon': Icons.palette_rounded, 'label': 'Art'},
+    {'icon': Icons.travel_explore_rounded, 'label': 'Travel'},
+    {'icon': Icons.restaurant_rounded, 'label': 'Food'},
+  ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadPosts();
+    _loadReels();
+    _loadPeople();
   }
 
   @override
@@ -33,907 +57,447 @@ class _ExplorePageState extends State<ExplorePage>
     super.dispose();
   }
 
-  void _onCategorySelected(String? category, IconData? icon, Color? color) {
-    setState(() {
-      _selectedCategory = category;
-      _selectedCategoryIcon = icon;
-      _selectedCategoryColor = color;
-    });
+  Future<void> _loadPosts() async {
+    try {
+      setState(() => _isLoadingPosts = true);
+
+      final currentUserId = _supabase.auth.currentUser?.id;
+      if (currentUserId == null) {
+        setState(() => _isLoadingPosts = false);
+        return;
+      }
+
+      final result = await _supabase
+          .from('posts')
+          .select('id, media_urls, likes_count, comments_count, type, user_id')
+          .eq('type', 'image')
+          .order('likes_count', ascending: false)
+          .limit(30);
+
+      final posts = (result as List)
+          .map((post) {
+            final mediaUrls = post['media_urls'] != null
+                ? List<String>.from(post['media_urls'])
+                : <String>[];
+
+            // Filter out placeholder URLs
+            final validMediaUrls = mediaUrls.where((url) {
+              return !url.contains('picsum.photos') &&
+                  !url.contains('placeholder.com') &&
+                  !url.contains('pravatar.cc') &&
+                  url.isNotEmpty;
+            }).toList();
+
+            return {
+              'id': post['id'],
+              'user_id': post['user_id'],
+              'imageUrl': validMediaUrls.isNotEmpty ? validMediaUrls.first : '',
+              'likes': post['likes_count'] ?? 0,
+              'comments': post['comments_count'] ?? 0,
+              'type': 'post',
+            };
+          })
+          .where((post) => post['imageUrl'].toString().isNotEmpty)
+          .toList();
+
+      setState(() {
+        _posts = posts;
+        _isLoadingPosts = false;
+      });
+    } catch (e) {
+      print('Error loading posts: $e');
+      setState(() => _isLoadingPosts = false);
+    }
   }
 
-  // Category posts data
-  final Map<String, List<Map<String, String>>> _categoryPosts = {
-    'Trending': [
-      {
-        'imageUrl': 'https://picsum.photos/seed/trend1/600/800',
-        'likes': '245K',
-        'comments': '1.2K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/trend2/600/800',
-        'likes': '189K',
-        'comments': '856',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/trend3/600/800',
-        'likes': '312K',
-        'comments': '2.1K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/trend4/600/800',
-        'likes': '428K',
-        'comments': '3.5K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/trend5/600/800',
-        'likes': '156K',
-        'comments': '942',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/trend6/600/800',
-        'likes': '278K',
-        'comments': '1.8K',
-      },
-    ],
-    'Music': [
-      {
-        'imageUrl': 'https://picsum.photos/seed/music1/600/800',
-        'likes': '167K',
-        'comments': '723',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/music2/600/800',
-        'likes': '234K',
-        'comments': '1.4K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/music3/600/800',
-        'likes': '189K',
-        'comments': '892',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/music4/600/800',
-        'likes': '312K',
-        'comments': '2.3K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/music5/600/800',
-        'likes': '145K',
-        'comments': '634',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/music6/600/800',
-        'likes': '298K',
-        'comments': '1.9K',
-      },
-    ],
-    'Learn': [
-      {
-        'imageUrl': 'https://picsum.photos/seed/learn1/600/800',
-        'likes': '123K',
-        'comments': '567',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/learn2/600/800',
-        'likes': '198K',
-        'comments': '1.1K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/learn3/600/800',
-        'likes': '145K',
-        'comments': '732',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/learn4/600/800',
-        'likes': '267K',
-        'comments': '1.7K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/learn5/600/800',
-        'likes': '112K',
-        'comments': '489',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/learn6/600/800',
-        'likes': '223K',
-        'comments': '1.3K',
-      },
-    ],
-    'Gaming': [
-      {
-        'imageUrl': 'https://picsum.photos/seed/game1/600/800',
-        'likes': '334K',
-        'comments': '2.4K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/game2/600/800',
-        'likes': '289K',
-        'comments': '1.9K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/game3/600/800',
-        'likes': '412K',
-        'comments': '3.1K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/game4/600/800',
-        'likes': '156K',
-        'comments': '876',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/game5/600/800',
-        'likes': '298K',
-        'comments': '2.2K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/game6/600/800',
-        'likes': '378K',
-        'comments': '2.8K',
-      },
-    ],
-    'Sports': [
-      {
-        'imageUrl': 'https://picsum.photos/seed/sport1/600/800',
-        'likes': '445K',
-        'comments': '3.2K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/sport2/600/800',
-        'likes': '289K',
-        'comments': '1.8K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/sport3/600/800',
-        'likes': '367K',
-        'comments': '2.5K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/sport4/600/800',
-        'likes': '198K',
-        'comments': '1.1K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/sport5/600/800',
-        'likes': '423K',
-        'comments': '3.4K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/sport6/600/800',
-        'likes': '312K',
-        'comments': '2.3K',
-      },
-    ],
-    'Fashion': [
-      {
-        'imageUrl': 'https://picsum.photos/seed/fashion1/600/800',
-        'likes': '256K',
-        'comments': '1.5K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/fashion2/600/800',
-        'likes': '334K',
-        'comments': '2.1K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/fashion3/600/800',
-        'likes': '189K',
-        'comments': '967',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/fashion4/600/800',
-        'likes': '412K',
-        'comments': '3.0K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/fashion5/600/800',
-        'likes': '223K',
-        'comments': '1.3K',
-      },
-      {
-        'imageUrl': 'https://picsum.photos/seed/fashion6/600/800',
-        'likes': '367K',
-        'comments': '2.6K',
-      },
-    ],
-  };
+  Future<void> _loadReels() async {
+    try {
+      setState(() => _isLoadingReels = true);
+
+      final currentUserId = _supabase.auth.currentUser?.id;
+      if (currentUserId == null) {
+        setState(() => _isLoadingReels = false);
+        return;
+      }
+
+      final result = await _supabase
+          .from('posts')
+          .select(
+            'id, media_urls, thumbnail_url, likes_count, views_count, user_id',
+          )
+          .eq('type', 'reel')
+          .order('views_count', ascending: false)
+          .limit(30);
+
+      final reels = (result as List)
+          .map((post) {
+            final mediaUrls = post['media_urls'] != null
+                ? List<String>.from(post['media_urls'])
+                : <String>[];
+
+            // Filter out placeholder URLs
+            final validMediaUrls = mediaUrls.where((url) {
+              return !url.contains('picsum.photos') &&
+                  !url.contains('placeholder.com') &&
+                  !url.contains('pravatar.cc') &&
+                  url.isNotEmpty;
+            }).toList();
+
+            final thumbnailUrl =
+                post['thumbnail_url'] ??
+                (validMediaUrls.isNotEmpty ? validMediaUrls.first : '');
+            return {
+              'id': post['id'],
+              'user_id': post['user_id'],
+              'imageUrl': thumbnailUrl,
+              'videoUrl': validMediaUrls.isNotEmpty ? validMediaUrls.first : '',
+              'likes': post['likes_count'] ?? 0,
+              'views': post['views_count'] ?? 0,
+              'type': 'reel',
+            };
+          })
+          .where((reel) => reel['imageUrl'].toString().isNotEmpty)
+          .toList();
+
+      setState(() {
+        _reels = reels;
+        _isLoadingReels = false;
+      });
+    } catch (e) {
+      print('Error loading reels: $e');
+      setState(() => _isLoadingReels = false);
+    }
+  }
+
+  Future<void> _loadPeople() async {
+    try {
+      setState(() => _isLoadingPeople = true);
+
+      final currentUserId = _supabase.auth.currentUser?.id;
+      if (currentUserId == null) {
+        setState(() => _isLoadingPeople = false);
+        return;
+      }
+
+      final result = await _supabase
+          .from('users')
+          .select(
+            'uid, username, username_display, display_name, full_name, photo_url, followers_count',
+          )
+          .neq('uid', currentUserId)
+          .order('followers_count', ascending: false)
+          .limit(30);
+
+      final people = (result as List).map((user) {
+        return {
+          'id': user['uid'],
+          'username':
+              user['username_display'] ??
+              user['display_name'] ??
+              user['username'],
+          'fullName': user['full_name'],
+          'avatar': user['photo_url'] ?? '',
+          'followers': user['followers_count'] ?? 0,
+          'type': 'user',
+        };
+      }).toList();
+
+      setState(() {
+        _people = people;
+        _isLoadingPeople = false;
+      });
+    } catch (e) {
+      print('Error loading people: $e');
+      setState(() => _isLoadingPeople = false);
+    }
+  }
+
+  String _formatCount(int count) {
+    if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    } else if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    }
+    return count.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? [
-                  const Color(0xFF0B0E13),
-                  const Color(0xFF1A1D29),
-                  const Color(0xFF0B0E13),
-                ]
-              : [
-                  const Color(0xFFF6F7FB),
-                  const Color(0xFFE8ECFF),
-                  const Color(0xFFF6F7FB),
-                ],
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      backgroundColor: isDark ? kDarkBackground : kLightBackground,
+      appBar: _buildGlassAppBar(isDark),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? [
+                    kDarkBackground,
+                    kDarkBackground.withOpacity(0.95),
+                    const Color(0xFF1a1a2e),
+                  ]
+                : [
+                    kLightBackground,
+                    Colors.blue.shade50.withOpacity(0.3),
+                    Colors.purple.shade50.withOpacity(0.3),
+                  ],
+          ),
         ),
-      ),
-      child: SafeArea(
-        child: _selectedCategory == null
-            ? CustomScrollView(
-                slivers: [
-                  // Modern Hero Header with Glass Effect
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Hero Title with Gradient
-                          ShaderMask(
-                            shaderCallback: (bounds) => LinearGradient(
-                              colors: [kPrimary, Colors.purple, Colors.blue],
-                            ).createShader(bounds),
-                            child: Text(
-                              'Explore',
-                              style: TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                letterSpacing: -1,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Discover amazing content',
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: isDark ? Colors.white60 : Colors.black54,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          const _SearchBar(),
-                          const SizedBox(height: 16),
-                          _CategoryChips(
-                            onCategorySelected: _onCategorySelected,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Featured Card with Glass Effect
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: _FeaturedCard(isDark: isDark),
-                    ),
-                  ),
-
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
-                      child: _SectionTitle(title: 'Trending Videos'),
-                    ),
-                  ),
-                  const _TrendingVideoGrid(),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
-                      child: _SectionTitle(title: 'Explore More'),
-                    ),
-                  ),
-                  const _ExploreGrid(),
-                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                ],
-              )
-            : _buildCategoryView(isDark),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 8),
+              _buildCategoryChips(isDark),
+              const SizedBox(height: 12),
+              _buildFilterBar(isDark),
+              const SizedBox(height: 12),
+              Expanded(child: _buildFilteredContent(isDark)),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildCategoryView(bool isDark) {
-    final posts = _categoryPosts[_selectedCategory] ?? [];
-    final reels = posts; // Using same data for reels demonstration
-
-    return Column(
-      children: [
-        // Header with back button and category info
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              IconButton(
-                icon: Icon(
-                  Icons.arrow_back_rounded,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-                onPressed: () => _onCategorySelected(null, null, null),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _selectedCategoryColor?.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  _selectedCategoryIcon,
-                  color: _selectedCategoryColor,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                _selectedCategory!,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Tabs with glassmorphic design
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: Container(
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isDark
-                        ? [
-                            Colors.white.withOpacity(0.15),
-                            Colors.white.withOpacity(0.08),
-                          ]
-                        : [
-                            Colors.white.withOpacity(0.9),
-                            Colors.white.withOpacity(0.7),
-                          ],
-                  ),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: isDark
-                        ? Colors.white.withOpacity(0.2)
-                        : Colors.white.withOpacity(0.6),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isDark
-                          ? Colors.black.withOpacity(0.3)
-                          : Colors.grey.withOpacity(0.2),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: TabBar(
-                  controller: _tabController,
-                  indicator: BoxDecoration(
-                    borderRadius: BorderRadius.circular(28),
-                    gradient: LinearGradient(
-                      colors: [kPrimary, kPrimary.withOpacity(0.8)],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: kPrimary.withOpacity(0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  dividerColor: Colors.transparent,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: isDark
-                      ? Colors.white70
-                      : Colors.black54,
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    letterSpacing: 0.5,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                  ),
-                  padding: const EdgeInsets.all(4),
-                  tabs: [
-                    Tab(text: '${posts.length} Posts'),
-                    Tab(text: '${reels.length} Reels'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        // Content
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              // Posts Grid
-              GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 4,
-                  mainAxisSpacing: 4,
-                  childAspectRatio: 0.75,
-                ),
-                itemCount: posts.length,
-                itemBuilder: (context, index) {
-                  final post = posts[index];
-                  return _CategoryPostCard(
-                    imageUrl: post['imageUrl']!,
-                    likes: post['likes']!,
-                    comments: post['comments']!,
-                  );
-                },
-              ),
-              // Reels Grid
-              GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 4,
-                  mainAxisSpacing: 4,
-                  childAspectRatio: 0.75,
-                ),
-                itemCount: posts.length,
-                itemBuilder: (context, index) {
-                  final post = posts[index];
-                  return _CategoryPostCard(
-                    imageUrl: post['imageUrl']!,
-                    likes: post['likes']!,
-                    comments: post['comments']!,
-                    isReel: true,
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// --- Helper Widgets for ExplorePage ---
-
-// Featured Card Widget with Glass Effect
-class _FeaturedCard extends StatelessWidget {
-  const _FeaturedCard({required this.isDark});
-
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-        child: Container(
-          height: 160,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDark
-                  ? [
-                      kPrimary.withOpacity(0.3),
-                      Colors.purple.withOpacity(0.2),
-                      Colors.blue.withOpacity(0.15),
-                    ]
-                  : [
-                      kPrimary.withOpacity(0.15),
-                      Colors.purple.withOpacity(0.1),
-                      Colors.blue.withOpacity(0.08),
-                    ],
-            ),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
+  PreferredSizeWidget _buildGlassAppBar(bool isDark) {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(70),
+      child: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Container(
+            decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withOpacity(0.2)
-                  : Colors.white.withOpacity(0.5),
-              width: 1.5,
+                  ? Colors.black.withOpacity(0.3)
+                  : Colors.white.withOpacity(0.3),
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.1)
+                      : Colors.black.withOpacity(0.05),
+                  width: 0.5,
+                ),
+              ),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: kPrimary.withOpacity(0.2),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              // Decorative circles
-              Positioned(
-                top: -30,
-                right: -30,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [kPrimary.withOpacity(0.3), Colors.transparent],
-                    ),
-                  ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
                 ),
-              ),
-              Positioned(
-                bottom: -20,
-                left: -20,
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        Colors.purple.withOpacity(0.3),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(24.0),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: kPrimary.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: kPrimary.withOpacity(0.3),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.local_fire_department,
-                                      color: kPrimary,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'HOT',
-                                      style: TextStyle(
-                                        color: kPrimary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'What\'s Trending',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Check out the hottest content right now',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDark ? Colors.white70 : Colors.black54,
-                            ),
-                          ),
-                        ],
-                      ),
+                    Expanded(child: _buildGlassSearchBar(isDark)),
+                    const SizedBox(width: 12),
+                    _buildGlassIconButton(
+                      Icons.qr_code_scanner_rounded,
+                      isDark,
                     ),
-                    const SizedBox(width: 16),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            kPrimary.withOpacity(0.8),
-                            kPrimary.withOpacity(0.6),
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: kPrimary.withOpacity(0.4),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.trending_up_rounded,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                    ),
+                    const SizedBox(width: 8),
+                    _buildGlassIconButton(Icons.tune_rounded, isDark),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
-}
 
-// Section Title Widget
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 24,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [kPrimary, Colors.purple],
-            ),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black87,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SearchBar extends StatelessWidget {
-  const _SearchBar();
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildGlassSearchBar(bool isDark) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const ExploreSearchPage()),
+          MaterialPageRoute(builder: (context) => const SearchPage()),
         );
       },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? [
-                        Colors.white.withOpacity(0.15),
-                        Colors.white.withOpacity(0.08),
-                      ]
-                    : [
-                        Colors.white.withOpacity(0.9),
-                        Colors.white.withOpacity(0.7),
-                      ],
-              ),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withOpacity(0.25)
-                    : Colors.white.withOpacity(0.6),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: isDark
-                      ? Colors.black.withOpacity(0.3)
-                      : Colors.grey.withOpacity(0.2),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.search_rounded,
-                  color: isDark
-                      ? Colors.white70
-                      : Colors.black.withOpacity(0.6),
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Search Syncup',
-                    style: TextStyle(
-                      color: isDark
-                          ? Colors.white60
-                          : Colors.black.withOpacity(0.5),
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                Icon(
-                  Icons.mic_rounded,
-                  color: isDark
-                      ? Colors.white60
-                      : Colors.black.withOpacity(0.5),
-                  size: 22,
-                ),
-              ],
-            ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? [
+                    Colors.white.withOpacity(0.08),
+                    Colors.white.withOpacity(0.05),
+                  ]
+                : [
+                    Colors.black.withOpacity(0.05),
+                    Colors.black.withOpacity(0.02),
+                  ],
           ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.15)
+                : Colors.black.withOpacity(0.08),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withOpacity(0.2)
+                  : Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.search_rounded,
+              color: isDark ? Colors.white70 : Colors.black54,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Search',
+                style: TextStyle(
+                  color: isDark ? Colors.white60 : Colors.black45,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
-}
 
-class _CategoryChips extends StatelessWidget {
-  const _CategoryChips({required this.onCategorySelected});
-
-  final void Function(String?, IconData?, Color?) onCategorySelected;
-
-  final List<Map<String, dynamic>> categories = const [
-    {
-      'label': 'Trending',
-      'icon': Icons.local_fire_department,
-      'color': Colors.redAccent,
-    },
-    {'label': 'Music', 'icon': Icons.music_note, 'color': Colors.blueAccent},
-    {'label': 'Learn', 'icon': Icons.lightbulb, 'color': Colors.orangeAccent},
-    {'label': 'Gaming', 'icon': Icons.gamepad, 'color': Colors.greenAccent},
-    {
-      'label': 'Sports',
-      'icon': Icons.sports_basketball,
-      'color': Colors.purpleAccent,
-    },
-    {'label': 'Fashion', 'icon': Icons.checkroom, 'color': Colors.pinkAccent},
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return SizedBox(
-      height: 50,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 0),
-        itemCount: categories.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final category = categories[index];
-          return GestureDetector(
-            onTap: () {
-              onCategorySelected(
-                category['label'],
-                category['icon'],
-                category['color'],
-              );
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: (category['color'] as Color).withOpacity(0.2),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
+  Widget _buildGlassIconButton(IconData icon, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [Colors.white.withOpacity(0.08), Colors.white.withOpacity(0.05)]
+              : [
+                  Colors.black.withOpacity(0.05),
+                  Colors.black.withOpacity(0.02),
                 ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: isDark
-                            ? [
-                                Colors.white.withOpacity(0.15),
-                                Colors.white.withOpacity(0.08),
-                              ]
-                            : [
-                                Colors.white.withOpacity(0.9),
-                                Colors.white.withOpacity(0.7),
-                              ],
-                      ),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                        color: isDark
-                            ? Colors.white.withOpacity(0.25)
-                            : Colors.white.withOpacity(0.6),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: (category['color'] as Color).withOpacity(
-                              0.2,
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            category['icon'],
-                            color: category['color'],
-                            size: 18,
-                          ),
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.15)
+              : Colors.black.withOpacity(0.08),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withOpacity(0.2)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Icon(icon, color: kPrimary, size: 22),
+    );
+  }
+
+  Widget _buildCategoryChips(bool isDark) {
+    return SizedBox(
+      height: 45,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _categories.length,
+        itemBuilder: (context, index) {
+          final category = _categories[index];
+          final isSelected = _selectedCategory == index;
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedCategory = index),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  gradient: isSelected
+                      ? LinearGradient(
+                          colors: [kPrimary, kPrimary.withOpacity(0.8)],
+                        )
+                      : LinearGradient(
+                          colors: isDark
+                              ? [
+                                  Colors.white.withOpacity(0.08),
+                                  Colors.white.withOpacity(0.05),
+                                ]
+                              : [
+                                  Colors.black.withOpacity(0.05),
+                                  Colors.black.withOpacity(0.02),
+                                ],
                         ),
-                        const SizedBox(width: 10),
-                        Text(
-                          category['label'],
-                          style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black87,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected
+                        ? kPrimary.withOpacity(0.5)
+                        : isDark
+                        ? Colors.white.withOpacity(0.12)
+                        : Colors.black.withOpacity(0.08),
+                    width: isSelected ? 1.5 : 1,
                   ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: kPrimary.withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : [
+                          BoxShadow(
+                            color: isDark
+                                ? Colors.black.withOpacity(0.2)
+                                : Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      category['icon'] as IconData,
+                      size: 18,
+                      color: isSelected
+                          ? Colors.white
+                          : isDark
+                          ? Colors.white70
+                          : Colors.black54,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      category['label'] as String,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: isSelected
+                            ? Colors.white
+                            : isDark
+                            ? Colors.white70
+                            : Colors.black54,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -942,214 +506,116 @@ class _CategoryChips extends StatelessWidget {
       ),
     );
   }
-}
 
-class _TrendingVideoGrid extends StatelessWidget {
-  const _TrendingVideoGrid();
+  Widget _buildFilterBar(bool isDark) {
+    final filters = [
+      {
+        'value': ContentFilter.all,
+        'label': 'All',
+        'icon': Icons.explore_rounded,
+      },
+      {
+        'value': ContentFilter.posts,
+        'label': 'Posts',
+        'icon': Icons.grid_on_rounded,
+      },
+      {
+        'value': ContentFilter.reels,
+        'label': 'Reels',
+        'icon': Icons.play_circle_rounded,
+      },
+      {
+        'value': ContentFilter.people,
+        'label': 'People',
+        'icon': Icons.people_rounded,
+      },
+    ];
 
-  final List<Map<String, String>> trendingVideos = const [
-    {
-      'imageUrl': 'https://picsum.photos/seed/trending1/400/600',
-      'title': 'Create a 3D Scene from a ...',
-      'userName': 'maria.roze',
-      'userAvatarUrl': 'https://i.pravatar.cc/100?img=1',
-    },
-    {
-      'imageUrl': 'https://picsum.photos/seed/trending2/400/600',
-      'title': 'Apple event, Macbook pro',
-      'userName': 'andokkk2',
-      'userAvatarUrl': 'https://i.pravatar.cc/100?img=2',
-    },
-    {
-      'imageUrl': 'https://picsum.photos/seed/trending3/400/600',
-      'title': 'Designing the future of UI',
-      'userName': 'jason.designer',
-      'userAvatarUrl': 'https://i.pravatar.cc/100?img=3',
-    },
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: SizedBox(
-        height: 250, // Height for the horizontal list
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: trendingVideos.length,
-          separatorBuilder: (context, index) => const SizedBox(width: 16),
-          itemBuilder: (context, index) {
-            final video = trendingVideos[index];
-            return _VideoCard(
-              imageUrl: video['imageUrl']!,
-              title: video['title']!,
-              userName: video['userName']!,
-              userAvatarUrl: video['userAvatarUrl']!,
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _ExploreGrid extends StatelessWidget {
-  const _ExploreGrid();
-
-  final List<String> exploreImages = const [
-    'https://picsum.photos/seed/explore1/400/400',
-    'https://picsum.photos/seed/explore2/400/400',
-    'https://picsum.photos/seed/explore3/400/400',
-    'https://picsum.photos/seed/explore4/400/400',
-    'https://picsum.photos/seed/explore5/400/400',
-    'https://picsum.photos/seed/explore6/400/400',
-  ];
-
-  void _openPostViewer(BuildContext context, String imageUrl) {
-    final navVisibility = NavBarVisibilityScope.maybeOf(context);
-    navVisibility?.value = false;
-
-    // Create a mock post model
-    final post = profile_post.PostModel(
-      id: imageUrl,
-      userId: 'explorer_user', // Demo user ID
-      type: profile_post.PostType.image,
-      mediaUrls: [imageUrl],
-      thumbnailUrl: imageUrl,
-      username: '@explorer', // demo placeholder; real data comes from posts
-      userAvatar: 'https://i.pravatar.cc/150?img=10',
-      timestamp: DateTime.now(),
-      caption: 'Explore post',
-      likes: 1234,
-      comments: 56,
-      shares: 10,
-      views: 10000,
-    );
-
-    Navigator.of(context)
-        .push(
-          MaterialPageRoute(
-            builder: (context) =>
-                PostViewerInstagramStyle(initialPost: post, allPosts: [post]),
-          ),
-        )
-        .whenComplete(() {
-          navVisibility?.value = true;
-        });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 0.85,
-        ),
-        delegate: SliverChildBuilderDelegate((context, index) {
-          return GestureDetector(
-            onTap: () => _openPostViewer(context, exploreImages[index]),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: kPrimary.withOpacity(0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [Colors.white.withOpacity(0.08), Colors.white.withOpacity(0.05)]
+              : [
+                  Colors.black.withOpacity(0.05),
+                  Colors.black.withOpacity(0.02),
                 ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Stack(
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.15)
+              : Colors.black.withOpacity(0.08),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withOpacity(0.2)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: filters.map((filter) {
+          final isSelected = _selectedFilter == filter['value'];
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedFilter = filter['value'] as ContentFilter;
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: isSelected
+                      ? LinearGradient(
+                          colors: [kPrimary, kPrimary.withOpacity(0.8)],
+                        )
+                      : null,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: kPrimary.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Background image
-                    Positioned.fill(
-                      child: Image.network(
-                        exploreImages[index],
-                        fit: BoxFit.cover,
-                      ),
+                    Icon(
+                      filter['icon'] as IconData,
+                      size: 18,
+                      color: isSelected
+                          ? Colors.white
+                          : isDark
+                          ? Colors.white60
+                          : Colors.black54,
                     ),
-                    // Gradient overlay
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withOpacity(0.6),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Glass border effect
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 1.5,
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                      ),
-                    ),
-                    // Glass info card at bottom
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(24),
-                          bottomRight: Radius.circular(24),
-                        ),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Colors.white.withOpacity(0.25),
-                                  Colors.white.withOpacity(0.15),
-                                ],
-                              ),
-                              border: Border(
-                                top: BorderSide(
-                                  color: Colors.white.withOpacity(0.4),
-                                  width: 1,
-                                ),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: [
-                                _GlassStatItem(
-                                  icon: Icons.favorite_rounded,
-                                  label: '${(index + 1) * 234}K',
-                                ),
-                                _GlassStatItem(
-                                  icon: Icons.comment_rounded,
-                                  label: '${(index + 1) * 45}',
-                                ),
-                                _GlassStatItem(
-                                  icon: Icons.share_rounded,
-                                  label: '${(index + 1) * 12}',
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                    const SizedBox(width: 6),
+                    Text(
+                      filter['label'] as String,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: isSelected
+                            ? Colors.white
+                            : isDark
+                            ? Colors.white60
+                            : Colors.black54,
                       ),
                     ),
                   ],
@@ -1157,433 +623,936 @@ class _ExploreGrid extends StatelessWidget {
               ),
             ),
           );
-        }, childCount: exploreImages.length),
+        }).toList(),
       ),
     );
   }
-}
 
-// Glass Stat Item Widget
-class _GlassStatItem extends StatelessWidget {
-  const _GlassStatItem({required this.icon, required this.label});
+  Widget _buildFilteredContent(bool isDark) {
+    switch (_selectedFilter) {
+      case ContentFilter.posts:
+        return _buildMasonryGrid(_posts, _isLoadingPosts, isDark, 'posts');
+      case ContentFilter.reels:
+        return _buildReelsGrid(_reels, _isLoadingReels, isDark);
+      case ContentFilter.people:
+        return _buildPeopleList(_people, _isLoadingPeople, isDark);
+      case ContentFilter.all:
+        return _buildAllContent(isDark);
+    }
+  }
 
-  final IconData icon;
-  final String label;
+  Widget _buildAllContent(bool isDark) {
+    final isLoading = _isLoadingPosts || _isLoadingReels || _isLoadingPeople;
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: Colors.white, size: 16),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
-          ),
+    if (isLoading) {
+      return Center(
+        child: CircularProgressIndicator(color: kPrimary, strokeWidth: 3),
+      );
+    }
+
+    final allContent = [..._posts, ..._reels, ..._people]
+      ..shuffle(); // Mix content for variety
+
+    if (allContent.isEmpty) {
+      return _buildEmptyState(
+        isDark,
+        'No content available',
+        Icons.explore_off_rounded,
+      );
+    }
+
+    return RefreshIndicator(
+      color: kPrimary,
+      onRefresh: () async {
+        await Future.wait([_loadPosts(), _loadReels(), _loadPeople()]);
+      },
+      child: GridView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: 0.75,
         ),
-      ],
-    );
-  }
-}
-
-class _VideoCard extends StatelessWidget {
-  const _VideoCard({
-    required this.imageUrl,
-    required this.title,
-    required this.userName,
-    required this.userAvatarUrl,
-  });
-
-  final String imageUrl;
-  final String title;
-  final String userName;
-  final String userAvatarUrl;
-
-  void _openReelPage(BuildContext context) {
-    // Create a ReelData object from the video data
-    final reelData = ReelData(
-      id: 'explore_${imageUrl.hashCode}',
-      userId: 'user_${userName.replaceAll('.', '_')}',
-      username: '@$userName',
-      profilePic: userAvatarUrl,
-      caption: title,
-      musicName: 'Original Audio',
-      musicArtist: '@$userName',
-      videoUrl: imageUrl,
-      likes: 12400,
-      comments: 856,
-      shares: 234,
-      views: 98000,
-      isLiked: false,
-      isSaved: false,
-      isFollowing: false,
-      location: null,
-    );
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) =>
-            ReelsPageNew(initialReel: reelData, initialIndex: 0),
+        itemCount: allContent.length,
+        itemBuilder: (context, index) {
+          final item = allContent[index];
+          if (item['type'] == 'user') {
+            return _buildPersonGridItem(item, isDark);
+          } else {
+            return _buildGlassGridItem(
+              item,
+              isDark,
+              item['type'] as String,
+              index,
+            );
+          }
+        },
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _openReelPage(context),
-      child: Container(
-        width: 190,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: kPrimary.withOpacity(0.15),
-              blurRadius: 25,
-              offset: const Offset(0, 10),
+  Widget _buildReelsGrid(
+    List<Map<String, dynamic>> reels,
+    bool isLoading,
+    bool isDark,
+  ) {
+    if (isLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: kPrimary, strokeWidth: 3),
+            const SizedBox(height: 16),
+            Text(
+              'Loading reels...',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : Colors.black54,
+                fontSize: 14,
+              ),
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Stack(
-            children: [
-              // Background image
-              Positioned.fill(
-                child: Image.network(imageUrl, fit: BoxFit.cover),
+      );
+    }
+
+    if (reels.isEmpty) {
+      return _buildEmptyState(
+        isDark,
+        'No reels to watch',
+        Icons.videocam_off_rounded,
+      );
+    }
+
+    return RefreshIndicator(
+      color: kPrimary,
+      onRefresh: _loadReels,
+      child: GridView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: 0.6,
+        ),
+        itemCount: reels.length,
+        itemBuilder: (context, index) {
+          final reel = reels[index];
+          return _buildReelGridItem(reel, isDark, index);
+        },
+      ),
+    );
+  }
+
+  Widget _buildPeopleList(
+    List<Map<String, dynamic>> people,
+    bool isLoading,
+    bool isDark,
+  ) {
+    if (isLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: kPrimary, strokeWidth: 3),
+            const SizedBox(height: 16),
+            Text(
+              'Loading people...',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : Colors.black54,
+                fontSize: 14,
               ),
-              // Gradient overlay
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.2),
-                        Colors.black.withOpacity(0.8),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (people.isEmpty) {
+      return _buildEmptyState(
+        isDark,
+        'No people found',
+        Icons.people_outline_rounded,
+      );
+    }
+
+    return RefreshIndicator(
+      color: kPrimary,
+      onRefresh: _loadPeople,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: people.length,
+        itemBuilder: (context, index) {
+          final person = people[index];
+          return _buildPersonListItem(person, isDark);
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(bool isDark, String message, IconData icon) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [
+                        Colors.white.withOpacity(0.08),
+                        Colors.white.withOpacity(0.05),
+                      ]
+                    : [
+                        Colors.black.withOpacity(0.05),
+                        Colors.black.withOpacity(0.02),
                       ],
-                    ),
-                  ),
-                ),
               ),
-              // Glass border
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.3),
-                      width: 1.5,
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                ),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.15)
+                    : Colors.black.withOpacity(0.08),
+                width: 1,
               ),
-              // Play button in the center with glass effect
-              Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(50),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
+            ),
+            child: Icon(
+              icon,
+              size: 48,
+              color: isDark ? Colors.white30 : Colors.black26,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            message,
+            style: TextStyle(
+              color: isDark ? Colors.white70 : Colors.black54,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Check back later 😅',
+            style: TextStyle(
+              color: isDark ? Colors.white.withOpacity(0.5) : Colors.black38,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReelGridItem(Map<String, dynamic> reel, bool isDark, int index) {
+    return GestureDetector(
+      onTap: () {
+        // Navigate to reels page
+        final reelData = ReelData(
+          id: reel['id'] as String,
+          userId: reel['user_id'] as String? ?? '',
+          username: reel['username'] as String? ?? '@unknown',
+          profilePic: reel['avatarUrl'] as String? ?? '',
+          caption: reel['caption'] as String? ?? '',
+          musicName: reel['musicName'] as String? ?? '',
+          musicArtist: reel['musicArtist'] as String? ?? '',
+          videoUrl: reel['videoUrl'] as String,
+          likes: reel['likes'] as int? ?? 0,
+          comments: reel['comments'] as int? ?? 0,
+          shares: reel['shares'] as int? ?? 0,
+          views: reel['views'] as int? ?? 0,
+          isLiked: false,
+          isSaved: false,
+          isFollowing: false,
+        );
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ReelsPageNew(initialReel: reelData),
+          ),
+        );
+      },
+      child: Hero(
+        tag: 'reel_${reel['id']}_$index',
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.1),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.network(
+                  reel['imageUrl'] as String,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
                         gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.white.withOpacity(0.35),
-                            Colors.white.withOpacity(0.2),
-                          ],
+                          colors: isDark
+                              ? [Colors.grey[850]!, Colors.grey[900]!]
+                              : [Colors.grey[300]!, Colors.grey[200]!],
                         ),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.5),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
-                          ),
+                      ),
+                      child: Icon(
+                        Icons.broken_image_rounded,
+                        color: isDark ? Colors.white30 : Colors.black26,
+                        size: 32,
+                      ),
+                    );
+                  },
+                ),
+                // Dark gradient overlay
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.7),
                         ],
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow_rounded,
-                        color: Colors.white,
-                        size: 36,
+                        stops: const [0.5, 1.0],
                       ),
                     ),
                   ),
                 ),
-              ),
-              // Glass user info at the bottom
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(24),
-                    bottomRight: Radius.circular(24),
+                // Play icon overlay
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.3),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.5),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                   ),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.white.withOpacity(0.25),
-                            Colors.white.withOpacity(0.15),
-                          ],
-                        ),
-                        border: Border(
-                          top: BorderSide(
-                            color: Colors.white.withOpacity(0.4),
-                            width: 1.5,
-                          ),
+                ),
+                // Views count
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  right: 8,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.play_circle_fill_rounded,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatCount(reel['views'] as int),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              shadows: [
-                                Shadow(color: Colors.black54, blurRadius: 6),
-                              ],
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.6),
-                                    width: 2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 8,
-                                    ),
-                                  ],
-                                ),
-                                child: CircleAvatar(
-                                  radius: 12,
-                                  backgroundImage: NetworkImage(userAvatarUrl),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  userName,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black45,
-                                        blurRadius: 4,
-                                      ),
-                                    ],
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonGridItem(Map<String, dynamic> person, bool isDark) {
+    return GestureDetector(
+      onTap: () {
+        // Navigate to user profile
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => OtherUserProfilePage(
+              userId: person['id'] as String,
+              username: person['username'] as String,
+              avatarUrl: person['avatar'] as String?,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? [
+                    Colors.white.withOpacity(0.08),
+                    Colors.white.withOpacity(0.05),
+                  ]
+                : [
+                    Colors.black.withOpacity(0.05),
+                    Colors.black.withOpacity(0.02),
+                  ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.15)
+                : Colors.black.withOpacity(0.08),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 32,
+              backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
+              backgroundImage: person['avatar'].isNotEmpty
+                  ? NetworkImage(person['avatar'])
+                  : null,
+              child: person['avatar'].isEmpty
+                  ? Icon(
+                      Icons.person,
+                      size: 32,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    )
+                  : null,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              person['username'],
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${_formatCount(person['followers'] as int)} followers',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : Colors.black54,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonListItem(Map<String, dynamic> person, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [Colors.white.withOpacity(0.08), Colors.white.withOpacity(0.05)]
+              : [
+                  Colors.black.withOpacity(0.05),
+                  Colors.black.withOpacity(0.02),
+                ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.15)
+              : Colors.black.withOpacity(0.08),
+          width: 1,
+        ),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          radius: 24,
+          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
+          backgroundImage: person['avatar'].isNotEmpty
+              ? NetworkImage(person['avatar'])
+              : null,
+          child: person['avatar'].isEmpty
+              ? Icon(
+                  Icons.person,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                )
+              : null,
+        ),
+        title: Text(
+          person['username'],
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black87,
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
+        ),
+        subtitle: person['fullName'] != null
+            ? Text(
+                person['fullName'],
+                style: TextStyle(
+                  color: isDark ? Colors.white60 : Colors.black54,
+                  fontSize: 13,
+                ),
+              )
+            : null,
+        trailing: Text(
+          '${_formatCount(person['followers'] as int)} followers',
+          style: TextStyle(
+            color: isDark ? Colors.white60 : Colors.black54,
+            fontSize: 12,
+          ),
+        ),
+        onTap: () {
+          // Navigate to user profile
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => OtherUserProfilePage(
+                userId: person['id'] as String,
+                username: person['username'] as String,
+                avatarUrl: person['avatar'] as String?,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildGlassTabBar(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [Colors.white.withOpacity(0.08), Colors.white.withOpacity(0.05)]
+              : [
+                  Colors.black.withOpacity(0.05),
+                  Colors.black.withOpacity(0.02),
+                ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.15)
+              : Colors.black.withOpacity(0.08),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withOpacity(0.2)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TabBar(
+        controller: _tabController,
+        labelColor: Colors.white,
+        unselectedLabelColor: isDark ? Colors.white60 : Colors.black54,
+        indicator: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [kPrimary, kPrimary.withOpacity(0.8)],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: kPrimary.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 15,
+        ),
+        tabs: const [
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.grid_on_rounded, size: 18),
+                SizedBox(width: 6),
+                Text('Posts'),
+              ],
+            ),
+          ),
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.play_circle_rounded, size: 18),
+                SizedBox(width: 6),
+                Text('Reels'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMasonryGrid(
+    List<Map<String, dynamic>> items,
+    bool isLoading,
+    bool isDark,
+    String type,
+  ) {
+    if (isLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: kPrimary, strokeWidth: 3),
+            const SizedBox(height: 16),
+            Text(
+              'Loading $type...',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : Colors.black54,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? [
+                          Colors.white.withOpacity(0.08),
+                          Colors.white.withOpacity(0.05),
+                        ]
+                      : [
+                          Colors.black.withOpacity(0.05),
+                          Colors.black.withOpacity(0.02),
+                        ],
+                ),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.15)
+                      : Colors.black.withOpacity(0.08),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                type == 'posts'
+                    ? Icons.photo_library_rounded
+                    : Icons.video_library_rounded,
+                size: 48,
+                color: isDark ? Colors.white30 : Colors.black26,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              type == 'posts' ? 'No posts to explore' : 'No reels to watch',
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black54,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Check back later for new content',
+              style: TextStyle(
+                color: isDark ? Colors.white.withOpacity(0.5) : Colors.black38,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      color: kPrimary,
+      onRefresh: type == 'posts' ? _loadPosts : _loadReels,
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 0.75,
+              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final item = items[index];
+                return _buildGlassGridItem(item, isDark, type, index);
+              }, childCount: items.length),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlassGridItem(
+    Map<String, dynamic> item,
+    bool isDark,
+    String type,
+    int index,
+  ) {
+    return GestureDetector(
+      onTap: () async {
+        if (type == 'posts') {
+          // Convert Map to PostModel
+          final post = PostModel(
+            id: item['id'] as String,
+            userId: item['user_id'] as String? ?? '',
+            type: PostType.image,
+            mediaUrls: [item['imageUrl'] as String],
+            thumbnailUrl: item['imageUrl'] as String,
+            username: item['username'] as String? ?? 'Unknown',
+            userAvatar: item['avatarUrl'] as String? ?? '',
+            timestamp: DateTime.parse(
+              item['created_at'] as String? ?? DateTime.now().toIso8601String(),
+            ),
+            caption: item['caption'] as String? ?? '',
+            likes: item['likes'] as int? ?? 0,
+            comments: item['comments'] as int? ?? 0,
+            views: item['views'] as int? ?? 0,
+          );
+
+          // Navigate to post viewer
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => PostViewerPageV2(
+                initialPost: post,
+                allPosts: [post], // Just show this one post
+              ),
+            ),
+          );
+        } else if (type == 'reels') {
+          // Navigate to reels page
+          final reel = ReelData(
+            id: item['id'] as String,
+            userId: item['user_id'] as String? ?? '',
+            username: item['username'] as String? ?? '@unknown',
+            profilePic: item['avatarUrl'] as String? ?? '',
+            caption: item['caption'] as String? ?? '',
+            musicName: item['musicName'] as String? ?? '',
+            musicArtist: item['musicArtist'] as String? ?? '',
+            videoUrl: item['videoUrl'] as String,
+            likes: item['likes'] as int? ?? 0,
+            comments: item['comments'] as int? ?? 0,
+            shares: item['shares'] as int? ?? 0,
+            views: item['views'] as int? ?? 0,
+            isLiked: false,
+            isSaved: false,
+            isFollowing: false,
+          );
+
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => ReelsPageNew(initialReel: reel),
+            ),
+          );
+        }
+      },
+      child: Hero(
+        tag: '${type}_${item['id']}_$index',
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.1),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.network(
+                  item['imageUrl'] as String,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isDark
+                              ? [Colors.grey[850]!, Colors.grey[900]!]
+                              : [Colors.grey[300]!, Colors.grey[200]!],
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.broken_image_rounded,
+                        color: isDark ? Colors.white30 : Colors.black26,
+                        size: 32,
+                      ),
+                    );
+                  },
+                ),
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.1),
+                          Colors.black.withOpacity(0.7),
+                        ],
+                        stops: const [0.4, 0.7, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: ClipRRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.black.withOpacity(0.3),
+                              Colors.black.withOpacity(0.2),
                             ],
                           ),
-                        ],
+                          border: Border(
+                            top: BorderSide(
+                              color: Colors.white.withOpacity(0.2),
+                              width: 0.5,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildStatItem(
+                              type == 'posts'
+                                  ? Icons.favorite_rounded
+                                  : Icons.play_circle_fill_rounded,
+                              _formatCount(
+                                type == 'posts'
+                                    ? (item['likes'] as int)
+                                    : (item['views'] as int),
+                              ),
+                            ),
+                            if (type == 'posts')
+                              _buildStatItem(
+                                Icons.chat_bubble_rounded,
+                                _formatCount(item['comments'] as int),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          kPrimary.withOpacity(0.9),
+                          kPrimary.withOpacity(0.7),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 0.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: kPrimary.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      type == 'posts'
+                          ? Icons.image_rounded
+                          : Icons.videocam_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem(IconData icon, String count) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white, size: 14),
+        const SizedBox(width: 4),
+        Text(
+          count,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            shadows: [
+              Shadow(
+                color: Colors.black45,
+                offset: Offset(0, 1),
+                blurRadius: 2,
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _CategoryPostCard extends StatelessWidget {
-  const _CategoryPostCard({
-    required this.imageUrl,
-    required this.likes,
-    required this.comments,
-    this.isReel = false,
-  });
-
-  final String imageUrl;
-  final String likes;
-  final String comments;
-  final bool isReel;
-
-  void _openPostViewer(BuildContext context) {
-    final navVisibility = NavBarVisibilityScope.maybeOf(context);
-    navVisibility?.value = false;
-
-    // Create a mock post model
-    final post = profile_post.PostModel(
-      id: imageUrl,
-      userId: 'explorer_user', // Demo user ID
-      type: profile_post.PostType.image,
-      mediaUrls: [imageUrl],
-      thumbnailUrl: imageUrl,
-      username: '@explorer',
-      userAvatar: 'https://i.pravatar.cc/150?img=10',
-      timestamp: DateTime.now(),
-      caption: 'Explore post',
-      likes: int.tryParse(likes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
-      comments: int.tryParse(comments.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
-      shares: 10,
-      views: 1000,
-    );
-
-    Navigator.of(context)
-        .push(
-          MaterialPageRoute(
-            builder: (context) =>
-                PostViewerInstagramStyle(initialPost: post, allPosts: [post]),
-          ),
-        )
-        .whenComplete(() {
-          navVisibility?.value = true;
-        });
-  }
-
-  void _openReelPage(BuildContext context) {
-    // Create a ReelData object from the category post data
-    final reelData = ReelData(
-      id: 'category_${imageUrl.hashCode}',
-      userId: 'user_explorer_${imageUrl.hashCode}',
-      username: '@explorer',
-      profilePic: 'https://i.pravatar.cc/150?img=10',
-      caption: 'Amazing content! 🔥',
-      musicName: 'Trending Audio',
-      musicArtist: '@TrendingMusic',
-      videoUrl: imageUrl,
-      likes: int.tryParse(likes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 12400,
-      comments: int.tryParse(comments.replaceAll(RegExp(r'[^0-9]'), '')) ?? 856,
-      shares: 234,
-      views: 98000,
-      isLiked: false,
-      isSaved: false,
-      isFollowing: false,
-      location: null,
-    );
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) =>
-            ReelsPageNew(initialReel: reelData, initialIndex: 0),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        if (isReel) {
-          _openReelPage(context);
-        } else {
-          _openPostViewer(context);
-        }
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.network(imageUrl, fit: BoxFit.cover),
-            // Dark gradient overlay
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-                  ),
-                ),
-              ),
-            ),
-            // Reel icon if it's a reel
-            if (isReel)
-              const Positioned(
-                top: 8,
-                right: 8,
-                child: Icon(
-                  Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-            // Stats at bottom
-            Positioned(
-              bottom: 8,
-              left: 8,
-              right: 8,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.favorite, color: Colors.white, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        likes,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      const Icon(Icons.comment, color: Colors.white, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        comments,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }

@@ -15,6 +15,7 @@ import 'pages/post_viewer_instagram_style.dart';
 import 'pages/profile_photo_viewer.dart';
 import 'highlight_viewer.dart';
 import '../settings/settings_home_page.dart';
+import 'widgets/unified_post_options_sheet.dart';
 
 class MyProfilePage extends StatefulWidget {
   const MyProfilePage({super.key});
@@ -153,32 +154,51 @@ class _MyProfilePageState extends State<MyProfilePage>
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Background Image with Gradient Overlay
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              image: const DecorationImage(
-                image: NetworkImage(coverUrl),
-                fit: BoxFit.cover,
-              ),
-            ),
+          // Background Image with Gradient Overlay - Make it tappable
+          GestureDetector(
+            onTap: () {
+              // TODO: Open cover photo viewer/editor
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Cover photo clicked')),
+              );
+            },
             child: Container(
+              height: 200,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    (isDark ? kDarkBackground : kLightBackground).withOpacity(
-                      0.3,
-                    ),
-                    (isDark ? kDarkBackground : kLightBackground).withOpacity(
-                      0.95,
-                    ),
-                  ],
+                image: const DecorationImage(
+                  image: NetworkImage(coverUrl),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      (isDark ? kDarkBackground : kLightBackground).withOpacity(
+                        0.3,
+                      ),
+                      (isDark ? kDarkBackground : kLightBackground).withOpacity(
+                        0.95,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
+          ),
+          // Edit Cover Photo Button (Top Left)
+          Positioned(
+            top: 16,
+            left: 16,
+            child: _buildGlassIconButton(Icons.edit, isDark, () {
+              // TODO: Implement cover photo edit
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Edit cover photo')));
+            }),
           ),
           // Settings Button (Top Right)
           Positioned(
@@ -547,6 +567,7 @@ class _MyProfilePageState extends State<MyProfilePage>
           padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.person_off_outlined, size: 64, color: Colors.grey),
               const SizedBox(height: 16),
@@ -572,6 +593,7 @@ class _MyProfilePageState extends State<MyProfilePage>
           padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.photo_library_outlined,
@@ -676,6 +698,50 @@ class _MyProfilePageState extends State<MyProfilePage>
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ),
+                // Three-dot menu button (own posts)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: GestureDetector(
+                    onTap: () {
+                      UnifiedPostOptionsSheet.show(
+                        context,
+                        post: post,
+                        isOwnPost: true,
+                        onPostUpdated: () {
+                          final postProvider = context.read<PostProvider>();
+                          final authProvider = context.read<AuthProvider>();
+                          if (authProvider.currentUserId != null) {
+                            postProvider.loadUserPosts(
+                              authProvider.currentUserId!,
+                            );
+                          }
+                        },
+                        onPostDeleted: () {
+                          final postProvider = context.read<PostProvider>();
+                          final authProvider = context.read<AuthProvider>();
+                          if (authProvider.currentUserId != null) {
+                            postProvider.loadUserPosts(
+                              authProvider.currentUserId!,
+                            );
+                          }
+                        },
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.more_vert,
+                        size: 18,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),

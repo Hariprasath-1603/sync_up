@@ -9,7 +9,10 @@ class UserSearchService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   /// Search users by username or display name
-  Future<List<Map<String, dynamic>>> searchUsers(String query, {int limit = 20}) async {
+  Future<List<Map<String, dynamic>>> searchUsers(
+    String query, {
+    int limit = 20,
+  }) async {
     try {
       if (query.trim().isEmpty) {
         return [];
@@ -20,21 +23,30 @@ class UserSearchService {
       // Search in username, display_name, and full_name
       final result = await _supabase
           .from('users')
-          .select('uid, username, username_display, display_name, full_name, photo_url, bio, followers_count, following_count')
-          .or('username.ilike.%$searchQuery%,username_display.ilike.%$searchQuery%,display_name.ilike.%$searchQuery%,full_name.ilike.%$searchQuery%')
+          .select(
+            'uid, username, username_display, display_name, full_name, photo_url, bio, followers_count, following_count',
+          )
+          .or(
+            'username.ilike.%$searchQuery%,username_display.ilike.%$searchQuery%,display_name.ilike.%$searchQuery%,full_name.ilike.%$searchQuery%',
+          )
           .order('followers_count', ascending: false)
           .limit(limit);
 
       return (result as List)
-          .map((user) => {
-                'uid': user['uid'],
-                'username': user['username_display'] ?? user['username'],
-                'display_name': user['display_name'] ?? user['full_name'] ?? user['username_display'],
-                'photo_url': user['photo_url'],
-                'bio': user['bio'],
-                'followers_count': user['followers_count'] ?? 0,
-                'following_count': user['following_count'] ?? 0,
-              })
+          .map(
+            (user) => {
+              'uid': user['uid'],
+              'username': user['username_display'] ?? user['username'],
+              'display_name':
+                  user['display_name'] ??
+                  user['full_name'] ??
+                  user['username_display'],
+              'photo_url': user['photo_url'],
+              'bio': user['bio'],
+              'followers_count': user['followers_count'] ?? 0,
+              'following_count': user['following_count'] ?? 0,
+            },
+          )
           .toList();
     } catch (e) {
       print('❌ Error searching users: $e');
@@ -47,19 +59,26 @@ class UserSearchService {
     try {
       final result = await _supabase
           .from('users')
-          .select('uid, username, username_display, display_name, full_name, photo_url, bio, followers_count')
+          .select(
+            'uid, username, username_display, display_name, full_name, photo_url, bio, followers_count',
+          )
           .order('followers_count', ascending: false)
           .limit(limit);
 
       return (result as List)
-          .map((user) => {
-                'uid': user['uid'],
-                'username': user['username_display'] ?? user['username'],
-                'display_name': user['display_name'] ?? user['full_name'] ?? user['username_display'],
-                'photo_url': user['photo_url'],
-                'bio': user['bio'],
-                'followers_count': user['followers_count'] ?? 0,
-              })
+          .map(
+            (user) => {
+              'uid': user['uid'],
+              'username': user['username_display'] ?? user['username'],
+              'display_name':
+                  user['display_name'] ??
+                  user['full_name'] ??
+                  user['username_display'],
+              'photo_url': user['photo_url'],
+              'bio': user['bio'],
+              'followers_count': user['followers_count'] ?? 0,
+            },
+          )
           .toList();
     } catch (e) {
       print('❌ Error getting suggested users: $e');

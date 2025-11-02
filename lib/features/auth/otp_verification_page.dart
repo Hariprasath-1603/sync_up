@@ -49,6 +49,21 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
 
+    // Set initial cooldown to 30 seconds (shorter for better UX)
+    _emailCooldown = 30;
+    _emailTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _emailCooldown--;
+          if (_emailCooldown <= 0) {
+            timer.cancel();
+          }
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+
     // Listen to tab changes to send phone OTP when user switches to phone tab
     _tabController.addListener(() {
       if (_tabController.index == 1 && !_phoneOtpSent && !_isPhoneVerified) {
@@ -230,10 +245,15 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
     setState(() => _isResendingPhone = true);
 
     try {
+      print('📱 Resending phone OTP to: ${widget.phone}');
+
       final response = await Supabase.instance.client.functions.invoke(
         'send-otp',
         body: {'phone': widget.phone},
       );
+
+      print('📡 Phone OTP response status: ${response.status}');
+      print('📡 Phone OTP response data: ${response.data}');
 
       if (response.status == 200) {
         setState(() {
@@ -252,11 +272,42 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
 
         _showSnackBar('Phone OTP sent successfully!', Colors.green);
       } else {
-        throw Exception('Failed to send phone OTP');
+        // Parse error message from response
+        String errorMessage = 'Failed to send phone OTP';
+        if (response.data != null) {
+          if (response.data is Map && response.data['error'] != null) {
+            errorMessage = response.data['error'].toString();
+          } else if (response.data is String) {
+            errorMessage = response.data;
+          }
+        }
+        throw Exception(errorMessage);
       }
     } catch (e) {
+      print('❌ Failed to resend phone OTP: $e');
       setState(() => _isResendingPhone = false);
-      _showSnackBar('Failed to send OTP. Please try again.', Colors.red);
+
+      // Show the actual error message
+      String displayMessage = e.toString().replaceFirst('Exception: ', '');
+
+      // Make error messages more user-friendly
+      if (displayMessage.contains('Invalid phone number') ||
+          displayMessage.contains('60200')) {
+        displayMessage =
+            'Invalid phone number. Please check the format (e.g., +1234567890)';
+      } else if (displayMessage.contains('not verified') ||
+          displayMessage.contains('60212')) {
+        displayMessage =
+            'Phone number not verified in Twilio. Please contact support or use a different number.';
+      } else if (displayMessage.contains('Maximum') ||
+          displayMessage.contains('60203')) {
+        displayMessage = 'Too many attempts. Please try again later.';
+      } else if (!displayMessage.contains('Failed to send')) {
+        // Keep detailed error if it's informative
+        displayMessage = 'Failed to send OTP: $displayMessage';
+      }
+
+      _showSnackBar(displayMessage, Colors.red);
     }
   }
 
@@ -304,6 +355,21 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
 
       print('✅ User already has password set during signup');
 
+      // Check if user already exists in database (zombie user scenario)
+      final existingUser = await Supabase.instance.client
+          .from('users')
+          .select('uid, created_at')
+          .eq('uid', user.id)
+          .maybeSingle();
+
+      final bool isZombieUser = existingUser != null;
+
+      if (isZombieUser) {
+        print(
+          '⚠️ ZOMBIE USER DETECTED: User exists in auth but completing signup again',
+        );
+      }
+
       // Build complete user data for database with verification status
       final completeUserData = {
         'uid': user.id,
@@ -323,7 +389,9 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
         'phone': widget.phone,
         'location': userMetadata['location'],
         'photo_url': null,
-        'username_last_changed': DateTime.now().toIso8601String(),
+        'username_last_changed': isZombieUser
+            ? existingUser['created_at'] // Keep original timestamp for zombie users
+            : DateTime.now().toIso8601String(),
         'is_private': false,
         'show_activity_status': true,
         'allow_messages_from_everyone': false,
@@ -336,15 +404,23 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
         'posts_count': 0,
         'followers': [],
         'following': [],
-        'created_at': DateTime.now().toIso8601String(),
+        'created_at': isZombieUser
+            ? existingUser['created_at'] // Preserve original created_at for zombie users
+            : DateTime.now().toIso8601String(),
         'last_active': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       };
 
-      // Insert or update user record in database
+      // Insert or update user record in database (UPSERT handles zombie users)
       await Supabase.instance.client
           .from('users')
           .upsert(completeUserData, onConflict: 'uid');
+
+      print(
+        isZombieUser
+            ? '✅ ZOMBIE USER RECOVERED: Database record updated successfully'
+            : '✅ NEW USER CREATED: Database record inserted successfully',
+      );
 
       // Save user session to preferences (for persistent login)
       await PreferencesService.saveUserSession(
@@ -357,7 +433,12 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
 
       if (!mounted) return;
 
-      _showSnackBar('Account created successfully! 🎉', Colors.green);
+      _showSnackBar(
+        isZombieUser
+            ? 'Account recovered successfully! 🎉'
+            : 'Account created successfully! 🎉',
+        Colors.green,
+      );
 
       // Navigate to profile setup flow
       await Future.delayed(const Duration(milliseconds: 800));

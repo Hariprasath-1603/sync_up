@@ -36,8 +36,12 @@ class SupabaseStorageService {
           .from(SupabaseConfig.profilePhotosBucket)
           .getPublicUrl(fileName);
 
-      print('DEBUG: Profile photo uploaded successfully: $publicUrl');
-      return publicUrl;
+      // Add cache-busting parameter to force image reload
+      final cacheBustedUrl =
+          '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+
+      print('DEBUG: Profile photo uploaded successfully: $cacheBustedUrl');
+      return cacheBustedUrl;
     } catch (e) {
       print('ERROR: Supabase profile photo upload failed: $e');
       return null;
@@ -121,5 +125,51 @@ class SupabaseStorageService {
   /// Delete profile photo
   static Future<bool> deleteProfilePhoto(String userId) async {
     return await deleteFile(SupabaseConfig.profilePhotosBucket, '$userId.jpg');
+  }
+
+  /// Upload cover photo
+  /// Returns the public URL of the uploaded image
+  static Future<String?> uploadCoverPhoto(File imageFile, String userId) async {
+    try {
+      final fileName = '${userId}_cover.jpg';
+      final bytes = await imageFile.readAsBytes();
+
+      print('DEBUG: Uploading cover photo for user: $userId');
+
+      // Upload to Supabase Storage
+      await _storage
+          .from(SupabaseConfig.coverPhotosBucket)
+          .uploadBinary(
+            fileName,
+            bytes,
+            fileOptions: const FileOptions(
+              cacheControl: '3600',
+              upsert: true, // Replace existing cover photo
+            ),
+          );
+
+      // Get public URL
+      final publicUrl = _storage
+          .from(SupabaseConfig.coverPhotosBucket)
+          .getPublicUrl(fileName);
+
+      // Add cache-busting parameter to force image reload
+      final cacheBustedUrl =
+          '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+
+      print('DEBUG: Cover photo uploaded successfully: $cacheBustedUrl');
+      return cacheBustedUrl;
+    } catch (e) {
+      print('ERROR: Supabase cover photo upload failed: $e');
+      return null;
+    }
+  }
+
+  /// Delete cover photo
+  static Future<bool> deleteCoverPhoto(String userId) async {
+    return await deleteFile(
+      SupabaseConfig.coverPhotosBucket,
+      '${userId}_cover.jpg',
+    );
   }
 }

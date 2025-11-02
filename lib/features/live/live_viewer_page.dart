@@ -35,29 +35,6 @@ class _LiveViewerPageState extends State<LiveViewerPage> {
   final _textController = TextEditingController();
   final List<LiveComment> _commentHistory = [];
 
-  final _mockUsernames = <String>[
-    'Priya',
-    'Noah',
-    'Lena',
-    'Diego',
-    'Haru',
-    'Maya',
-    'Ezra',
-    'Nova',
-  ];
-
-  final _mockMessages = <String>[
-    'This looks incredible! 🔥',
-    'Loving the energy.',
-    'Greetings from Toronto!',
-    'Can you save this live?',
-    'Drop the playlist please 🎶',
-    'Best session yet!',
-    'Camera quality is insane!',
-  ];
-
-  Timer? _mockCommentTimer;
-  Timer? _mockReactionTimer;
   Timer? _viewerCountTimer;
   late int _viewerCount;
   bool _isFollowing = false;
@@ -66,14 +43,11 @@ class _LiveViewerPageState extends State<LiveViewerPage> {
   void initState() {
     super.initState();
     _viewerCount = widget.initialViewerCount;
-    _seedInitialComments();
-    _startMockActivity();
+    _startViewerCountUpdates();
   }
 
   @override
   void dispose() {
-    _mockCommentTimer?.cancel();
-    _mockReactionTimer?.cancel();
     _viewerCountTimer?.cancel();
     _commentController.dispose();
     _reactionController.dispose();
@@ -81,30 +55,8 @@ class _LiveViewerPageState extends State<LiveViewerPage> {
     super.dispose();
   }
 
-  void _seedInitialComments() {
-    const seed = [
-      LiveComment(username: 'Priya', message: 'Notification squad! 🙌'),
-      LiveComment(username: 'Noah', message: 'Been waiting for this.'),
-      LiveComment(username: 'Lena', message: 'Camera quality is unreal!'),
-    ];
-    for (final comment in seed) {
-      _pushComment(comment);
-    }
-  }
-
-  void _startMockActivity() {
+  void _startViewerCountUpdates() {
     final random = Random();
-    _mockCommentTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      final username = _mockUsernames[random.nextInt(_mockUsernames.length)];
-      final message = _mockMessages[random.nextInt(_mockMessages.length)];
-      _pushComment(LiveComment(username: username, message: message));
-    });
-
-    _mockReactionTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      const emojis = ['❤️', '💜', '💛', '🔥'];
-      _reactionController.addReaction(emojis[random.nextInt(emojis.length)]);
-    });
-
     _viewerCountTimer = Timer.periodic(const Duration(seconds: 8), (timer) {
       final delta = random.nextInt(120) - 50;
       setState(() {

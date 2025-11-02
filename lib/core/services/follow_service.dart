@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import './notification_service.dart';
 
 /// Service for managing follow/unfollow relationships
 class FollowService {
@@ -7,8 +8,9 @@ class FollowService {
   FollowService._internal();
 
   final SupabaseClient _supabase = Supabase.instance.client;
+  final NotificationService _notificationService = NotificationService();
 
-  /// Follow a user
+  /// Follow a user (checks if account is private)
   Future<bool> followUser(String currentUserId, String targetUserId) async {
     try {
       // Check if already following
@@ -24,19 +26,44 @@ class FollowService {
         return false;
       }
 
-      // Add follow relationship
-      await _supabase.from('followers').insert({
-        'follower_id': currentUserId,
-        'following_id': targetUserId,
-        'created_at': DateTime.now().toIso8601String(),
-      });
+      // Check if target user has private account
+      final userData = await _supabase
+          .from('users')
+          .select('is_private')
+          .eq('uid', targetUserId)
+          .single();
 
-      // Update follower counts
-      await _incrementFollowerCount(targetUserId);
-      await _incrementFollowingCount(currentUserId);
+      final isPrivate = userData['is_private'] ?? false;
 
-      print('✅ Successfully followed user: $targetUserId');
-      return true;
+      if (isPrivate) {
+        // Send follow request notification
+        await _notificationService.sendFollowRequest(
+          fromUserId: currentUserId,
+          toUserId: targetUserId,
+        );
+        print('✅ Follow request sent to private account');
+        return true;
+      } else {
+        // Add follow relationship directly for public accounts
+        await _supabase.from('followers').insert({
+          'follower_id': currentUserId,
+          'following_id': targetUserId,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        // Update follower counts
+        await _incrementFollowerCount(targetUserId);
+        await _incrementFollowingCount(currentUserId);
+
+        // Send follow notification
+        await _notificationService.sendFollowNotification(
+          fromUserId: currentUserId,
+          toUserId: targetUserId,
+        );
+
+        print('✅ Successfully followed user: $targetUserId');
+        return true;
+      }
     } catch (e) {
       print('❌ Error following user: $e');
       return false;
@@ -92,13 +119,17 @@ class FollowService {
           .order('created_at', ascending: false);
 
       return (result as List)
-          .map((e) => {
-                'uid': e['users']['uid'],
-                'username': e['users']['username_display'] ?? e['users']['username'],
-                'display_name': e['users']['display_name'] ?? e['users']['full_name'],
-                'photo_url': e['users']['photo_url'],
-                'bio': e['users']['bio'],
-              })
+          .map(
+            (e) => {
+              'uid': e['users']['uid'],
+              'username':
+                  e['users']['username_display'] ?? e['users']['username'],
+              'display_name':
+                  e['users']['display_name'] ?? e['users']['full_name'],
+              'photo_url': e['users']['photo_url'],
+              'bio': e['users']['bio'],
+            },
+          )
           .toList();
     } catch (e) {
       print('❌ Error fetching followers: $e');
@@ -116,13 +147,17 @@ class FollowService {
           .order('created_at', ascending: false);
 
       return (result as List)
-          .map((e) => {
-                'uid': e['users']['uid'],
-                'username': e['users']['username_display'] ?? e['users']['username'],
-                'display_name': e['users']['display_name'] ?? e['users']['full_name'],
-                'photo_url': e['users']['photo_url'],
-                'bio': e['users']['bio'],
-              })
+          .map(
+            (e) => {
+              'uid': e['users']['uid'],
+              'username':
+                  e['users']['username_display'] ?? e['users']['username'],
+              'display_name':
+                  e['users']['display_name'] ?? e['users']['full_name'],
+              'photo_url': e['users']['photo_url'],
+              'bio': e['users']['bio'],
+            },
+          )
           .toList();
     } catch (e) {
       print('❌ Error fetching following: $e');
@@ -163,7 +198,10 @@ class FollowService {
   // Helper methods to update counts
   Future<void> _incrementFollowerCount(String userId) async {
     try {
-      await _supabase.rpc('increment_followers_count', params: {'user_id': userId});
+      await _supabase.rpc(
+        'increment_followers_count',
+        params: {'user_id': userId},
+      );
     } catch (e) {
       print('Error incrementing follower count: $e');
     }
@@ -171,7 +209,10 @@ class FollowService {
 
   Future<void> _decrementFollowerCount(String userId) async {
     try {
-      await _supabase.rpc('decrement_followers_count', params: {'user_id': userId});
+      await _supabase.rpc(
+        'decrement_followers_count',
+        params: {'user_id': userId},
+      );
     } catch (e) {
       print('Error decrementing follower count: $e');
     }
@@ -179,7 +220,10 @@ class FollowService {
 
   Future<void> _incrementFollowingCount(String userId) async {
     try {
-      await _supabase.rpc('increment_following_count', params: {'user_id': userId});
+      await _supabase.rpc(
+        'increment_following_count',
+        params: {'user_id': userId},
+      );
     } catch (e) {
       print('Error incrementing following count: $e');
     }
@@ -187,7 +231,10 @@ class FollowService {
 
   Future<void> _decrementFollowingCount(String userId) async {
     try {
-      await _supabase.rpc('decrement_following_count', params: {'user_id': userId});
+      await _supabase.rpc(
+        'decrement_following_count',
+        params: {'user_id': userId},
+      );
     } catch (e) {
       print('Error decrementing following count: $e');
     }

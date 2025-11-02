@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/scaffold_with_nav_bar.dart';
+import '../../../core/services/interaction_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/theme.dart';
 import '../models/post_model.dart';
 import '../../profile/models/post_model.dart' as profile_post;
@@ -30,6 +32,11 @@ class _PostCardState extends State<PostCard> {
   final List<_Comment> _comments = [];
   final GlobalKey<FloatingHeartsFromPositionState> _heartsKey = GlobalKey();
 
+  // Services
+  final InteractionService _interactionService = InteractionService();
+  final NotificationService _notificationService = NotificationService();
+  bool _isLiking = false; // Prevent double-tap
+
   Post get post => widget.post;
 
   @override
@@ -42,6 +49,7 @@ class _PostCardState extends State<PostCard> {
     _compressLikeCount = _isAbbreviated(post.likes);
     _compressCommentCount = _isAbbreviated(post.comments);
     _decimalFormat = NumberFormat.decimalPattern();
+    _loadLikeStatus();
   }
 
   @override
@@ -93,7 +101,17 @@ class _PostCardState extends State<PostCard> {
                           ),
                           child: CircleAvatar(
                             radius: 20,
-                            backgroundImage: NetworkImage(post.userAvatarUrl),
+                            backgroundImage: post.userAvatarUrl.isNotEmpty
+                                ? NetworkImage(post.userAvatarUrl)
+                                : null,
+                            child: post.userAvatarUrl.isEmpty
+                                ? Icon(
+                                    Icons.person,
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.black54,
+                                  )
+                                : null,
                           ),
                         ),
                       ),
@@ -182,9 +200,29 @@ class _PostCardState extends State<PostCard> {
                                   context,
                                 ).colorScheme.surfaceContainerHighest,
                                 alignment: Alignment.center,
-                                child: const Icon(
-                                  Icons.image_not_supported_rounded,
-                                  size: 48,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.broken_image_outlined,
+                                      size: 64,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant
+                                          .withOpacity(0.5),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Could not load image',
+                                      style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant
+                                            .withOpacity(0.7),
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -272,7 +310,23 @@ class _PostCardState extends State<PostCard> {
     );
   }
 
-  void _toggleLike() {
+  // Load initial like status from backend
+  Future<void> _loadLikeStatus() async {
+    final isLiked = await _interactionService.isPostLiked(post.id);
+    if (mounted) {
+      setState(() {
+        _isLiked = isLiked;
+      });
+    }
+  }
+
+  // Toggle like with backend integration
+  Future<void> _toggleLike() async {
+    if (_isLiking) return; // Prevent double-tap
+    _isLiking = true;
+
+    // Optimistic UI update
+    final wasLiked = _isLiked;
     setState(() {
       _isLiked = !_isLiked;
       if (_isLiked) {
@@ -282,6 +336,48 @@ class _PostCardState extends State<PostCard> {
       }
       _compressLikeCount = false;
     });
+
+    try {
+      // Call backend
+      final nowLiked = await _interactionService.toggleLike(post.id);
+
+      // Send notification if now liked (and not our own post)
+      if (nowLiked) {
+        final currentUserId = _notificationService.getCurrentUserId();
+        if (currentUserId != null && currentUserId != post.userId) {
+          await _notificationService.sendLikeNotification(
+            fromUserId: currentUserId,
+            toUserId: post.userId,
+            postId: post.id,
+          );
+        }
+      }
+
+      // Update UI with backend response
+      if (mounted) {
+        setState(() {
+          _isLiked = nowLiked;
+        });
+      }
+    } catch (e) {
+      // Revert on error
+      print('❌ Error toggling like: $e');
+      if (mounted) {
+        setState(() {
+          _isLiked = wasLiked;
+          if (wasLiked) {
+            _likeCount += 1;
+          } else if (_likeCount > 0) {
+            _likeCount -= 1;
+          }
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to update like')));
+      }
+    } finally {
+      _isLiking = false;
+    }
   }
 
   void _toggleLikeWithHearts() {
@@ -289,7 +385,7 @@ class _PostCardState extends State<PostCard> {
     final wasLiked = _isLiked;
     _toggleLike();
     // Show hearts from center of image when liking via button
-    if (!wasLiked && _isLiked) {
+    if (!wasLiked && !_isLiked) {
       // Trigger hearts from center of the image (140px from left, 140px from top of image)
       _heartsKey.currentState?.addHeartsFromPosition(const Offset(140, 140));
     }

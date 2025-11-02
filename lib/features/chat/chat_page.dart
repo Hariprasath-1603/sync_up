@@ -11,7 +11,8 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin {
+class _ChatPageState extends State<ChatPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
@@ -55,9 +56,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               // Story-like Quick Access
               _buildQuickAccess(isDark),
               // Chat List
-              Expanded(
-                child: _buildChatList(isDark),
-              ),
+              Expanded(child: _buildChatList(isDark)),
             ],
           ),
         ),
@@ -76,10 +75,14 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               // Back Button
               Container(
                 decoration: BoxDecoration(
-                  color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                  color: (isDark ? Colors.white : Colors.black).withOpacity(
+                    0.05,
+                  ),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
+                    color: (isDark ? Colors.white : Colors.black).withOpacity(
+                      0.1,
+                    ),
                     width: 1,
                   ),
                 ),
@@ -124,15 +127,23 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               // Action Buttons
               Container(
                 decoration: BoxDecoration(
-                  color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                  color: (isDark ? Colors.white : Colors.black).withOpacity(
+                    0.05,
+                  ),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
+                    color: (isDark ? Colors.white : Colors.black).withOpacity(
+                      0.1,
+                    ),
                     width: 1,
                   ),
                 ),
                 child: IconButton(
-                  icon: Icon(Icons.video_call_rounded, color: kPrimary, size: 24),
+                  icon: Icon(
+                    Icons.video_call_rounded,
+                    color: kPrimary,
+                    size: 24,
+                  ),
                   onPressed: () {},
                   padding: const EdgeInsets.all(8),
                   constraints: const BoxConstraints(),
@@ -154,7 +165,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                   ],
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 20),
+                  icon: const Icon(
+                    Icons.edit_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   onPressed: () {
                     _showNewMessageSheet();
                   },
@@ -174,12 +189,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                    color: (isDark ? Colors.white : Colors.black).withOpacity(
+                      0.05,
+                    ),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: _isSearching
                           ? kPrimary.withOpacity(0.5)
-                          : (isDark ? Colors.white : Colors.black).withOpacity(0.1),
+                          : (isDark ? Colors.white : Colors.black).withOpacity(
+                              0.1,
+                            ),
                       width: 1.5,
                     ),
                   ),
@@ -330,49 +349,51 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                       children: [
                         Center(
                           child: CircleAvatar(
-                          radius: 28,
-                          backgroundColor: kPrimary.withOpacity(0.2),
-                          child: Text(
-                            'U${index + 1}',
-                            style: TextStyle(
-                              color: kPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (index % 3 == 0)
-                        Positioned(
-                          right: 4,
-                          bottom: 4,
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: Colors.green,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isDark ? kDarkBackground : kLightBackground,
-                                width: 2,
+                            radius: 28,
+                            backgroundColor: kPrimary.withOpacity(0.2),
+                            child: Text(
+                              'U${index + 1}',
+                              style: TextStyle(
+                                color: kPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
                               ),
                             ),
                           ),
                         ),
-                    ],
+                        if (index % 3 == 0)
+                          Positioned(
+                            right: 4,
+                            bottom: 4,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isDark
+                                      ? kDarkBackground
+                                      : kLightBackground,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'User ${index + 1}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : Colors.black87,
+                  const SizedBox(height: 6),
+                  Text(
+                    'User ${index + 1}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
             ),
           );
         },
@@ -435,12 +456,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 decoration: BoxDecoration(
                   color: hasUnread
                       ? kPrimary.withOpacity(0.05)
-                      : (isDark ? Colors.white : Colors.black).withOpacity(0.03),
+                      : (isDark ? Colors.white : Colors.black).withOpacity(
+                          0.03,
+                        ),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: hasUnread
                         ? kPrimary.withOpacity(0.2)
-                        : (isDark ? Colors.white : Colors.black).withOpacity(0.08),
+                        : (isDark ? Colors.white : Colors.black).withOpacity(
+                            0.08,
+                          ),
                     width: 1,
                   ),
                 ),
@@ -455,7 +480,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                             shape: BoxShape.circle,
                             gradient: hasUnread
                                 ? LinearGradient(
-                                    colors: [kPrimary, kPrimary.withOpacity(0.6)],
+                                    colors: [
+                                      kPrimary,
+                                      kPrimary.withOpacity(0.6),
+                                    ],
                                   )
                                 : null,
                           ),
@@ -483,7 +511,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                 color: Colors.green,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: isDark ? kDarkBackground : kLightBackground,
+                                  color: isDark
+                                      ? kDarkBackground
+                                      : kLightBackground,
                                   width: 2.5,
                                 ),
                               ),
@@ -526,9 +556,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                 child: Text(
                                   'User ${index + 1}',
                                   style: TextStyle(
-                                    fontWeight: hasUnread ? FontWeight.bold : FontWeight.w600,
+                                    fontWeight: hasUnread
+                                        ? FontWeight.bold
+                                        : FontWeight.w600,
                                     fontSize: 16,
-                                    color: isDark ? Colors.white : Colors.black87,
+                                    color: isDark
+                                        ? Colors.white
+                                        : Colors.black87,
                                   ),
                                 ),
                               ),
@@ -537,9 +571,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                 style: TextStyle(
                                   color: hasUnread
                                       ? kPrimary
-                                      : (isDark ? Colors.white60 : Colors.grey.shade600),
+                                      : (isDark
+                                            ? Colors.white60
+                                            : Colors.grey.shade600),
                                   fontSize: 12,
-                                  fontWeight: hasUnread ? FontWeight.w600 : FontWeight.normal,
+                                  fontWeight: hasUnread
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
                                 ),
                               ),
                             ],
@@ -556,7 +594,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                   ),
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
-                                      colors: [kPrimary, kPrimary.withOpacity(0.7)],
+                                      colors: [
+                                        kPrimary,
+                                        kPrimary.withOpacity(0.7),
+                                      ],
                                     ),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
@@ -576,10 +617,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: hasUnread
-                                        ? (isDark ? Colors.white : Colors.black87)
-                                        : (isDark ? Colors.white60 : Colors.grey.shade600),
+                                        ? (isDark
+                                              ? Colors.white
+                                              : Colors.black87)
+                                        : (isDark
+                                              ? Colors.white60
+                                              : Colors.grey.shade600),
                                     fontSize: 14,
-                                    fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
+                                    fontWeight: hasUnread
+                                        ? FontWeight.w500
+                                        : FontWeight.normal,
                                   ),
                                 ),
                               ),
@@ -589,7 +636,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
-                                      colors: [kPrimary, kPrimary.withOpacity(0.8)],
+                                      colors: [
+                                        kPrimary,
+                                        kPrimary.withOpacity(0.8),
+                                      ],
                                     ),
                                     shape: BoxShape.circle,
                                     boxShadow: [
@@ -648,10 +698,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         elevation: 0,
         label: const Text(
           'New Message',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
         icon: const Icon(Icons.add_comment_rounded),
       ),
@@ -727,9 +774,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               child: Center(
                 child: Text(
                   'Select a contact',
-                  style: TextStyle(
-                    color: Colors.grey.shade400,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade400),
                 ),
               ),
             ),
@@ -772,8 +817,14 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400),
-              title: Text('Delete chat', style: TextStyle(color: Colors.red.shade400)),
+              leading: Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.red.shade400,
+              ),
+              title: Text(
+                'Delete chat',
+                style: TextStyle(color: Colors.red.shade400),
+              ),
               onTap: () => Navigator.pop(context),
             ),
             const SizedBox(height: 20),

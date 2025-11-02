@@ -62,16 +62,16 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
               ValueListenableBuilder<bool>(
                 valueListenable: _navIsVisible,
                 builder: (context, isVisible, _) {
-                  return IgnorePointer(
-                    ignoring: !isVisible,
-                    child: AnimatedSlide(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      offset: isVisible ? Offset.zero : const Offset(0, 0.1),
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeInOut,
-                        opacity: isVisible ? 1 : 0,
+                  return AnimatedSlide(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    offset: isVisible ? Offset.zero : const Offset(0, 0.1),
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeInOut,
+                      opacity: isVisible ? 1 : 0,
+                      child: IgnorePointer(
+                        ignoring: !isVisible,
                         child: const Align(
                           alignment: Alignment.bottomCenter,
                           child: AnimatedNavBar(),

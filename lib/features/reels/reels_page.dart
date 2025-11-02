@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme.dart';
+import '../profile/models/post_model.dart';
 
 class ReelsPage extends StatefulWidget {
   const ReelsPage({super.key});
@@ -10,53 +12,86 @@ class ReelsPage extends StatefulWidget {
 
 class _ReelsPageState extends State<ReelsPage> {
   final PageController _pageController = PageController();
+  final SupabaseClient _supabase = Supabase.instance.client;
 
-  final List<ReelData> _reels = [
-    ReelData(
-      videoUrl: 'https://picsum.photos/seed/reel1/400/800',
-      username: 'user_john',
-      description: 'Amazing sunset vibes 🌅 #nature #sunset #beautiful',
-      avatarUrl: 'https://i.pravatar.cc/100?img=10',
-      likes: 1234,
-      comments: 89,
-      shares: 45,
-      isLiked: false,
-      isSaved: false,
-    ),
-    ReelData(
-      videoUrl: 'https://picsum.photos/seed/reel2/400/800',
-      username: 'travel_diaries',
-      description: 'Exploring the mountains ⛰️ #travel #adventure #explore',
-      avatarUrl: 'https://i.pravatar.cc/100?img=20',
-      likes: 5678,
-      comments: 234,
-      shares: 123,
-      isLiked: false,
-      isSaved: false,
-    ),
-    ReelData(
-      videoUrl: 'https://picsum.photos/seed/reel3/400/800',
-      username: 'fitness_guru',
-      description: 'Morning workout routine 💪 #fitness #gym #motivation',
-      avatarUrl: 'https://i.pravatar.cc/100?img=30',
-      likes: 3456,
-      comments: 156,
-      shares: 78,
-      isLiked: true,
-      isSaved: false,
-    ),
-    ReelData(
-      videoUrl: 'https://picsum.photos/seed/reel4/400/800',
-      username: 'food_lover',
-      description: 'Delicious pasta recipe 🍝 #food #cooking #foodie',
-      avatarUrl: 'https://i.pravatar.cc/100?img=40',
-      likes: 2890,
-      comments: 98,
-      shares: 67,
-      isLiked: false,
-      isSaved: true,
-    ),
-  ];
+  List<PostModel> _reels = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReels();
+  }
+
+  Future<void> _loadReels() async {
+    try {
+      setState(() => _isLoading = true);
+
+      final currentUserId = _supabase.auth.currentUser?.id;
+      if (currentUserId == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Get reels from database
+      final result = await _supabase
+          .from('posts')
+          .select('''
+            *,
+            users!posts_user_id_fkey(
+              uid,
+              username,
+              username_display,
+              display_name,
+              photo_url
+            )
+          ''')
+          .eq('type', 'reel')
+          .order('created_at', ascending: false)
+          .limit(30);
+
+      final reels = (result as List).map((postData) {
+        final user = postData['users'];
+        final username =
+            user['username_display'] ??
+            user['display_name'] ??
+            user['username'] ??
+            'User';
+
+        final mediaUrls = postData['media_urls'] != null
+            ? List<String>.from(postData['media_urls'])
+            : <String>[];
+
+        return PostModel(
+          id: postData['id'],
+          userId: postData['user_id'],
+          type: PostType.reel,
+          mediaUrls: mediaUrls,
+          thumbnailUrl:
+              postData['thumbnail_url'] ??
+              (mediaUrls.isNotEmpty ? mediaUrls[0] : ''),
+          username: username,
+          userAvatar: user['photo_url'] ?? '',
+          timestamp: DateTime.parse(postData['created_at']),
+          caption: postData['caption'] ?? '',
+          location: postData['location'],
+          likes: postData['likes_count'] ?? 0,
+          comments: postData['comments_count'] ?? 0,
+          shares: postData['shares_count'] ?? 0,
+          views: postData['views_count'] ?? 0,
+          isFollowing: postData['user_id'] != currentUserId,
+        );
+      }).toList();
+
+      setState(() {
+        _reels = reels;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('❌ Error loading reels: $e');
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,25 +99,39 @@ class _ReelsPageState extends State<ReelsPage> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Main Reels Content
-          PageView.builder(
-            controller: _pageController,
-            scrollDirection: Axis.vertical,
-            onPageChanged: (index) {
-              // Page changed to index
-            },
-            itemCount: _reels.length,
-            itemBuilder: (context, index) {
-              return _buildReelItem(_reels[index], index);
-            },
-          ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          : _reels.isEmpty
+          ? const Center(
+              child: Text(
+                'No reels available',
+                style: TextStyle(color: Colors.white),
+              ),
+            )
+          : Stack(
+              children: [
+                // Main Reels Content
+                PageView.builder(
+                  controller: _pageController,
+                  scrollDirection: Axis.vertical,
+                  onPageChanged: (index) {
+                    // Page changed to index
+                  },
+                  itemCount: _reels.length,
+                  itemBuilder: (context, index) {
+                    return _buildReelItem(_reels[index], index);
+                  },
+                ),
 
-          // Top Bar with Camera and search
-          Positioned(top: 0, left: 0, right: 0, child: _buildTopBar(isDark)),
-        ],
-      ),
+                // Top Bar with camera and search
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: _buildTopBar(isDark),
+                ),
+              ],
+            ),
     );
   }
 
@@ -144,12 +193,15 @@ class _ReelsPageState extends State<ReelsPage> {
     );
   }
 
-  Widget _buildReelItem(ReelData reel, int index) {
+  Widget _buildReelItem(PostModel reel, int index) {
     return Stack(
       fit: StackFit.expand,
       children: [
         // Video/Image Background
-        Image.network(reel.videoUrl, fit: BoxFit.cover),
+        if (reel.mediaUrls.isNotEmpty)
+          Image.network(reel.mediaUrls.first, fit: BoxFit.cover)
+        else
+          Container(color: Colors.grey[900]),
 
         // Gradient Overlays
         Positioned.fill(
@@ -187,24 +239,16 @@ class _ReelsPageState extends State<ReelsPage> {
     );
   }
 
-  Widget _buildActionButtons(ReelData reel, int index) {
+  Widget _buildActionButtons(PostModel reel, int index) {
     return Column(
       children: [
         // Like Button
         _buildActionButton(
-          icon: reel.isLiked ? Icons.favorite : Icons.favorite_border,
+          icon: Icons.favorite_border, // TODO: Check if liked
           label: _formatCount(reel.likes),
-          color: reel.isLiked ? Colors.red : Colors.white,
+          color: Colors.white,
           onTap: () {
-            setState(() {
-              _reels[index].isLiked = !_reels[index].isLiked;
-              if (_reels[index].isLiked) {
-                _reels[index].likes++;
-              } else {
-                _reels[index].likes--;
-              }
-            });
-            _showMessage(reel.isLiked ? 'Liked' : 'Unliked');
+            _showMessage('Like feature coming soon');
           },
         ),
         const SizedBox(height: 20),
@@ -231,14 +275,11 @@ class _ReelsPageState extends State<ReelsPage> {
 
         // Save Button
         _buildActionButton(
-          icon: reel.isSaved ? Icons.bookmark : Icons.bookmark_border,
+          icon: Icons.bookmark_border, // TODO: Check if saved
           label: '',
-          color: reel.isSaved ? Colors.yellow : Colors.white,
+          color: Colors.white,
           onTap: () {
-            setState(() {
-              _reels[index].isSaved = !_reels[index].isSaved;
-            });
-            _showMessage(reel.isSaved ? 'Saved' : 'Removed from saved');
+            _showMessage('Save feature coming soon');
           },
         ),
         const SizedBox(height: 20),
@@ -288,7 +329,7 @@ class _ReelsPageState extends State<ReelsPage> {
     );
   }
 
-  Widget _buildUserInfo(ReelData reel) {
+  Widget _buildUserInfo(PostModel reel) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -303,7 +344,12 @@ class _ReelsPageState extends State<ReelsPage> {
               ),
               child: CircleAvatar(
                 radius: 16,
-                backgroundImage: NetworkImage(reel.avatarUrl),
+                backgroundImage: reel.userAvatar.isNotEmpty
+                    ? NetworkImage(reel.userAvatar)
+                    : null,
+                child: reel.userAvatar.isEmpty
+                    ? const Icon(Icons.person, color: Colors.white)
+                    : null,
               ),
             ),
             const SizedBox(width: 10),
@@ -317,44 +363,46 @@ class _ReelsPageState extends State<ReelsPage> {
               ),
             ),
             const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () {
-                _showMessage('Follow ${reel.username}');
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white, width: 1.2),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'Follow',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+            if (reel.isFollowing)
+              GestureDetector(
+                onTap: () {
+                  _showMessage('Follow ${reel.username}');
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white, width: 1.2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Follow',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 8),
 
-        // Description
-        Text(
-          reel.description,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            shadows: [Shadow(color: Colors.black87, blurRadius: 8)],
+        // Description/Caption
+        if (reel.caption.isNotEmpty)
+          Text(
+            reel.caption,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              shadows: [Shadow(color: Colors.black87, blurRadius: 8)],
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
         const SizedBox(height: 6),
 
         // Audio Info
@@ -399,16 +447,16 @@ class _ReelsPageState extends State<ReelsPage> {
     );
   }
 
-  void _showCommentsSheet(ReelData reel) {
+  void _showCommentsSheet(PostModel reel) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _CommentsSheet(reel: reel),
+      builder: (context) => _CommentsSheet(postId: reel.id),
     );
   }
 
-  void _showShareSheet(ReelData reel) {
+  void _showShareSheet(PostModel reel) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -416,7 +464,7 @@ class _ReelsPageState extends State<ReelsPage> {
     );
   }
 
-  void _showMoreOptions(ReelData reel) {
+  void _showMoreOptions(PostModel reel) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -425,36 +473,11 @@ class _ReelsPageState extends State<ReelsPage> {
   }
 }
 
-// Data Model
-class ReelData {
-  final String videoUrl;
-  final String username;
-  final String description;
-  final String avatarUrl;
-  int likes;
-  final int comments;
-  final int shares;
-  bool isLiked;
-  bool isSaved;
-
-  ReelData({
-    required this.videoUrl,
-    required this.username,
-    required this.description,
-    required this.avatarUrl,
-    required this.likes,
-    required this.comments,
-    required this.shares,
-    required this.isLiked,
-    required this.isSaved,
-  });
-}
-
-// Comments Bottom Sheet
+// Comments Bottom Sheet with Real Data
 class _CommentsSheet extends StatefulWidget {
-  final ReelData reel;
+  final String postId;
 
-  const _CommentsSheet({required this.reel});
+  const _CommentsSheet({required this.postId});
 
   @override
   State<_CommentsSheet> createState() => _CommentsSheetState();
@@ -462,6 +485,100 @@ class _CommentsSheet extends StatefulWidget {
 
 class _CommentsSheetState extends State<_CommentsSheet> {
   final TextEditingController _commentController = TextEditingController();
+  final SupabaseClient _supabase = Supabase.instance.client;
+  List<Map<String, dynamic>> _comments = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadComments();
+  }
+
+  Future<void> _loadComments() async {
+    try {
+      setState(() => _isLoading = true);
+
+      final result = await _supabase
+          .from('comments')
+          .select('''
+            *,
+            users!comments_user_id_fkey(
+              username,
+              username_display,
+              display_name,
+              photo_url
+            )
+          ''')
+          .eq('post_id', widget.postId)
+          .order('created_at', ascending: false);
+
+      final comments = (result as List).map((commentData) {
+        final user = commentData['users'];
+        final username =
+            user['username_display'] ??
+            user['display_name'] ??
+            user['username'] ??
+            'User';
+
+        return {
+          'id': commentData['id'],
+          'text': commentData['text'],
+          'username': username,
+          'userAvatar': user['photo_url'] ?? '',
+          'timestamp': DateTime.parse(commentData['created_at']),
+          'likes': commentData['likes_count'] ?? 0,
+        };
+      }).toList();
+
+      setState(() {
+        _comments = comments;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('❌ Error loading comments: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _addComment() async {
+    if (_commentController.text.isEmpty) return;
+
+    try {
+      final currentUser = _supabase.auth.currentUser;
+      if (currentUser == null) return;
+
+      await _supabase.from('comments').insert({
+        'post_id': widget.postId,
+        'user_id': currentUser.id,
+        'text': _commentController.text,
+        'likes_count': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // Increment comments count
+      await _supabase.rpc(
+        'increment_comments_count',
+        params: {'post_id_input': widget.postId},
+      );
+
+      _commentController.clear();
+      _loadComments(); // Reload comments
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Comment posted!')));
+      }
+    } catch (e) {
+      print('❌ Error adding comment: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to post comment')));
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -497,7 +614,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${widget.reel.comments} Comments',
+                  '${_comments.length} Comments',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -514,13 +631,17 @@ class _CommentsSheetState extends State<_CommentsSheet> {
 
           // Comments List
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: 5,
-              itemBuilder: (context, index) {
-                return _buildCommentItem(index);
-              },
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _comments.isEmpty
+                ? const Center(child: Text('No comments yet'))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _comments.length,
+                    itemBuilder: (context, index) {
+                      return _buildCommentItem(_comments[index]);
+                    },
+                  ),
           ),
 
           // Comment Input
@@ -558,14 +679,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                   const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.send, color: kPrimary),
-                    onPressed: () {
-                      if (_commentController.text.isNotEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Comment posted!')),
-                        );
-                        _commentController.clear();
-                      }
-                    },
+                    onPressed: _addComment,
                   ),
                 ],
               ),
@@ -576,7 +690,15 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     );
   }
 
-  Widget _buildCommentItem(int index) {
+  Widget _buildCommentItem(Map<String, dynamic> comment) {
+    final timestamp = comment['timestamp'] as DateTime;
+    final timeDiff = DateTime.now().difference(timestamp);
+    final timeAgo = timeDiff.inDays > 0
+        ? '${timeDiff.inDays}d'
+        : timeDiff.inHours > 0
+        ? '${timeDiff.inHours}h'
+        : '${timeDiff.inMinutes}m';
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -584,9 +706,12 @@ class _CommentsSheetState extends State<_CommentsSheet> {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundImage: NetworkImage(
-              'https://i.pravatar.cc/100?img=${index + 50}',
-            ),
+            backgroundImage: comment['userAvatar'].isNotEmpty
+                ? NetworkImage(comment['userAvatar'])
+                : null,
+            child: comment['userAvatar'].isEmpty
+                ? const Icon(Icons.person, size: 18)
+                : null,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -596,7 +721,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                 Row(
                   children: [
                     Text(
-                      'user_${index + 1}',
+                      comment['username'],
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -604,19 +729,24 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '${index + 1}h',
+                      timeAgo,
                       style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'This is an amazing reel! Love the content 🔥',
+                  comment['text'],
                   style: TextStyle(color: Colors.grey[800], fontSize: 14),
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
+                    Text(
+                      '${comment['likes']} likes',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    ),
+                    const SizedBox(width: 16),
                     Text(
                       'Reply',
                       style: TextStyle(
@@ -644,7 +774,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
 
 // Share Bottom Sheet
 class _ShareSheet extends StatelessWidget {
-  final ReelData reel;
+  final PostModel reel;
 
   const _ShareSheet({required this.reel});
 
@@ -727,7 +857,7 @@ class _ShareSheet extends StatelessWidget {
 
 // More Options Bottom Sheet
 class _MoreOptionsSheet extends StatelessWidget {
-  final ReelData reel;
+  final PostModel reel;
 
   const _MoreOptionsSheet({required this.reel});
 

@@ -713,12 +713,7 @@ class _PostViewerInstagramStyleState extends State<PostViewerInstagramStyle>
   }
 
   Widget _buildLikedBySection(PostModel post, bool isDark) {
-    // Mock data for demonstration - replace with actual liked users
-    final List<String> likedByAvatars = [
-      'https://i.pravatar.cc/150?img=1',
-      'https://i.pravatar.cc/150?img=2',
-      'https://i.pravatar.cc/150?img=3',
-    ];
+    // TODO: Fetch actual liked users from database
     final String likedByName = post.username.isNotEmpty
         ? post.username
         : 'user_${post.userId.substring(0, 6)}';
@@ -734,37 +729,11 @@ class _PostViewerInstagramStyleState extends State<PostViewerInstagramStyle>
       },
       child: Row(
         children: [
-          // Avatars stack
-          SizedBox(
-            width: 50,
-            height: 24,
-            child: Stack(
-              children: [
-                for (
-                  int i = 0;
-                  i < (likedByAvatars.length > 3 ? 3 : likedByAvatars.length);
-                  i++
-                )
-                  Positioned(
-                    left: i * 16.0,
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDark ? kDarkBackground : kLightBackground,
-                          width: 2,
-                        ),
-                      ),
-                      child: CircleAvatar(
-                        radius: 11,
-                        backgroundImage: NetworkImage(likedByAvatars[i]),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+          // Generic likes icon instead of avatars
+          Icon(
+            Icons.favorite,
+            size: 20,
+            color: isDark ? Colors.white70 : Colors.black54,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1193,7 +1162,7 @@ class _PostViewerInstagramStyleState extends State<PostViewerInstagramStyle>
                   child: post.mediaUrls.isNotEmpty
                       ? Image.network(
                           post.mediaUrls[_currentMediaIndex],
-                          fit: BoxFit.cover,
+                          fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => Container(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
@@ -1522,8 +1491,13 @@ class _PostViewerInstagramStyleState extends State<PostViewerInstagramStyle>
                     // User avatar
                     CircleAvatar(
                       radius: 18,
-                      backgroundImage: NetworkImage(
-                        'https://i.pravatar.cc/150?img=1',
+                      backgroundColor: isDark
+                          ? Colors.grey[800]
+                          : Colors.grey[300],
+                      child: Icon(
+                        Icons.person,
+                        size: 20,
+                        color: isDark ? Colors.white70 : Colors.black54,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1588,11 +1562,14 @@ class _PostViewerInstagramStyleState extends State<PostViewerInstagramStyle>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Avatar
+        // Avatar - Use theme-based placeholder
         CircleAvatar(
           radius: 18,
-          backgroundImage: NetworkImage(
-            'https://i.pravatar.cc/150?img=${username.hashCode % 70}',
+          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
+          child: Icon(
+            Icons.person,
+            size: 20,
+            color: isDark ? Colors.white70 : Colors.black54,
           ),
         ),
         const SizedBox(width: 12),
@@ -1998,7 +1975,7 @@ class _PostViewerInstagramStyleState extends State<PostViewerInstagramStyle>
                       if (isOwnPost) ...[
                         _buildShareOption(
                           icon: Icons.edit_outlined,
-                          label: 'Edit Caption',
+                          label: 'Edit Post',
                           onTap: () {
                             Navigator.pop(context);
                             _showEditCaptionDialog();
@@ -2014,6 +1991,69 @@ class _PostViewerInstagramStyleState extends State<PostViewerInstagramStyle>
                           onTap: () {
                             Navigator.pop(context);
                             _showInsightsSheet();
+                          },
+                          isDark: isDark,
+                        ),
+
+                        _buildDivider(isDark),
+
+                        _buildShareOption(
+                          icon: Icons.share_outlined,
+                          label: 'Share Post',
+                          onTap: () {
+                            Navigator.pop(context);
+                            HapticFeedback.lightImpact();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Share functionality coming soon',
+                                ),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                          isDark: isDark,
+                        ),
+
+                        _buildDivider(isDark),
+
+                        _buildShareOption(
+                          icon: Icons.link_rounded,
+                          label: 'Copy Link',
+                          onTap: () {
+                            Navigator.pop(context);
+                            HapticFeedback.lightImpact();
+                            final postLink = _postService.getPostLink(
+                              _currentPost.id,
+                            );
+                            Clipboard.setData(ClipboardData(text: postLink));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Link copied to clipboard'),
+                                backgroundColor: Colors.green,
+                                behavior: SnackBarBehavior.floating,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          isDark: isDark,
+                        ),
+
+                        _buildDivider(isDark),
+
+                        _buildShareOption(
+                          icon: Icons.people_outline,
+                          label: 'Post Settings',
+                          onTap: () {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Post settings feature coming soon',
+                                ),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
                           },
                           isDark: isDark,
                         ),

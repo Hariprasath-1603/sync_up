@@ -4,6 +4,7 @@ class UserModel {
   final String email;
   final String? displayName;
   final String? photoURL;
+  final String? coverPhotoUrl; // Cover/banner photo
   final String? bio;
   final String? dateOfBirth;
   final String? gender;
@@ -19,6 +20,7 @@ class UserModel {
   final bool isPrivate;
   final bool showActivityStatus;
   final bool allowMessagesFromEveryone;
+  final bool hasStories; // New field for stories status
 
   UserModel({
     required this.uid,
@@ -26,6 +28,7 @@ class UserModel {
     required this.email,
     this.displayName,
     this.photoURL,
+    this.coverPhotoUrl,
     this.bio,
     this.dateOfBirth,
     this.gender,
@@ -41,6 +44,7 @@ class UserModel {
     this.isPrivate = false,
     this.showActivityStatus = true,
     this.allowMessagesFromEveryone = false,
+    this.hasStories = false,
   });
 
   // Convert UserModel to Map for Firestore
@@ -53,6 +57,7 @@ class UserModel {
       'email': email.toLowerCase(),
       'displayName': displayName,
       'photoURL': photoURL,
+      'coverPhotoUrl': coverPhotoUrl,
       'bio': bio,
       'dateOfBirth': dateOfBirth,
       'gender': gender,
@@ -68,6 +73,7 @@ class UserModel {
       'isPrivate': isPrivate,
       'showActivityStatus': showActivityStatus,
       'allowMessagesFromEveryone': allowMessagesFromEveryone,
+      'hasStories': hasStories,
     };
   }
 
@@ -83,6 +89,7 @@ class UserModel {
       email: map['email'] ?? '',
       displayName: map['displayName'] ?? map['display_name'],
       photoURL: map['photoURL'] ?? map['photo_url'],
+      coverPhotoUrl: map['coverPhotoUrl'] ?? map['cover_photo_url'],
       bio: map['bio'],
       dateOfBirth: map['dateOfBirth'] ?? map['date_of_birth'],
       gender: map['gender'],
@@ -104,8 +111,13 @@ class UserModel {
       followers: List<String>.from(map['followers'] ?? []),
       following: List<String>.from(map['following'] ?? []),
       isPrivate: map['isPrivate'] ?? map['is_private'] ?? false,
-      showActivityStatus: map['showActivityStatus'] ?? map['show_activity_status'] ?? true,
-      allowMessagesFromEveryone: map['allowMessagesFromEveryone'] ?? map['allow_messages_from_everyone'] ?? false,
+      showActivityStatus:
+          map['showActivityStatus'] ?? map['show_activity_status'] ?? true,
+      allowMessagesFromEveryone:
+          map['allowMessagesFromEveryone'] ??
+          map['allow_messages_from_everyone'] ??
+          false,
+      hasStories: map['hasStories'] ?? map['has_stories'] ?? false,
     );
   }
 
@@ -143,6 +155,7 @@ class UserModel {
     String? email,
     String? displayName,
     String? photoURL,
+    String? coverPhotoUrl,
     String? bio,
     String? dateOfBirth,
     String? gender,
@@ -158,6 +171,7 @@ class UserModel {
     bool? isPrivate,
     bool? showActivityStatus,
     bool? allowMessagesFromEveryone,
+    bool? hasStories,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -165,6 +179,7 @@ class UserModel {
       email: email ?? this.email,
       displayName: displayName ?? this.displayName,
       photoURL: photoURL ?? this.photoURL,
+      coverPhotoUrl: coverPhotoUrl ?? this.coverPhotoUrl,
       bio: bio ?? this.bio,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       gender: gender ?? this.gender,
@@ -179,7 +194,9 @@ class UserModel {
       following: following ?? this.following,
       isPrivate: isPrivate ?? this.isPrivate,
       showActivityStatus: showActivityStatus ?? this.showActivityStatus,
-      allowMessagesFromEveryone: allowMessagesFromEveryone ?? this.allowMessagesFromEveryone,
+      allowMessagesFromEveryone:
+          allowMessagesFromEveryone ?? this.allowMessagesFromEveryone,
+      hasStories: hasStories ?? this.hasStories,
     );
   }
 }

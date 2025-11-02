@@ -201,6 +201,27 @@ class DatabaseService {
     }
   }
 
+  // ==================== PROFILE UPDATES ====================
+
+  /// Update user's cover photo URL
+  Future<bool> updateUserCoverPhoto(String uid, String? coverPhotoUrl) async {
+    try {
+      await _supabase
+          .from('users')
+          .update({
+            'cover_photo_url': coverPhotoUrl,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('uid', uid);
+
+      print('Cover photo updated successfully for user: $uid');
+      return true;
+    } catch (e) {
+      print('Error updating cover photo: $e');
+      return false;
+    }
+  }
+
   // ==================== SEARCH ====================
 
   Future<List<UserModel>> searchUsers(String query, {int limit = 20}) async {

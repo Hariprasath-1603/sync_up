@@ -2516,61 +2516,8 @@ class _ShareToggleState extends State<_ShareToggle> {
 
 class _StoryVerseMockData {
   static List<StoryVerseStory> get stories {
-    final gradientClip = StoryVerseClip(
-      id: 'demo-1',
-      mode: StoryVerseMode.photo,
-      imageBytes: null,
-      duration: const Duration(seconds: 6),
-      mood: 'Adventure',
-    );
-    return [
-      StoryVerseStory(
-        id: 'story-1',
-        ownerName: 'Amelia',
-        ownerAvatar: 'https://i.pravatar.cc/150?img=32',
-        mood: 'Sunlit',
-        timestamp: DateTime.now().subtract(const Duration(minutes: 35)),
-        clips: [gradientClip],
-        music: const StoryVerseMusicTrack(
-          id: 'track-1',
-          title: 'Golden Hour',
-          artist: 'Aline Fox',
-          artworkUrl:
-              'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
-        ),
-      ),
-      StoryVerseStory(
-        id: 'story-2',
-        ownerName: 'Kai',
-        ownerAvatar: 'https://i.pravatar.cc/150?img=30',
-        mood: 'Chillwave',
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        clips: [gradientClip],
-        hasNewContent: false,
-        music: const StoryVerseMusicTrack(
-          id: 'track-2',
-          title: 'Night Drive',
-          artist: 'Neon Boulevard',
-          artworkUrl:
-              'https://images.unsplash.com/photo-1498050108023-c5249f4df085',
-        ),
-      ),
-      StoryVerseStory(
-        id: 'story-3',
-        ownerName: 'Sasha',
-        ownerAvatar: 'https://i.pravatar.cc/150?img=43',
-        mood: 'Romantic',
-        timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-        clips: [gradientClip],
-        music: const StoryVerseMusicTrack(
-          id: 'track-3',
-          title: 'Starlit',
-          artist: 'Aurora Bloom',
-          artworkUrl:
-              'https://images.unsplash.com/photo-1517816743773-6e0fd518b4a6',
-        ),
-      ),
-    ];
+    // Return empty list - stories should come from database
+    return [];
   }
 }
 

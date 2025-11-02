@@ -1,56 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../core/providers/post_provider.dart';
 
-class UserPostsPage extends StatelessWidget {
+class UserPostsPage extends StatefulWidget {
   const UserPostsPage({super.key});
 
-  // Sample posts data - matches the profile page posts
-  final List<Map<String, dynamic>> _posts = const [
-    {
-      'imageUrl': 'https://picsum.photos/seed/post0/400/600',
-      'likes': '2.4K',
-      'comments': '89',
-    },
-    {
-      'imageUrl': 'https://picsum.photos/seed/post1/400/600',
-      'likes': '3.1K',
-      'comments': '124',
-    },
-    {
-      'imageUrl': 'https://picsum.photos/seed/post2/400/600',
-      'likes': '1.8K',
-      'comments': '67',
-    },
-    {
-      'imageUrl': 'https://picsum.photos/seed/post3/400/600',
-      'likes': '4.2K',
-      'comments': '203',
-    },
-    {
-      'imageUrl': 'https://picsum.photos/seed/post4/400/600',
-      'likes': '2.9K',
-      'comments': '156',
-    },
-    {
-      'imageUrl': 'https://picsum.photos/seed/post5/400/600',
-      'likes': '3.7K',
-      'comments': '178',
-    },
-    {
-      'imageUrl': 'https://picsum.photos/seed/post6/400/600',
-      'likes': '5.1K',
-      'comments': '234',
-    },
-    {
-      'imageUrl': 'https://picsum.photos/seed/post7/400/600',
-      'likes': '2.3K',
-      'comments': '91',
-    },
-  ];
+  @override
+  State<UserPostsPage> createState() => _UserPostsPageState();
+}
+
+class _UserPostsPageState extends State<UserPostsPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Load user posts from database
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = context.read<AuthProvider>();
+      final postProvider = context.read<PostProvider>();
+      final userId = authProvider.currentUserId;
+
+      if (userId != null) {
+        postProvider.loadUserPosts(userId);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final authProvider = context.watch<AuthProvider>();
+    final postProvider = context.watch<PostProvider>();
+    final userId = authProvider.currentUserId;
+
+    final userPosts = userId != null ? postProvider.getUserPosts(userId) : [];
 
     return Scaffold(
       body: Container(
@@ -99,7 +83,7 @@ class UserPostsPage extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '${_posts.length} posts',
+                          '${userPosts.length} posts',
                           style: TextStyle(
                             fontSize: 14,
                             color: isDark ? Colors.white60 : Colors.grey[600],
@@ -110,27 +94,64 @@ class UserPostsPage extends StatelessWidget {
                   ],
                 ),
               ),
-              // Posts Grid
+              // Posts Grid or Empty State
               Expanded(
-                child: GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 4,
-                    mainAxisSpacing: 4,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: _posts.length,
-                  itemBuilder: (context, index) {
-                    final post = _posts[index];
-                    return _buildPostCard(
-                      post['imageUrl']!,
-                      post['likes']!,
-                      post['comments']!,
-                      isDark,
-                    );
-                  },
-                ),
+                child: userPosts.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.photo_library_outlined,
+                              size: 64,
+                              color: isDark ? Colors.white24 : Colors.grey[300],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No posts yet',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? Colors.white60
+                                    : Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Share your first photo or video',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isDark
+                                    ? Colors.white38
+                                    : Colors.grey[400],
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : GridView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 4,
+                              mainAxisSpacing: 4,
+                              childAspectRatio: 0.75,
+                            ),
+                        itemCount: userPosts.length,
+                        itemBuilder: (context, index) {
+                          final post = userPosts[index];
+                          return _buildPostCard(
+                            post.mediaUrls.isNotEmpty
+                                ? post.mediaUrls.first
+                                : '',
+                            post.likes.toString(),
+                            post.comments.toString(),
+                            isDark,
+                          );
+                        },
+                      ),
               ),
             ],
           ),

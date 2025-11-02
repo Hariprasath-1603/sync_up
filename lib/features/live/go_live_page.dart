@@ -30,22 +30,7 @@ class _GoLivePageState extends State<GoLivePage> {
   final _reactionController = FloatingReactionController();
   final _textController = TextEditingController();
 
-  final List<String> _mockUsernames = [
-    'Lena',
-    'Priya',
-    'Tom',
-    'Haruki',
-    'Amelia',
-    'Diego',
-    'Hana',
-    'Maya',
-    'Ezra',
-  ];
-
   final List<LiveComment> _commentHistory = [];
-  Timer? _mockCommentTimer;
-  Timer? _mockJoinTimer;
-  Timer? _mockReactionTimer;
   Timer? _giftTimer;
   String? _latestJoin;
 
@@ -86,9 +71,6 @@ class _GoLivePageState extends State<GoLivePage> {
 
   @override
   void dispose() {
-    _mockCommentTimer?.cancel();
-    _mockJoinTimer?.cancel();
-    _mockReactionTimer?.cancel();
     _giftTimer?.cancel();
     _cameraController?.dispose();
     _commentController.dispose();
@@ -98,51 +80,11 @@ class _GoLivePageState extends State<GoLivePage> {
   }
 
   void _seedInitialComments() {
-    const seed = [
-      LiveComment(username: 'Priya', message: 'Love this energy! 🔥'),
-      LiveComment(username: 'Lena', message: 'You look stunning ✨'),
-      LiveComment(username: 'Tom', message: 'Tuning in from NYC!'),
-    ];
-    for (final comment in seed) {
-      _pushComment(comment);
-    }
+    // No initial comments - wait for real viewers
   }
 
   void _startMockStreams() {
-    final random = Random();
-    _mockCommentTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (!_commentsEnabled) return;
-      final user = _mockUsernames[random.nextInt(_mockUsernames.length)];
-      final phrases = [
-        'This is epic! 💥',
-        'Sending love from Berlin ❤️',
-        'Drop that playlist!',
-        'The vibes are immaculate ✨',
-        'Can we get a sneak peek?',
-      ];
-      _pushComment(
-        LiveComment(
-          username: user,
-          message: phrases[random.nextInt(phrases.length)],
-        ),
-      );
-    });
-
-    _mockJoinTimer = Timer.periodic(const Duration(seconds: 11), (_) {
-      final user = _mockUsernames[random.nextInt(_mockUsernames.length)];
-      final message = '@$user joined the live';
-      setState(() => _latestJoin = message);
-      Future<void>.delayed(const Duration(seconds: 3), () {
-        if (mounted && _latestJoin == message) {
-          setState(() => _latestJoin = null);
-        }
-      });
-    });
-
-    _mockReactionTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      const emojis = ['❤️', '💜', '💛', '🔥'];
-      _reactionController.addReaction(emojis[random.nextInt(emojis.length)]);
-    });
+    // Mock streams removed - use real live stream data
   }
 
   Future<void> _initializeLiveHardware() async {

@@ -18,7 +18,7 @@ class _FollowersFollowingPageState extends State<FollowersFollowingPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final FollowService _followService = FollowService();
-  
+
   List<Map<String, dynamic>> _followers = [];
   List<Map<String, dynamic>> _following = [];
   bool _isLoadingFollowers = false;
@@ -38,7 +38,7 @@ class _FollowersFollowingPageState extends State<FollowersFollowingPage>
   Future<void> _loadData() async {
     final authProvider = context.read<AuthProvider>();
     final currentUserId = authProvider.currentUserId;
-    
+
     if (currentUserId == null) return;
 
     setState(() {
@@ -68,10 +68,13 @@ class _FollowersFollowingPageState extends State<FollowersFollowingPage>
     super.dispose();
   }
 
-  Future<void> _toggleFollow(String targetUserId, bool isCurrentlyFollowing) async {
+  Future<void> _toggleFollow(
+    String targetUserId,
+    bool isCurrentlyFollowing,
+  ) async {
     final authProvider = context.read<AuthProvider>();
     final currentUserId = authProvider.currentUserId;
-    
+
     if (currentUserId == null) return;
 
     if (isCurrentlyFollowing) {
@@ -228,7 +231,7 @@ class _FollowersFollowingPageState extends State<FollowersFollowingPage>
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _isLoadingFollowers 
+                    _isLoadingFollowers
                         ? const Center(child: CircularProgressIndicator())
                         : _buildUserList(_followers, true, isDark),
                     _isLoadingFollowing
@@ -344,16 +347,12 @@ class _FollowersFollowingPageState extends State<FollowersFollowingPage>
                       ),
                     ),
                     // Follow/Following button
-                    _buildFollowButton(
-                      user['isFollowing'] ?? false,
-                      () {
-                        final userId = user['uid'] as String?;
-                        if (userId != null) {
-                          _toggleFollow(userId, user['isFollowing'] ?? false);
-                        }
-                      },
-                      isDark,
-                    ),
+                    _buildFollowButton(user['isFollowing'] ?? false, () {
+                      final userId = user['uid'] as String?;
+                      if (userId != null) {
+                        _toggleFollow(userId, user['isFollowing'] ?? false);
+                      }
+                    }, isDark),
                   ],
                 ),
               ),

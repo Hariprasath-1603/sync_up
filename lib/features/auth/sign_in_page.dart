@@ -7,7 +7,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/services/preferences_service.dart';
 
 // Import OAuthProvider enum
-import 'package:supabase_flutter/supabase_flutter.dart' show OAuthProvider;
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});

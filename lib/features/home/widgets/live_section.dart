@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
 import '../../live/live_viewer_page.dart';
+import '../../live/go_live_page.dart';
 import '../../live/all_lives_page.dart';
 
 class LiveSection extends StatelessWidget {
@@ -11,78 +12,52 @@ class LiveSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final List<LiveStream> liveStreams = [
-      LiveStream(
-        hostName: 'Harper Ray',
-        hostAvatarUrl:
-            'https://images.unsplash.com/photo-1614289371518-722f2615943c?auto=format&fit=crop&w=200&q=80',
-        coverImageUrl:
-            'https://images.unsplash.com/photo-1525182008055-f88b95ff7980?auto=format&fit=crop&w=900&q=80',
-        viewerCount: 3200,
-        title: 'Weekly AMA',
-      ),
-      LiveStream(
-        hostName: 'Priya Sharma',
-        hostAvatarUrl:
-            'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=200&q=80',
-        coverImageUrl:
-            'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=900&q=80',
-        viewerCount: 1850,
-        title: 'Design Tutorial',
-      ),
-      LiveStream(
-        hostName: 'Diego Luna',
-        hostAvatarUrl:
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-        coverImageUrl:
-            'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80',
-        viewerCount: 960,
-        title: 'Sunset Sessions',
-      ),
-      LiveStream(
-        hostName: 'Maya Collins',
-        hostAvatarUrl:
-            'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=200&q=80',
-        coverImageUrl:
-            'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=900&q=80',
-        viewerCount: 1520,
-        title: 'Morning Yoga',
-      ),
-      LiveStream(
-        hostName: 'Nova Tech',
-        hostAvatarUrl:
-            'https://images.unsplash.com/photo-1525132298875-2d716f84a3b3?auto=format&fit=crop&w=200&q=80',
-        coverImageUrl:
-            'https://images.unsplash.com/photo-1517430816045-df4b7de11d1d?auto=format&fit=crop&w=900&q=80',
-        viewerCount: 2210,
-        title: 'React Native Tips',
-      ),
-    ];
+    // TODO: Load actual live streams from database
+    final List<LiveStream> liveStreams = [];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section Header
+        // Live Now Heading with red dot and View All button
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFF6B6B), Color(0xFFFF5252)],
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.videocam_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
+                  // Animated red dot
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.6, end: 1.0),
+                    duration: const Duration(milliseconds: 800),
+                    curve: Curves.easeInOut,
+                    builder: (context, value, child) {
+                      return Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.withOpacity(value * 0.6),
+                              blurRadius: value * 12,
+                              spreadRadius: value * 3,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    onEnd: () {
+                      // Loop animation
+                      if (context.mounted) {
+                        Future.delayed(const Duration(milliseconds: 100), () {
+                          if (context.mounted) {
+                            (context as Element).markNeedsBuild();
+                          }
+                        });
+                      }
+                    },
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -95,6 +70,7 @@ class LiveSection extends StatelessWidget {
                   ),
                 ],
               ),
+              // View All button
               GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -134,19 +110,100 @@ class LiveSection extends StatelessWidget {
           ),
         ),
 
-        // Horizontal Scrollable Live Streams
+        // Horizontal Scrollable Live Streams (Story-style rectangles)
         SizedBox(
-          height: 180,
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+          height: 200,
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
-            itemCount: liveStreams.length,
-            itemBuilder: (context, index) {
-              return _LiveCard(liveStream: liveStreams[index], isDark: isDark);
-            },
+            children: [
+              // Create Live Button (Red + Rectangle) - Always First
+              _CreateLiveButton(isDark: isDark),
+              const SizedBox(width: 12),
+              // Actual live streams from database
+              ...liveStreams.map(
+                (stream) => Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: _LiveCard(liveStream: stream, isDark: isDark),
+                ),
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+}
+
+// Create Live Button Widget (Simple, no animation or glow)
+class _CreateLiveButton extends StatelessWidget {
+  const _CreateLiveButton({required this.isDark});
+
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        // Navigate to go live page
+        Navigator.of(context).push(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) {
+              return const GoLivePage();
+            },
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  const begin = Offset(0.0, 1.0);
+                  const end = Offset.zero;
+                  const curve = Curves.easeInOutCubic;
+                  var tween = Tween(
+                    begin: begin,
+                    end: end,
+                  ).chain(CurveTween(curve: curve));
+                  return SlideTransition(
+                    position: animation.drive(tween),
+                    child: child,
+                  );
+                },
+            transitionDuration: const Duration(milliseconds: 400),
+          ),
+        );
+      },
+      child: Container(
+        width: 130,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFF3B30), Color(0xFFFF6B6B)],
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+              ),
+              child: const Icon(Icons.add, color: Colors.white, size: 36),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Go Live',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -175,174 +232,179 @@ class _LiveCard extends StatelessWidget {
         );
       },
       child: Container(
-        width: 140,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Live Stream Thumbnail
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Cover Image
-                    Image.network(liveStream.coverImageUrl, fit: BoxFit.cover),
-                    // Gradient Overlay
-                    Container(
+        width: 130,
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(20)),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Cover Image
+              Image.network(
+                liveStream.coverImageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: isDark ? Colors.grey[850] : Colors.grey[200],
+                  child: const Icon(Icons.person, size: 48, color: Colors.grey),
+                ),
+              ),
+              // Gradient Overlay
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.3),
+                      Colors.black.withOpacity(0.7),
+                    ],
+                  ),
+                ),
+              ),
+              // LIVE Badge at top
+              Positioned(
+                top: 10,
+                left: 10,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.7),
-                          ],
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF3B30), Color(0xFFFF6B6B)],
                         ),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ),
-                    // LIVE Badge
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFFF6B6B), Color(0xFFFF5252)],
-                              ),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(
-                                  Icons.circle,
-                                  color: Colors.white,
-                                  size: 8,
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  'LIVE',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Viewer Count
-                    Positioned(
-                      bottom: 8,
-                      left: 8,
-                      right: 8,
                       child: Row(
-                        children: [
-                          // Avatar
-                          Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 1.5,
-                              ),
-                              image: DecorationImage(
-                                image: NetworkImage(liveStream.hostAvatarUrl),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          // Viewer count
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.5),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.visibility,
-                                      color: Colors.white,
-                                      size: 12,
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      _formatViewerCount(
-                                        liveStream.viewerCount,
-                                      ),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.circle, color: Colors.white, size: 6),
+                          SizedBox(width: 4),
+                          Text(
+                            'LIVE',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ),
+                ),
+              ),
+              // User info and viewer count at bottom
+              Positioned(
+                bottom: 10,
+                left: 10,
+                right: 10,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Viewer count badge
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.visibility,
+                                color: Colors.white,
+                                size: 12,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatViewerCount(liveStream.viewerCount),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Avatar and name
+                    Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            image: DecorationImage(
+                              image: NetworkImage(liveStream.hostAvatarUrl),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                liveStream.hostName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (liveStream.title.isNotEmpty)
+                                Text(
+                                  liveStream.title,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 10,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 6),
-            // Host Name & Title
-            Text(
-              liveStream.hostName,
-              style: TextStyle(
-                color: isDark ? Colors.white : Colors.black87,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              liveStream.title,
-              style: TextStyle(
-                color: isDark ? Colors.white60 : Colors.grey[600],
-                fontSize: 11,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   String _formatViewerCount(int count) {
-    if (count >= 1000) {
+    if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    } else if (count >= 1000) {
       return '${(count / 1000).toStringAsFixed(1)}K';
     }
     return count.toString();

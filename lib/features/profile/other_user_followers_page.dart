@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme.dart';
 
 class OtherUserFollowersPage extends StatefulWidget {
@@ -21,28 +22,12 @@ class OtherUserFollowersPage extends StatefulWidget {
 class _OtherUserFollowersPageState extends State<OtherUserFollowersPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final SupabaseClient _supabase = Supabase.instance.client;
 
-  // Mock data for followers
-  final List<Map<String, dynamic>> _followers = List.generate(
-    25,
-    (index) => {
-      'name': 'Follower ${index + 1}',
-      'username': '@follower${index + 1}',
-      'avatar': 'https://i.pravatar.cc/150?img=${index + 1}',
-      'isFollowing': index % 3 == 0,
-    },
-  );
-
-  // Mock data for following
-  final List<Map<String, dynamic>> _following = List.generate(
-    15,
-    (index) => {
-      'name': 'User ${index + 1}',
-      'username': '@user${index + 1}',
-      'avatar': 'https://i.pravatar.cc/150?img=${index + 20}',
-      'isFollowing': true,
-    },
-  );
+  List<Map<String, dynamic>> _followers = [];
+  List<Map<String, dynamic>> _following = [];
+  bool _isLoadingFollowers = true;
+  bool _isLoadingFollowing = true;
 
   @override
   void initState() {
@@ -52,6 +37,97 @@ class _OtherUserFollowersPageState extends State<OtherUserFollowersPage>
       vsync: this,
       initialIndex: widget.initialTab,
     );
+    _loadFollowers();
+    _loadFollowing();
+  }
+
+  Future<void> _loadFollowers() async {
+    try {
+      setState(() => _isLoadingFollowers = true);
+
+      // Get followers from database
+      final result = await _supabase
+          .from('followers')
+          .select('''
+            follower_id,
+            users!followers_follower_id_fkey(
+              uid,
+              username,
+              username_display,
+              display_name,
+              photo_url
+            )
+          ''')
+          .eq('following_id', widget.userId);
+
+      final followers = (result as List).map((data) {
+        final user = data['users'];
+        return {
+          'userId': user['uid'],
+          'name':
+              user['username_display'] ??
+              user['display_name'] ??
+              user['username'] ??
+              'User',
+          'username': '@${user['username'] ?? 'user'}',
+          'avatar': user['photo_url'] ?? '',
+          'isFollowing':
+              false, // TODO: Check if current user follows this person
+        };
+      }).toList();
+
+      setState(() {
+        _followers = followers;
+        _isLoadingFollowers = false;
+      });
+    } catch (e) {
+      print('❌ Error loading followers: $e');
+      setState(() => _isLoadingFollowers = false);
+    }
+  }
+
+  Future<void> _loadFollowing() async {
+    try {
+      setState(() => _isLoadingFollowing = true);
+
+      // Get following from database
+      final result = await _supabase
+          .from('followers')
+          .select('''
+            following_id,
+            users!followers_following_id_fkey(
+              uid,
+              username,
+              username_display,
+              display_name,
+              photo_url
+            )
+          ''')
+          .eq('follower_id', widget.userId);
+
+      final following = (result as List).map((data) {
+        final user = data['users'];
+        return {
+          'userId': user['uid'],
+          'name':
+              user['username_display'] ??
+              user['display_name'] ??
+              user['username'] ??
+              'User',
+          'username': '@${user['username'] ?? 'user'}',
+          'avatar': user['photo_url'] ?? '',
+          'isFollowing': true,
+        };
+      }).toList();
+
+      setState(() {
+        _following = following;
+        _isLoadingFollowing = false;
+      });
+    } catch (e) {
+      print('❌ Error loading following: $e');
+      setState(() => _isLoadingFollowing = false);
+    }
   }
 
   @override
@@ -127,14 +203,50 @@ class _OtherUserFollowersPageState extends State<OtherUserFollowersPage>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildUserList(_followers, isDark),
-          _buildUserList(_following, isDark),
+          _buildUserList(_followers, _isLoadingFollowers, isDark, 'followers'),
+          _buildUserList(_following, _isLoadingFollowing, isDark, 'following'),
         ],
       ),
     );
   }
 
-  Widget _buildUserList(List<Map<String, dynamic>> users, bool isDark) {
+  Widget _buildUserList(
+    List<Map<String, dynamic>> users,
+    bool isLoading,
+    bool isDark,
+    String type,
+  ) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (users.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              type == 'followers'
+                  ? Icons.people_outline
+                  : Icons.person_add_outlined,
+              size: 64,
+              color: isDark ? Colors.white30 : Colors.black26,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              type == 'followers'
+                  ? 'No followers yet'
+                  : 'Not following anyone yet',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : Colors.black54,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: users.length,
@@ -177,7 +289,13 @@ class _OtherUserFollowersPageState extends State<OtherUserFollowersPage>
                   ),
                   child: CircleAvatar(
                     radius: 24,
-                    backgroundImage: NetworkImage(user['avatar']),
+                    backgroundImage:
+                        user['avatar'] != null && user['avatar'].isNotEmpty
+                        ? NetworkImage(user['avatar'])
+                        : null,
+                    child: user['avatar'] == null || user['avatar'].isEmpty
+                        ? const Icon(Icons.person, size: 24)
+                        : null,
                   ),
                 ),
                 const SizedBox(width: 12),

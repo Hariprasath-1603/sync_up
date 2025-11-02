@@ -23,7 +23,7 @@ class StoriesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
-      height: 160,
+      height: 200,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
@@ -111,144 +111,101 @@ class _MyStoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    // If user has a story, show it with the same style as live button
+    if (hasMyStory && imageUrl != null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 130,
+          height: 200,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: kPrimary, width: 2),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.network(
+                  imageUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: isDark ? Colors.grey[850] : Colors.grey[200],
+                    child: Icon(
+                      Icons.person,
+                      size: 48,
+                      color: isDark
+                          ? Colors.white.withOpacity(0.45)
+                          : Colors.black.withOpacity(0.32),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 12,
+                  left: 0,
+                  right: 0,
+                  child: Text(
+                    'Your Story',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withOpacity(0.6),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // If no story, show add button with same style as live + button
     return GestureDetector(
       onTap: onTap,
-      child: SizedBox(
-        width: 120,
+      child: Container(
+        width: 130,
+        height: 200,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [kPrimary, kPrimary.withOpacity(0.8)],
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              height: 120,
+              width: 64,
+              height: 64,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: hasMyStory
-                      ? kPrimary
-                      : colorScheme.outline.withOpacity(isDark ? 0.28 : 0.16),
-                  width: hasMyStory ? 2 : 1.5,
-                ),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    colorScheme.primaryContainer.withOpacity(
-                      isDark ? 0.32 : 0.22,
-                    ),
-                    colorScheme.primary.withOpacity(isDark ? 0.24 : 0.16),
-                  ],
-                ),
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (imageUrl != null)
-                      Image.network(
-                        imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            _placeholder(theme, isDark),
-                      )
-                    else
-                      _placeholder(theme, isDark),
-                    if (!hasMyStory)
-                      Center(
-                        child: Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                colorScheme.primary,
-                                colorScheme.primary.withOpacity(
-                                  isDark ? 0.9 : 0.75,
-                                ),
-                              ],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: colorScheme.primary.withOpacity(
-                                  isDark ? 0.3 : 0.45,
-                                ),
-                                blurRadius: 18,
-                                spreadRadius: 0,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Icons.add_to_photos_rounded,
-                            color: colorScheme.onPrimary,
-                            size: 26,
-                          ),
-                        ),
-                      )
-                    else
-                      Positioned(
-                        bottom: 10,
-                        left: 0,
-                        right: 0,
-                        child: Text(
-                          'Your Story',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withOpacity(0.5),
-                                blurRadius: 6,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+              child: const Icon(Icons.add, color: Colors.white, size: 36),
             ),
-            const SizedBox(height: 6),
-            Text(
-              hasMyStory ? 'My Story' : 'Add Story',
+            const SizedBox(height: 12),
+            const Text(
+              'Add Story',
               style: TextStyle(
-                color: isDark ? Colors.white : Colors.black87,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _placeholder(ThemeData theme, bool isDark) {
-    final colorScheme = theme.colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.surfaceContainerHighest.withOpacity(
-              isDark ? 0.45 : 0.35,
-            ),
-            colorScheme.surface.withOpacity(isDark ? 0.38 : 0.22),
-          ],
-        ),
-      ),
-      child: Icon(
-        Icons.person,
-        size: 44,
-        color: isDark
-            ? Colors.white.withOpacity(0.45)
-            : Colors.black.withOpacity(0.32),
       ),
     );
   }
@@ -272,147 +229,127 @@ class _StoryPreviewCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: SizedBox(
-        width: 120,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 120,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: story.hasNewContent
-                      ? kPrimary
-                      : (isDark
-                            ? Colors.white.withOpacity(0.18)
-                            : Colors.black.withOpacity(0.08)),
-                  width: story.hasNewContent ? 2.4 : 1.5,
+      child: Container(
+        width: 130,
+        height: 200,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: story.hasNewContent
+                ? kPrimary
+                : (isDark
+                      ? Colors.white.withOpacity(0.18)
+                      : Colors.black.withOpacity(0.08)),
+            width: story.hasNewContent ? 2.4 : 1.5,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (previewClip?.imageBytes != null)
+                Image.memory(previewClip!.imageBytes!, fit: BoxFit.cover)
+              else
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                        Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest.withOpacity(0.8),
+                      ],
+                    ),
+                  ),
+                ),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.55),
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.65),
+                    ],
+                    stops: const [0.0, 0.45, 1.0],
+                  ),
                 ),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Stack(
-                  fit: StackFit.expand,
+              Positioned(
+                bottom: 12,
+                left: 10,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (previewClip?.imageBytes != null)
-                      Image.memory(previewClip!.imageBytes!, fit: BoxFit.cover)
-                    else
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerHighest,
-                              Theme.of(context)
-                                  .colorScheme
-                                  .surfaceContainerHighest
-                                  .withOpacity(0.8),
-                            ],
-                          ),
-                        ),
-                      ),
                     Container(
+                      width: 34,
+                      height: 34,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withOpacity(0.55),
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.65),
-                          ],
-                          stops: const [0.0, 0.45, 1.0],
-                        ),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
                       ),
-                    ),
-                    Positioned(
-                      bottom: 10,
-                      left: 10,
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: ClipOval(
-                          child: Image.network(
-                            story.ownerAvatar,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: Colors.grey[300],
-                              child: const Icon(
-                                Icons.person,
-                                size: 16,
-                                color: Colors.grey,
-                              ),
+                      child: ClipOval(
+                        child: Image.network(
+                          story.ownerAvatar,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Colors.grey[300],
+                            child: const Icon(
+                              Icons.person,
+                              size: 16,
+                              color: Colors.grey,
                             ),
                           ),
                         ),
                       ),
                     ),
-                    if (moodTag.isNotEmpty)
-                      Positioned(
-                        top: 10,
-                        right: 10,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.55),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            moodTag,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
+                    const SizedBox(height: 6),
+                    Text(
+                      story.ownerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
                       ),
+                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              story.ownerName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: isDark ? Colors.white : Colors.black87,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            Text(
-              '${_timeAgo(story.timestamp)} • ${story.clips.length} clip${story.clips.length == 1 ? '' : 's'}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: isDark ? Colors.white70 : Colors.black54,
-                fontSize: 10,
-              ),
-            ),
-          ],
+              if (moodTag.isNotEmpty)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.55),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      moodTag,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  static String _timeAgo(DateTime postedAt) {
-    final difference = DateTime.now().difference(postedAt);
-    if (difference.inMinutes < 1) return 'Just now';
-    if (difference.inHours < 1) return '${difference.inMinutes}m ago';
-    if (difference.inDays < 1) return '${difference.inHours}h ago';
-    return '${difference.inDays}d ago';
   }
 }

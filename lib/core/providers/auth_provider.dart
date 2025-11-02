@@ -123,11 +123,88 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Reload user data
-  Future<void> reloadUserData() async {
+  /// Set [showLoading] to false to reload data silently without showing loading state
+  Future<void> reloadUserData({bool showLoading = false}) async {
     if (_currentUser == null) return;
 
-    final userData = await _databaseService.getUserByUid(_currentUser!.uid);
-    _currentUser = userData;
+    try {
+      if (showLoading) {
+        _isLoading = true;
+        notifyListeners();
+      }
+
+      final userData = await _databaseService.getUserByUid(_currentUser!.uid);
+      _currentUser = userData;
+
+      if (showLoading) {
+        _isLoading = false;
+      }
+      notifyListeners();
+    } catch (e) {
+      print('Error reloading user data: $e');
+      if (showLoading) {
+        _isLoading = false;
+      }
+      notifyListeners();
+    }
+  }
+
+  void applyLocalProfilePhoto(String? url) {
+    if (_currentUser == null) return;
+    _currentUser = _currentUser!.copyWith(
+      photoURL: url != null && url.isNotEmpty ? url : null,
+    );
     notifyListeners();
+  }
+
+  void applyLocalCoverPhoto(String? url) {
+    if (_currentUser == null) return;
+    _currentUser = _currentUser!.copyWith(
+      coverPhotoUrl: url != null && url.isNotEmpty ? url : null,
+    );
+    notifyListeners();
+  }
+
+  /// Update user's cover photo URL in database
+  Future<bool> updateCoverPhoto(String coverPhotoUrl) async {
+    if (_currentUser == null) return false;
+
+    try {
+      final success = await _databaseService.updateUserCoverPhoto(
+        _currentUser!.uid,
+        coverPhotoUrl,
+      );
+
+      if (success) {
+        // Reload user data to get updated cover photo
+        await reloadUserData(showLoading: false);
+      }
+
+      return success;
+    } catch (e) {
+      print('Error updating cover photo: $e');
+      return false;
+    }
+  }
+
+  /// Remove user's cover photo
+  Future<bool> removeCoverPhoto() async {
+    if (_currentUser == null) return false;
+
+    try {
+      final success = await _databaseService.updateUserCoverPhoto(
+        _currentUser!.uid,
+        null, // Set to null to remove cover photo
+      );
+
+      if (success) {
+        await reloadUserData(showLoading: false);
+      }
+
+      return success;
+    } catch (e) {
+      print('Error removing cover photo: $e');
+      return false;
+    }
   }
 }

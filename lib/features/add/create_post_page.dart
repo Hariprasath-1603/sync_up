@@ -1,7 +1,14 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../core/services/supabase_storage_service.dart';
+import '../../core/providers/post_provider.dart';
 
 class CreatePostPage extends StatefulWidget {
   final Map<String, dynamic>? draftData;
@@ -20,7 +27,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
   final List<XFile> _selectedMedia = [];
   final List<Map<String, dynamic>> _taggedUsers = [];
-  List<String> _hashtags = [];
+  // List<String> _hashtags = []; // Future feature
   String _selectedAudience = 'Public';
   final List<Map<String, dynamic>> _customAudienceUsers = [];
   Map<String, dynamic>? _location;
@@ -30,7 +37,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
   Map<String, dynamic>? _poll;
   DateTime? _scheduledDate;
   bool _showContentWarning = false;
-  String? _contentWarningText;
+  // String? _contentWarningText; // Future feature
   bool _isUploading = false;
   double _uploadProgress = 0.0;
   bool _hasUnsavedChanges = false;
@@ -39,8 +46,8 @@ class _CreatePostPageState extends State<CreatePostPage> {
   bool _crossPostTwitter = false;
   bool _crossPostLinkedIn = false;
   bool _enableBoost = false;
-  final String _selectedLanguage = 'English';
-  final List<String> _productTags = [];
+  // final String _selectedLanguage = 'English'; // Future feature
+  // final List<String> _productTags = []; // Future feature
 
   @override
   void initState() {
@@ -80,7 +87,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
     final text = _textController.text;
     final hashtagPattern = RegExp(r'#\w+');
     final matches = hashtagPattern.allMatches(text);
-    _hashtags = matches.map((m) => m.group(0)!).toList();
+    // _hashtags = matches.map((m) => m.group(0)!).toList(); // Future feature
+    // For now, just validate hashtags exist but don't store them
+    matches.toList();
   }
 
   void _loadDraft(Map<String, dynamic> draft) {
@@ -201,41 +210,98 @@ class _CreatePostPageState extends State<CreatePostPage> {
     });
 
     try {
-      // Simulate upload progress
-      for (int i = 0; i <= 100; i += 10) {
-        await Future.delayed(const Duration(milliseconds: 200));
-        setState(() {
-          _uploadProgress = i / 100;
-        });
+      // Get current user
+      final authProvider = context.read<AuthProvider>();
+      final currentUser = authProvider.currentUser;
+
+      if (currentUser == null) {
+        _showSnackBar('Please sign in to create a post', Colors.red);
+        setState(() => _isUploading = false);
+        return;
       }
 
-      final postData = {
-        'title': _titleController.text,
-        'text': _textController.text,
-        'media': _selectedMedia.map((m) => m.path).toList(),
-        'tags': _taggedUsers,
-        'hashtags': _hashtags,
-        'audience': _selectedAudience,
-        'location': _location,
-        'feeling': _feeling,
-        'enableComments': _enableComments,
-        'enableReactions': _enableReactions,
-        'poll': _poll,
-        'scheduledFor': _scheduledDate?.toIso8601String(),
-        'contentWarning': _showContentWarning ? _contentWarningText : null,
-        'crossPost': {
-          'twitter': _crossPostTwitter,
-          'linkedin': _crossPostLinkedIn,
-        },
-        'language': _selectedLanguage,
-        'productTags': _productTags,
-        'createdAt': DateTime.now().toIso8601String(),
-      };
+      final userId = currentUser.uid;
 
-      // TODO: Upload to server with resumable uploads
-      print('Post published: $postData');
+      // Upload media files first
+      final List<String> mediaUrls = [];
+
+      for (int i = 0; i < _selectedMedia.length; i++) {
+        setState(() {
+          _uploadProgress = (i / (_selectedMedia.length + 1));
+        });
+
+        final file = File(_selectedMedia[i].path);
+        final uploadedUrl = await SupabaseStorageService.uploadPost(
+          file,
+          userId,
+        );
+
+        if (uploadedUrl != null) {
+          mediaUrls.add(uploadedUrl);
+        } else {
+          throw Exception('Failed to upload media ${i + 1}');
+        }
+      }
 
       setState(() {
+        _uploadProgress = 0.9;
+      });
+
+      // Prepare caption with title if available
+      String caption = _textController.text.trim();
+      if (_titleController.text.trim().isNotEmpty) {
+        caption = '${_titleController.text.trim()}\n\n$caption';
+      }
+
+      // Extract hashtags from caption
+      final hashtagRegex = RegExp(r'#\w+');
+      final hashtags = hashtagRegex
+          .allMatches(caption)
+          .map((m) => m.group(0)!.substring(1))
+          .toList();
+
+      // Create post in database
+      final postData = {
+        'user_id': userId,
+        'caption': caption,
+        'media_urls': mediaUrls,
+        'location': _location?['name'],
+        'tags': hashtags,
+        'post_type': _selectedMedia.isEmpty
+            ? 'text'
+            : (_selectedMedia.length > 1 ? 'carousel' : 'image'),
+        'likes_count': 0,
+        'comments_count': 0,
+        'shares_count': 0,
+        'views_count': 0,
+        'comments_enabled': _enableComments,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      print('📤 Creating post with data: $postData');
+
+      final result = await Supabase.instance.client
+          .from('posts')
+          .insert(postData)
+          .select('id')
+          .single();
+
+      print('✅ Post created successfully: ${result['id']}');
+      print('   Media URLs saved: $mediaUrls');
+
+      // Update user's post count
+      await Supabase.instance.client.rpc(
+        'increment_posts_count',
+        params: {'user_id': userId},
+      );
+
+      // Reload user posts in provider
+      if (mounted) {
+        context.read<PostProvider>().loadUserPosts(userId);
+      }
+
+      setState(() {
+        _uploadProgress = 1.0;
         _isUploading = false;
         _hasUnsavedChanges = false;
       });
@@ -247,10 +313,11 @@ class _CreatePostPageState extends State<CreatePostPage> {
         Navigator.pop(context, true);
       }
     } catch (e) {
+      print('❌ Error publishing post: $e');
       setState(() {
         _isUploading = false;
       });
-      _showSnackBar('Error publishing post: $e', Colors.red);
+      _showSnackBar('Error publishing post: ${e.toString()}', Colors.red);
     }
   }
 
@@ -1086,7 +1153,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
                       ),
                       child: TextField(
                         style: TextStyle(color: _getTextColor(context)),
-                        onChanged: (val) => _contentWarningText = val,
+                        onChanged: (val) {
+                          // _contentWarningText = val; // Future feature
+                        },
                         decoration: InputDecoration(
                           hintText: 'Warning text...',
                           hintStyle: TextStyle(
@@ -1246,28 +1315,45 @@ class _CreatePostPageState extends State<CreatePostPage> {
                       // User avatar and audience selector
                       Row(
                         children: [
-                          CircleAvatar(
-                            radius: 24,
-                            backgroundColor: const Color(
-                              0xFF4A6CF7,
-                            ).withOpacity(0.2),
-                            child: const Icon(
-                              Icons.person,
-                              color: Color(0xFF4A6CF7),
-                            ),
+                          Consumer<AuthProvider>(
+                            builder: (context, authProvider, child) {
+                              final user = authProvider.currentUser;
+                              return CircleAvatar(
+                                radius: 24,
+                                backgroundImage: user?.photoURL != null
+                                    ? NetworkImage(user!.photoURL!)
+                                    : null,
+                                backgroundColor: const Color(
+                                  0xFF4A6CF7,
+                                ).withOpacity(0.2),
+                                child: user?.photoURL == null
+                                    ? const Icon(
+                                        Icons.person,
+                                        color: Color(0xFF4A6CF7),
+                                      )
+                                    : null,
+                              );
+                            },
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Your Name',
-                                  style: TextStyle(
-                                    color: _getTextColor(context),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
+                                Consumer<AuthProvider>(
+                                  builder: (context, authProvider, child) {
+                                    final user = authProvider.currentUser;
+                                    return Text(
+                                      user?.displayName ??
+                                          user?.username ??
+                                          'User',
+                                      style: TextStyle(
+                                        color: _getTextColor(context),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    );
+                                  },
                                 ),
                                 const SizedBox(height: 4),
                                 GestureDetector(

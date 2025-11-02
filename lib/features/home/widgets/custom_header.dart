@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme.dart';
+import '../../notifications/notifications_page.dart';
 
 class CustomHeader extends StatelessWidget {
   final int selectedIndex;
@@ -28,10 +29,7 @@ class CustomHeader extends StatelessWidget {
             children: [
               ShaderMask(
                 shaderCallback: (bounds) => LinearGradient(
-                  colors: [
-                    kPrimary,
-                    kPrimary.withOpacity(0.7),
-                  ],
+                  colors: [kPrimary, kPrimary.withOpacity(0.7)],
                 ).createShader(bounds),
                 child: const Text(
                   'Syncup',
@@ -84,12 +82,18 @@ class CustomHeader extends StatelessWidget {
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
-                      color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                      color: (isDark ? Colors.white : Colors.black).withOpacity(
+                        0.05,
+                      ),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
+                        color: (isDark ? Colors.white : Colors.black)
+                            .withOpacity(0.1),
                         width: 1.5,
                       ),
                     ),
@@ -103,45 +107,92 @@ class CustomHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              // Chat button with glassmorphic effect
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          kPrimary.withOpacity(0.8),
-                          kPrimary.withOpacity(0.6),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: kPrimary.withOpacity(0.3),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: kPrimary.withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
+              // Action buttons row
+              Row(
+                children: [
+                  // Notifications button with glassmorphic effect
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        width: 45,
+                        height: 45,
+                        decoration: BoxDecoration(
+                          color: (isDark ? Colors.white : Colors.black)
+                              .withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: (isDark ? Colors.white : Colors.black)
+                                .withOpacity(0.1),
+                            width: 1.5,
+                          ),
                         ),
-                      ],
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 24),
-                      onPressed: () {
-                        context.push('/chat');
-                      },
-                      padding: EdgeInsets.zero,
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.notifications_outlined,
+                            color: isDark ? Colors.white : Colors.black87,
+                            size: 22,
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const NotificationsPage(),
+                              ),
+                            );
+                          },
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  // Chat button with glassmorphic effect
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              kPrimary.withOpacity(0.8),
+                              kPrimary.withOpacity(0.6),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: kPrimary.withOpacity(0.3),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: kPrimary.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.chat_bubble_outline,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          onPressed: () {
+                            context.push('/chat');
+                          },
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

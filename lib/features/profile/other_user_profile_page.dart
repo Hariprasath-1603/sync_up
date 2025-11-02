@@ -1,7 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../core/scaffold_with_nav_bar.dart';
+import '../../core/utils/bottom_sheet_utils.dart';
+import '../../core/providers/post_provider.dart';
+import '../../core/services/database_service.dart';
+import '../../core/models/user_model.dart';
 import 'models/post_model.dart' as profile_post;
 import 'pages/post_viewer_instagram_style.dart';
 import 'pages/profile_photo_viewer.dart';
@@ -30,33 +35,15 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isFollowing = false;
+  final DatabaseService _databaseService = DatabaseService();
+  UserModel? _userData;
+  bool _isLoadingUser = true;
 
-  final List<String> _posts = List.generate(
-    8,
-    (index) => 'https://picsum.photos/seed/user_post$index/400/600',
-  );
-  final List<String> _media = List.generate(
-    6,
-    (index) => 'https://picsum.photos/seed/user_media$index/600/400',
-  );
+  // User's active stories (will be loaded from database)
+  final List<Map<String, String>> _userStories = [];
 
-  // User's active stories (mock data - set to empty list for no stories)
-  final List<Map<String, String>> _userStories = [
-    {'url': 'https://picsum.photos/seed/userstory1/400/600', 'title': 'Today'},
-    {
-      'url': 'https://picsum.photos/seed/userstory2/400/600',
-      'title': 'Morning',
-    },
-    {'url': 'https://picsum.photos/seed/userstory3/400/600', 'title': 'Sunset'},
-  ];
-
-  // User's story highlights (simple image data)
-  final List<Map<String, String>> _storyHighlights = [
-    {'url': 'https://picsum.photos/seed/story1/200', 'title': 'Travel'},
-    {'url': 'https://picsum.photos/seed/story2/200', 'title': 'Food'},
-    {'url': 'https://picsum.photos/seed/story3/200', 'title': 'Friends'},
-    {'url': 'https://picsum.photos/seed/story4/200', 'title': 'Events'},
-  ];
+  // User's story highlights (will be loaded from database)
+  final List<Map<String, String>> _storyHighlights = [];
 
   bool get hasStories => _userStories.isNotEmpty;
 
@@ -64,6 +51,31 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadUserData();
+
+    // Load user's posts
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<PostProvider>().loadUserPosts(widget.userId);
+    });
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final user = await _databaseService.getUserByUid(widget.userId);
+      if (mounted) {
+        setState(() {
+          _userData = user;
+          _isLoadingUser = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingUser = false;
+        });
+      }
+    }
   }
 
   @override
@@ -156,10 +168,7 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage>
           ],
           body: TabBarView(
             controller: _tabController,
-            children: [
-              _buildPostGrid(_posts, isDark),
-              _buildPostGrid(_media, isDark),
-            ],
+            children: [_buildPostGrid([], isDark), _buildPostGrid([], isDark)],
           ),
         ),
       ),
@@ -168,40 +177,73 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage>
 
   // Glassmorphic Header with Avatar and Actions
   Widget _buildGlassmorphicHeader(BuildContext context, bool isDark) {
-    final coverUrl = 'https://picsum.photos/seed/usercover/1200/400';
-    final avatarUrl = widget.avatarUrl ?? 'https://i.pravatar.cc/300?img=5';
+    // Use actual user data from database
+    final coverUrl = _userData?.coverPhotoUrl;
+    final avatarUrl = _userData?.photoURL ?? widget.avatarUrl;
 
     return SizedBox(
       height: 280,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Background Image with Gradient Overlay
+          // Background Image with Gradient Overlay or "Not Available" message
           Container(
             height: 200,
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: NetworkImage(coverUrl),
-                fit: BoxFit.cover,
-              ),
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    (isDark ? kDarkBackground : kLightBackground).withOpacity(
-                      0.3,
+            decoration: coverUrl != null
+                ? BoxDecoration(
+                    image: DecorationImage(
+                      image: NetworkImage(coverUrl),
+                      fit: BoxFit.cover,
                     ),
-                    (isDark ? kDarkBackground : kLightBackground).withOpacity(
-                      0.95,
+                  )
+                : BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDark
+                          ? [const Color(0xFF1A1D29), const Color(0xFF0B0E13)]
+                          : [const Color(0xFFE8ECFF), const Color(0xFFF6F7FB)],
                     ),
-                  ],
-                ),
-              ),
-            ),
+                  ),
+            child: coverUrl != null
+                ? Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          (isDark ? kDarkBackground : kLightBackground)
+                              .withOpacity(0.3),
+                          (isDark ? kDarkBackground : kLightBackground)
+                              .withOpacity(0.95),
+                        ],
+                      ),
+                    ),
+                  )
+                : Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.wallpaper_outlined,
+                          size: 48,
+                          color: (isDark ? Colors.white : Colors.black)
+                              .withOpacity(0.3),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Cover Photo Not Available',
+                          style: TextStyle(
+                            color: (isDark ? Colors.white : Colors.black)
+                                .withOpacity(0.5),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
           ),
           // Avatar with Glass Effect
           Positioned(
@@ -242,14 +284,28 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage>
                   ),
                   child: GestureDetector(
                     onTap: hasStories ? () => _openUserStories(context) : null,
-                    onLongPress: () =>
-                        _openProfilePhotoViewer(context, avatarUrl),
+                    onLongPress: avatarUrl != null
+                        ? () => _openProfilePhotoViewer(context, avatarUrl)
+                        : null,
                     child: Hero(
                       tag: 'profile_photo_${widget.username}',
-                      child: CircleAvatar(
-                        radius: 50,
-                        backgroundImage: NetworkImage(avatarUrl),
-                      ),
+                      child: avatarUrl != null
+                          ? CircleAvatar(
+                              radius: 50,
+                              backgroundImage: NetworkImage(avatarUrl),
+                            )
+                          : CircleAvatar(
+                              radius: 50,
+                              backgroundColor:
+                                  (isDark ? Colors.white : Colors.black)
+                                      .withOpacity(0.1),
+                              child: Icon(
+                                Icons.person,
+                                size: 50,
+                                color: (isDark ? Colors.white : Colors.black)
+                                    .withOpacity(0.3),
+                              ),
+                            ),
                     ),
                   ),
                 ),
@@ -364,37 +420,33 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage>
   }
 
   Widget _buildStatsAndBio(BuildContext context, bool isDark) {
+    // Get real counts from database
+    final postsCount = _userData?.postsCount ?? 0;
+    final followingCount = _userData?.followingCount ?? 0;
+    final followersCount = _userData?.followersCount ?? 0;
+    final bio = _userData?.bio;
+    final displayName = _userData?.displayName ?? widget.username;
+
     return Column(
       children: [
         Text(
-          widget.username,
+          displayName,
           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Photographer | Travel enthusiast 📸',
-          style: TextStyle(
-            fontSize: 14,
-            color: isDark ? Colors.white70 : Colors.grey[600],
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: kPrimary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            'bio.link.io/${widget.username.toLowerCase()}',
-            style: TextStyle(
-              color: kPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+        if (bio != null && bio.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              bio,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.white70 : Colors.grey[600],
+              ),
             ),
           ),
-        ),
+        ],
         const SizedBox(height: 20),
         // Follow and Message Buttons
         Row(
@@ -405,11 +457,11 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage>
           ],
         ),
         const SizedBox(height: 24),
-        // Stats Row
+        // Stats Row with real data
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildStatItem('87', 'Posts', isDark, () {
+            _buildStatItem(postsCount.toString(), 'Posts', isDark, () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const UserPostsPage()),
@@ -420,39 +472,58 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage>
               height: 40,
               color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
             ),
-            _buildStatItem('523', 'Following', isDark, () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => OtherUserFollowersPage(
-                    username: widget.username,
-                    userId: widget.userId,
-                    initialTab: 1,
+            _buildStatItem(
+              _formatCount(followingCount),
+              'Following',
+              isDark,
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => OtherUserFollowersPage(
+                      username: widget.username,
+                      userId: widget.userId,
+                      initialTab: 1,
+                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              },
+            ),
             Container(
               width: 1,
               height: 40,
               color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
             ),
-            _buildStatItem('45.2k', 'Followers', isDark, () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => OtherUserFollowersPage(
-                    username: widget.username,
-                    userId: widget.userId,
-                    initialTab: 0,
+            _buildStatItem(
+              _formatCount(followersCount),
+              'Followers',
+              isDark,
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => OtherUserFollowersPage(
+                      username: widget.username,
+                      userId: widget.userId,
+                      initialTab: 0,
+                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              },
+            ),
           ],
         ),
       ],
     );
+  }
+
+  String _formatCount(int count) {
+    if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    } else if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    }
+    return count.toString();
   }
 
   // Follow Button
@@ -707,10 +778,49 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage>
   }
 
   Widget _buildPostGrid(List<String> images, bool isDark) {
+    final postProvider = context.watch<PostProvider>();
+    final userPosts = postProvider.getUserPosts(widget.userId);
+
+    if (userPosts.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.photo_library_outlined,
+                size: 64,
+                color: isDark ? Colors.white24 : Colors.grey[300],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No posts yet',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'When ${widget.username} shares photos, they\'ll appear here',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.white60 : Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-      itemCount: images.length,
+      itemCount: userPosts.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 12,
@@ -718,157 +828,149 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage>
         childAspectRatio: 0.75,
       ),
       itemBuilder: (context, index) {
+        final post = userPosts[index];
+        // Use actual media URL from post - no fallback to picsum
+        final thumbnailUrl = post.mediaUrls.isNotEmpty ? post.mediaUrls[0] : '';
+
         return GestureDetector(
-          onTap: () => _openPostViewer(context, images, index),
+          onTap: () => _openPostViewerFromPosts(context, userPosts, index),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.network(images[index], fit: BoxFit.cover),
-                // Glass overlay on hover effect
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.3),
-                      ],
+            child: thumbnailUrl.isNotEmpty
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.network(thumbnailUrl, fit: BoxFit.cover),
+                      // Glass overlay on hover effect
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.3),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Multi-image indicator
+                      if (post.mediaUrls.length > 1)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.collections,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                    ],
+                  )
+                : Container(
+                    color: (isDark ? Colors.white : Colors.black).withOpacity(
+                      0.05,
+                    ),
+                    child: Icon(
+                      Icons.image_outlined,
+                      size: 48,
+                      color: (isDark ? Colors.white : Colors.black).withOpacity(
+                        0.2,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
           ),
         );
       },
     );
   }
 
-  void _openPostViewer(
+  void _openPostViewerFromPosts(
     BuildContext context,
-    List<String> images,
+    List<profile_post.PostModel> posts,
     int initialIndex,
   ) {
-    // Sample captions for testing
-    final sampleCaptions = [
-      'Living my best life! ✨ This moment was absolutely perfect. Can\'t believe how beautiful everything turned out. Feeling grateful for these amazing experiences and memories! 🌟💫',
-      'Beautiful sunset at the beach! 🌅 The colors were absolutely breathtaking today. Nature never fails to amaze me with its stunning displays.',
-      'Amazing day with friends! 💙 These are the moments that make life worth living. Grateful for such incredible people in my life.',
-      'Just perfect! ❤️',
-      'New adventures await! 🎊 Excited for what\'s coming next. Life is full of beautiful surprises and I\'m here for all of it!',
-      'Enjoying every moment 🌸',
-    ];
+    final navVisibility = NavBarVisibilityScope.maybeOf(context);
+    navVisibility?.value = false;
 
-    // Convert image URLs to PostModel list
-    final posts = images.asMap().entries.map((entry) {
-      final index = entry.key;
-      final imageUrl = entry.value;
-      return profile_post.PostModel(
-        id: imageUrl,
-        userId: widget.userId, // Other user's ID
-        type: profile_post.PostType.image,
-        mediaUrls: [imageUrl],
-        thumbnailUrl: imageUrl,
-        username: widget.username,
-        userAvatar: widget.avatarUrl ?? 'https://i.pravatar.cc/150?img=5',
-        timestamp: DateTime.now().subtract(Duration(hours: index * 2)),
-        caption: sampleCaptions[index % sampleCaptions.length],
-        likes: 1234 + (index * 234),
-        comments: 56 + (index * 12),
-        shares: 12 + (index * 3),
-        views: 10000 + (index * 1500),
-      );
-    }).toList();
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => PostViewerInstagramStyle(
-          initialPost: posts[initialIndex],
-          allPosts: posts,
-        ),
-      ),
-    );
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (context) => PostViewerInstagramStyle(
+              initialPost: posts[initialIndex],
+              allPosts: posts,
+            ),
+          ),
+        )
+        .whenComplete(() {
+          navVisibility?.value = true;
+        });
   }
 
   void _showMoreOptions(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Hide navigation bar when showing bottom sheet
-    final navVisibility = NavBarVisibilityScope.maybeOf(context);
-    navVisibility?.value = false;
-
-    showModalBottomSheet(
+    BottomSheetUtils.showAdaptiveBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              decoration: BoxDecoration(
-                color: (isDark ? kDarkBackground : Colors.white).withOpacity(
-                  0.9,
-                ),
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildBottomSheetOption(
-                    icon: Icons.block_outlined,
-                    label: 'Block',
-                    isDark: isDark,
-                    isDestructive: true,
-                    onTap: () {
-                      Navigator.pop(context);
-                      // TODO: Implement block
-                    },
-                  ),
-                  _buildBottomSheetOption(
-                    icon: Icons.report_outlined,
-                    label: 'Report',
-                    isDark: isDark,
-                    isDestructive: true,
-                    onTap: () {
-                      Navigator.pop(context);
-                      // TODO: Implement report
-                    },
-                  ),
-                  _buildBottomSheetOption(
-                    icon: Icons.share_outlined,
-                    label: 'Share Profile',
-                    isDark: isDark,
-                    onTap: () {
-                      Navigator.pop(context);
-                      // TODO: Implement share
-                    },
-                  ),
-                  _buildBottomSheetOption(
-                    icon: Icons.qr_code_rounded,
-                    label: 'QR Code',
-                    isDark: isDark,
-                    onTap: () {
-                      Navigator.pop(context);
-                      // TODO: Implement QR code
-                    },
-                  ),
-                ],
-              ),
+      builder: (context) => BottomSheetUtils.createPremiumBottomSheet(
+        context: context,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Options',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
-          ),
-        );
-      },
-    ).whenComplete(() {
-      // Show navigation bar when bottom sheet closes
-      navVisibility?.value = true;
-    });
+            const SizedBox(height: 16),
+            _buildBottomSheetOption(
+              icon: Icons.block_outlined,
+              label: 'Block',
+              isDark: isDark,
+              isDestructive: true,
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Implement block
+              },
+            ),
+            _buildBottomSheetOption(
+              icon: Icons.report_outlined,
+              label: 'Report',
+              isDark: isDark,
+              isDestructive: true,
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Implement report
+              },
+            ),
+            _buildBottomSheetOption(
+              icon: Icons.share_outlined,
+              label: 'Share Profile',
+              isDark: isDark,
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Implement share
+              },
+            ),
+            _buildBottomSheetOption(
+              icon: Icons.qr_code_rounded,
+              label: 'QR Code',
+              isDark: isDark,
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Implement QR code
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildBottomSheetOption({

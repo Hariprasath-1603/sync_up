@@ -1,12 +1,11 @@
 import 'dart:ui';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../core/services/supabase_storage_service.dart';
+import '../../core/services/image_picker_service.dart';
 import '../../core/theme.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -30,9 +29,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   bool _isPrivateAccount = false;
   bool _showActivityStatus = true;
   bool _allowMessagesFromEveryone = false;
-  bool _isUploadingPhoto = false;
-  File? _selectedImage;
-  final ImagePicker _imagePicker = ImagePicker();
+  final ImagePickerService _imagePickerService = ImagePickerService();
 
   @override
   void initState() {
@@ -63,7 +60,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     // Initialize privacy settings from user data
     _isPrivateAccount = currentUser?.isPrivate ?? false;
     _showActivityStatus = currentUser?.showActivityStatus ?? true;
-    _allowMessagesFromEveryone = currentUser?.allowMessagesFromEveryone ?? false;
+    _allowMessagesFromEveryone =
+        currentUser?.allowMessagesFromEveryone ?? false;
   }
 
   @override
@@ -254,32 +252,48 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 color: isDark ? kDarkBackground : kLightBackground,
                 shape: BoxShape.circle,
               ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: kPrimary.withOpacity(0.2),
-                    backgroundImage: avatarUrl != null
-                        ? NetworkImage(avatarUrl)
-                        : null,
-                    child: avatarUrl == null
-                        ? Icon(Icons.person_rounded, size: 60, color: kPrimary)
-                        : null,
-                  ),
-                  if (_isUploadingPhoto)
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
-                        shape: BoxShape.circle,
+              child: ClipOval(
+                child: avatarUrl != null && avatarUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: avatarUrl,
+                        width: 120,
+                        height: 120,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: kPrimary.withOpacity(0.2),
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(color: kPrimary),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: kPrimary.withOpacity(0.2),
+                          ),
+                          child: Icon(
+                            Icons.person_rounded,
+                            size: 60,
+                            color: kPrimary,
+                          ),
+                        ),
+                      )
+                    : Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: kPrimary.withOpacity(0.2),
+                        ),
+                        child: Icon(
+                          Icons.person_rounded,
+                          size: 60,
+                          color: kPrimary,
+                        ),
                       ),
-                      child: const Center(
-                        child: CircularProgressIndicator(color: Colors.white),
-                      ),
-                    ),
-                ],
               ),
             ),
           ),
@@ -767,178 +781,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: source,
-        maxWidth: 1080,
-        maxHeight: 1080,
-        imageQuality: 85,
-      );
-
-      if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
-        await _uploadPhoto();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error picking image: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _uploadPhoto() async {
-    if (_selectedImage == null) return;
-
-    setState(() {
-      _isUploadingPhoto = true;
-    });
-
-    try {
-      final authProvider = context.read<AuthProvider>();
-      final userId = authProvider.currentUserId;
-
-      if (userId == null) {
-        throw Exception('User not authenticated. Please sign in again.');
-      }
-
-      print('DEBUG: Starting photo upload for user: $userId');
-
-      // Upload to Supabase Storage
-      print('DEBUG: Uploading to Supabase Storage...');
-      final photoURL = await SupabaseStorageService.uploadProfilePhoto(
-        _selectedImage!,
-        userId,
-      );
-
-      if (photoURL == null) {
-        throw Exception('Failed to upload photo to Supabase');
-      }
-
-      print('DEBUG: Photo URL: $photoURL');
-
-      // Update Supabase user table
-      print('DEBUG: Updating Supabase user document...');
-      await Supabase.instance.client
-          .from('users')
-          .update({
-            'photo_url': photoURL,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('uid', userId);
-      print('DEBUG: Supabase updated successfully');
-
-      // Reload user data
-      print('DEBUG: Reloading user data...');
-      await authProvider.reloadUserData();
-      print('DEBUG: User data reloaded');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Profile photo updated successfully! ✓'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      print('ERROR: Photo upload failed: $e');
-      if (mounted) {
-        String errorMessage = 'Error uploading photo';
-
-        if (e.toString().contains('permission-denied')) {
-          errorMessage = 'Permission denied. Check Firebase Storage rules.';
-        } else if (e.toString().contains('not authenticated')) {
-          errorMessage = 'Please sign in again to upload photo.';
-        } else if (e.toString().contains('network')) {
-          errorMessage = 'Network error. Check your internet connection.';
-        } else {
-          errorMessage = 'Error uploading photo: ${e.toString()}';
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUploadingPhoto = false;
-          _selectedImage = null;
-        });
-      }
-    }
-  }
-
-  Future<void> _removePhoto() async {
-    final authProvider = context.read<AuthProvider>();
-    final userId = authProvider.currentUserId;
-
-    if (userId == null) return;
-
-    try {
-      // Delete from Supabase Storage
-      await SupabaseStorageService.deleteProfilePhoto(userId);
-
-      // Remove from Supabase database
-      await Supabase.instance.client
-          .from('users')
-          .update({'photo_url': null})
-          .eq('uid', userId);
-
-      // Reload user data
-      await authProvider.reloadUserData();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Profile photo removed'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error removing photo: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    }
-  }
-
   Future<void> _saveProfileChanges() async {
     final authProvider = context.read<AuthProvider>();
     final userId = authProvider.currentUserId;
@@ -1004,9 +846,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
           })
           .eq('uid', userId);
 
-      // Reload user data to reflect changes immediately
-      await authProvider.reloadUserData();
-
       if (mounted) {
         // Dismiss loading indicator
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -1022,7 +861,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ],
             ),
             backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
+            duration: const Duration(seconds: 1),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1030,9 +869,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
           ),
         );
 
-        // Navigate back after a short delay to show success message
-        Future.delayed(const Duration(milliseconds: 1500), () {
-          if (mounted) context.pop();
+        // Reload user data AFTER showing success but BEFORE popping
+        await authProvider.reloadUserData(showLoading: false);
+
+        // Small delay to ensure data is loaded, then pop
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) context.pop(true); // Return true to indicate success
         });
       }
     } catch (e) {
@@ -1065,83 +907,32 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   void _showPhotoOptions() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showModalBottomSheet(
+    final authProvider = context.read<AuthProvider>();
+    final userId = authProvider.currentUserId;
+    final currentUser = authProvider.currentUser;
+
+    if (userId == null) return;
+
+    _imagePickerService.showImageSourceBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: isDark ? kDarkBackground : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              margin: const EdgeInsets.only(bottom: 20),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.camera_alt_rounded, color: Colors.blue),
-              ),
-              title: const Text('Take Photo'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.photo_library_rounded,
-                  color: Colors.purple,
-                ),
-              ),
-              title: const Text('Choose from Gallery'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.delete_outline_rounded,
-                  color: Colors.red,
-                ),
-              ),
-              title: const Text('Remove Photo'),
-              onTap: () {
-                Navigator.pop(context);
-                _removePhoto();
-              },
-            ),
-            const SizedBox(height: 10),
-          ],
-        ),
-      ),
+      photoType: PhotoType.profile,
+      userId: userId,
+      currentImageUrl: currentUser?.photoURL,
+      onImageUploaded: (url) async {
+        // Clear image cache for old profile photo
+        if (currentUser?.photoURL != null) {
+          final oldImage = NetworkImage(currentUser!.photoURL!);
+          await oldImage.evict();
+        }
+
+        authProvider.applyLocalProfilePhoto(url);
+        await authProvider.reloadUserData(showLoading: false);
+
+        // Force UI update
+        if (mounted) {
+          setState(() {});
+        }
+      },
     );
   }
 }

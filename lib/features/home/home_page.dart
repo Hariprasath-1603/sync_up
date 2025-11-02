@@ -115,6 +115,9 @@ class _HomePageState extends State<HomePage> {
         ? 'Latest from Following'
         : 'Trending';
 
+    // Use real posts from database only
+    final postsToDisplay = _convertToHomePosts(currentPosts);
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -156,7 +159,19 @@ class _HomePageState extends State<HomePage> {
                       });
                     },
                   ),
-                  if (_selectedTabIndex == 1)
+                  // Stories Section with heading
+                  if (_selectedTabIndex == 1) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: Text(
+                        'Stories',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ),
                     StoriesSection(
                       stories: _stories,
                       hasMyStory:
@@ -166,16 +181,21 @@ class _HomePageState extends State<HomePage> {
                       onStartCapture: _openStoryCapture,
                       onViewStory: _openStoryViewer,
                     ),
-                  if (_selectedTabIndex == 1) const LiveSection(),
+                  ],
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: Text(
-                      sectionTitle,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          sectionTitle,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   if (isLoading && currentPosts.isEmpty)
@@ -185,44 +205,24 @@ class _HomePageState extends State<HomePage> {
                         child: CircularProgressIndicator(),
                       ),
                     )
-                  else if (currentPosts.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(40),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.photo_library_outlined,
-                              size: 64,
-                              color: isDark ? Colors.white30 : Colors.black26,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _selectedTabIndex == 0
-                                  ? 'No posts from people you follow yet.\nStart following users to see their posts!'
-                                  : 'No posts available yet.\nCheck back soon!',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: isDark ? Colors.white60 : Colors.black54,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
+                  else if (postsToDisplay.isEmpty)
+                    _buildEmptyState(isDark)
                   else
-                    ...currentPosts.map((dynamicPost) {
-                      // Convert dynamic PostModel to home Post for PostCard
-                      final homePost = Post(
-                        imageUrl: dynamicPost.thumbnailUrl,
-                        userName: dynamicPost.username,
-                        userHandle: '@${dynamicPost.username.toLowerCase()}',
-                        userAvatarUrl: dynamicPost.userAvatar,
-                        likes: _formatCount(dynamicPost.likes),
-                        comments: _formatCount(dynamicPost.comments),
-                        shares: _formatCount(dynamicPost.shares),
-                      );
-                      return PostCard(post: homePost);
+                    ...postsToDisplay.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final post = entry.value;
+
+                      // Insert Live Section after 2nd post
+                      if (index == 1) {
+                        return Column(
+                          children: [
+                            PostCard(post: post),
+                            const LiveSection(),
+                          ],
+                        );
+                      }
+
+                      return PostCard(post: post);
                     }),
                   const SizedBox(height: 100),
                 ],
@@ -260,5 +260,69 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
     );
+  }
+
+  Widget _buildEmptyState(bool isDark) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          children: [
+            Icon(
+              Icons.photo_library_outlined,
+              size: 64,
+              color: isDark ? Colors.white30 : Colors.black26,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _selectedTabIndex == 0
+                  ? 'No posts from people you follow yet.\nStart following users to see their posts!'
+                  : 'No posts available yet.\nCreate your first post!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark ? Colors.white60 : Colors.black54,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                // Navigate to create post
+                // You can implement this navigation
+              },
+              icon: const Icon(Icons.add_photo_alternate),
+              label: const Text('Create Post'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Post> _convertToHomePosts(List<dynamic> dynamicPosts) {
+    return dynamicPosts.map((dynamicPost) {
+      return Post(
+        id: dynamicPost.id,
+        userId: dynamicPost.userId,
+        imageUrl: dynamicPost.thumbnailUrl,
+        userName: dynamicPost.username,
+        userHandle: '@${dynamicPost.username.toLowerCase()}',
+        userAvatarUrl: dynamicPost.userAvatar,
+        likes: _formatCount(dynamicPost.likes),
+        comments: _formatCount(dynamicPost.comments),
+        shares: _formatCount(dynamicPost.shares),
+      );
+    }).toList();
   }
 }

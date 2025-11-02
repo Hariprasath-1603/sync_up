@@ -72,6 +72,7 @@ Deno.serve(async (req) => {
 
     const data = await response.json();
     console.log(`Twilio response status: ${response.status}`);
+    console.log(`Twilio response data: ${JSON.stringify(data)}`);
 
     if (response.ok) {
       console.log(`✅ OTP sent successfully to ${phone}`);
@@ -92,10 +93,22 @@ Deno.serve(async (req) => {
       );
     } else {
       console.error(`❌ Twilio error: ${JSON.stringify(data)}`);
+      
+      // Provide helpful error messages
+      let errorMessage = data.message || "Failed to send OTP";
+      if (data.code === 60200) {
+        errorMessage = "Phone number is invalid or not reachable. Please check the number format (e.g., +1234567890)";
+      } else if (data.code === 60203) {
+        errorMessage = "Maximum verification attempts reached. Please try again later or contact support.";
+      } else if (data.code === 60212) {
+        errorMessage = "This phone number is not verified in Twilio. For testing, add it to Twilio Console → Verify → Test Phone Numbers";
+      }
+      
       return new Response(
         JSON.stringify({ 
-          error: data.message || "Failed to send OTP",
+          error: errorMessage,
           details: data,
+          code: data.code,
         }),
         { 
           status: response.status, 
@@ -107,11 +120,12 @@ Deno.serve(async (req) => {
       );
     }
   } catch (error) {
-    console.error(`❌ Exception: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    console.error(`❌ Exception: ${errorMessage}`);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: "Internal server error",
-        message: error.message,
+        message: errorMessage,
       }),
       { 
         status: 500, 
