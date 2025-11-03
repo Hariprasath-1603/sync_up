@@ -559,9 +559,20 @@ class ImagePickerService {
     required String userId,
     required Function(String url) onImageUploaded,
   }) async {
+    bool dialogDismissed = false;
+
     try {
       // Show loading
       _showLoadingDialog(context);
+
+      // Set up a safety timeout to force close the dialog after 2 seconds
+      Future.delayed(const Duration(seconds: 2), () {
+        if (_isLoadingDialogVisible && !dialogDismissed && context.mounted) {
+          debugPrint('⏱️ Timeout reached - forcing dialog close');
+          dialogDismissed = true;
+          _hideLoadingDialog(context);
+        }
+      });
 
       final bucket = photoType == PhotoType.profile
           ? SupabaseConfig.profilePhotosBucket
@@ -573,9 +584,9 @@ class ImagePickerService {
       // Remove from storage (ignore errors to keep UX smooth)
       try {
         await _supabase.storage.from(bucket).remove([path]);
-        debugPrint('Removed $path from $bucket');
+        debugPrint('✅ Removed $path from $bucket');
       } catch (storageError) {
-        debugPrint('Failed to remove $path from $bucket: $storageError');
+        debugPrint('⚠️ Failed to remove $path from $bucket: $storageError');
       }
 
       // Update database to remove photo reference
@@ -584,17 +595,27 @@ class ImagePickerService {
           : 'cover_photo_url';
 
       await _supabase.from('users').update({fieldName: null}).eq('uid', userId);
+      debugPrint('✅ Database updated - $fieldName set to null');
 
-      // Hide loading dialog BEFORE callback
-      _hideLoadingDialog(context);
+      // Hide loading dialog BEFORE callback (if not already dismissed)
+      if (!dialogDismissed) {
+        dialogDismissed = true;
+        _hideLoadingDialog(context);
+      }
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              photoType == PhotoType.profile
-                  ? 'Profile photo removed'
-                  : 'Cover photo removed',
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Text(
+                  photoType == PhotoType.profile
+                      ? 'Profile picture removed'
+                      : 'Cover photo removed',
+                ),
+              ],
             ),
             backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
@@ -608,13 +629,26 @@ class ImagePickerService {
 
       // Call callback AFTER UI updates
       await Future.delayed(const Duration(milliseconds: 100));
+      debugPrint('🔄 Calling onImageUploaded callback with empty string...');
       onImageUploaded('');
+      debugPrint('✅ Callback completed');
     } catch (e) {
       debugPrint('❌ Error removing photo: $e');
-      _isLoadingDialogVisible = false; // Reset flag
+
+      // Ensure dialog is closed even on error
+      if (!dialogDismissed) {
+        dialogDismissed = true;
+        _isLoadingDialogVisible = false; // Reset flag
+        if (context.mounted) {
+          try {
+            _hideLoadingDialog(context);
+          } catch (hideError) {
+            debugPrint('⚠️ Error hiding dialog on error: $hideError');
+          }
+        }
+      }
 
       if (context.mounted) {
-        _hideLoadingDialog(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: ${e.toString()}'),
@@ -628,8 +662,21 @@ class ImagePickerService {
         );
       }
     } finally {
-      // Ensure flag is reset
-      _isLoadingDialogVisible = false;
+      // Ensure flag is reset and dialog is closed
+      debugPrint('🔒 Finally block: Ensuring cleanup');
+      if (!dialogDismissed) {
+        dialogDismissed = true;
+        _isLoadingDialogVisible = false;
+        if (context.mounted) {
+          try {
+            _hideLoadingDialog(context);
+          } catch (finalError) {
+            debugPrint('⚠️ Error in final cleanup: $finalError');
+          }
+        }
+      } else {
+        _isLoadingDialogVisible = false;
+      }
     }
   }
 }

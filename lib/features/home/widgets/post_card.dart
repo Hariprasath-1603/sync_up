@@ -6,6 +6,7 @@ import '../../../core/scaffold_with_nav_bar.dart';
 import '../../../core/services/interaction_service.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/theme.dart';
+import '../../../core/widgets/custom_video_player.dart';
 import '../models/post_model.dart';
 import '../../profile/models/post_model.dart' as profile_post;
 import '../../profile/pages/post_viewer_instagram_style.dart';
@@ -188,44 +189,58 @@ class _PostCardState extends State<PostCard> {
                         ),
                         child: Stack(
                           children: [
-                            Image.network(
-                              post.imageUrl,
-                              width: double.infinity,
-                              height: 280,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                            // Show video player for video posts, image for others
+                            if (post.isVideo &&
+                                post.videoUrl != null &&
+                                post.videoUrl!.isNotEmpty)
+                              SizedBox(
                                 width: double.infinity,
                                 height: 280,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHighest,
-                                alignment: Alignment.center,
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.broken_image_outlined,
-                                      size: 64,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant
-                                          .withOpacity(0.5),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Could not load image',
-                                      style: TextStyle(
+                                child: CompactVideoPlayer(
+                                  videoUrl: post.videoUrl!,
+                                  thumbnailUrl:
+                                      post.thumbnailUrl ?? post.imageUrl,
+                                ),
+                              )
+                            else
+                              Image.network(
+                                post.imageUrl,
+                                width: double.infinity,
+                                height: 280,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  width: double.infinity,
+                                  height: 280,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
+                                  alignment: Alignment.center,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.broken_image_outlined,
+                                        size: 64,
                                         color: Theme.of(context)
                                             .colorScheme
                                             .onSurfaceVariant
-                                            .withOpacity(0.7),
-                                        fontSize: 14,
+                                            .withOpacity(0.5),
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Could not load image',
+                                        style: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant
+                                              .withOpacity(0.7),
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
                             Positioned(
                               bottom: 0,
                               left: 0,

@@ -21,6 +21,9 @@ class PostModel {
     this.location,
     this.musicName,
     this.musicArtist,
+    this.videoUrl,
+    this.videoDuration,
+    this.mediaType,
     this.likes = 0,
     this.comments = 0,
     this.shares = 0,
@@ -49,6 +52,11 @@ class PostModel {
   final String? musicName;
   final String? musicArtist;
 
+  // Video-specific fields
+  final String? videoUrl;
+  final int? videoDuration; // Duration in seconds
+  final String? mediaType; // 'image', 'video', 'carousel'
+
   int likes;
   int comments;
   int shares;
@@ -63,9 +71,12 @@ class PostModel {
   bool hideLikeCount;
   final List<String> tags;
 
-  bool get isVideo => type == PostType.video || type == PostType.reel;
+  bool get isVideo =>
+      type == PostType.video || type == PostType.reel || mediaType == 'video';
   bool get isCarousel => type == PostType.carousel;
   bool get hasMultipleMedia => mediaUrls.length > 1;
+  String get videoUrlOrFirst =>
+      videoUrl ?? (mediaUrls.isNotEmpty ? mediaUrls.first : '');
 
   PostModel copyWith({
     String? id,
@@ -80,6 +91,9 @@ class PostModel {
     String? location,
     String? musicName,
     String? musicArtist,
+    String? videoUrl,
+    int? videoDuration,
+    String? mediaType,
     int? likes,
     int? comments,
     int? shares,
@@ -107,6 +121,9 @@ class PostModel {
       location: location ?? this.location,
       musicName: musicName ?? this.musicName,
       musicArtist: musicArtist ?? this.musicArtist,
+      videoUrl: videoUrl ?? this.videoUrl,
+      videoDuration: videoDuration ?? this.videoDuration,
+      mediaType: mediaType ?? this.mediaType,
       likes: likes ?? this.likes,
       comments: comments ?? this.comments,
       shares: shares ?? this.shares,

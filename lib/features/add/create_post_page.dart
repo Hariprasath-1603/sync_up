@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/services/supabase_storage_service.dart';
+import '../../core/services/video_service.dart';
 import '../../core/providers/post_provider.dart';
 
 class CreatePostPage extends StatefulWidget {
@@ -26,6 +27,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
   Timer? _autosaveTimer;
 
   final List<XFile> _selectedMedia = [];
+  final Map<String, String> _videoThumbnails = {}; // Store video thumbnails
   final List<Map<String, dynamic>> _taggedUsers = [];
   // List<String> _hashtags = []; // Future feature
   String _selectedAudience = 'Public';
@@ -144,12 +146,68 @@ class _CreatePostPageState extends State<CreatePostPage> {
     try {
       final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
       if (video != null) {
-        setState(() {
-          _selectedMedia.add(video);
-          _hasUnsavedChanges = true;
-        });
+        // Show loading dialog
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const Center(
+              child: Card(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Processing video...'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        // Validate video
+        final isValid = await VideoService.validateVideo(
+          video.path,
+          maxDurationSeconds: 60,
+          maxSizeMB: 100,
+        );
+
+        if (!isValid) {
+          if (mounted) {
+            Navigator.pop(context); // Close loading dialog
+            _showSnackBar(
+              'Video must be under 60 seconds and 100 MB',
+              Colors.red,
+            );
+          }
+          return;
+        }
+
+        // Generate thumbnail
+        final thumbnail = await VideoService.generateThumbnail(video.path);
+
+        if (mounted) {
+          Navigator.pop(context); // Close loading dialog
+
+          setState(() {
+            _selectedMedia.add(video);
+            if (thumbnail != null) {
+              _videoThumbnails[video.path] = thumbnail;
+            }
+            _hasUnsavedChanges = true;
+          });
+
+          _showSnackBar('Video added successfully!', Colors.green);
+        }
       }
     } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog if it's open
+      }
       _showSnackBar('Error picking video: $e', Colors.red);
     }
   }
@@ -224,22 +282,75 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
       // Upload media files first
       final List<String> mediaUrls = [];
+      String? videoUrl;
+      String? thumbnailUrl;
+      int? videoDuration;
+      String mediaType = 'text';
 
       for (int i = 0; i < _selectedMedia.length; i++) {
         setState(() {
           _uploadProgress = (i / (_selectedMedia.length + 1));
         });
 
-        final file = File(_selectedMedia[i].path);
-        final uploadedUrl = await SupabaseStorageService.uploadPost(
-          file,
-          userId,
-        );
+        final media = _selectedMedia[i];
+        final file = File(media.path);
+        final isVideo = _isVideo(media.path);
 
-        if (uploadedUrl != null) {
-          mediaUrls.add(uploadedUrl);
+        if (isVideo) {
+          // Handle video upload
+          print('🎥 Processing video...');
+          mediaType = 'video';
+
+          // Compress video (optional, can skip for faster upload)
+          // final compressedPath = await VideoService.compressVideo(media.path);
+          // final videoFile = File(compressedPath ?? media.path);
+          final videoFile = file;
+
+          // Upload video
+          final uploadedVideoUrl = await SupabaseStorageService.uploadPost(
+            videoFile,
+            userId,
+          );
+
+          if (uploadedVideoUrl != null) {
+            videoUrl = uploadedVideoUrl;
+            mediaUrls.add(uploadedVideoUrl);
+            print('✅ Video uploaded: $uploadedVideoUrl');
+
+            // Get video duration
+            videoDuration = await VideoService.getVideoDuration(media.path);
+
+            // Upload thumbnail
+            final thumbnailPath = _videoThumbnails[media.path];
+            if (thumbnailPath != null) {
+              final thumbnailFile = File(thumbnailPath);
+              final uploadedThumbnailUrl =
+                  await SupabaseStorageService.uploadPost(
+                    thumbnailFile,
+                    userId,
+                  );
+
+              if (uploadedThumbnailUrl != null) {
+                thumbnailUrl = uploadedThumbnailUrl;
+                print('✅ Thumbnail uploaded: $uploadedThumbnailUrl');
+              }
+            }
+          } else {
+            throw Exception('Failed to upload video');
+          }
         } else {
-          throw Exception('Failed to upload media ${i + 1}');
+          // Handle image upload
+          final uploadedUrl = await SupabaseStorageService.uploadPost(
+            file,
+            userId,
+          );
+
+          if (uploadedUrl != null) {
+            mediaUrls.add(uploadedUrl);
+            mediaType = _selectedMedia.length > 1 ? 'carousel' : 'image';
+          } else {
+            throw Exception('Failed to upload media ${i + 1}');
+          }
         }
       }
 
@@ -260,16 +371,20 @@ class _CreatePostPageState extends State<CreatePostPage> {
           .map((m) => m.group(0)!.substring(1))
           .toList();
 
-      // Create post in database
+      // Create post in database with video support
       final postData = {
         'user_id': userId,
         'caption': caption,
         'media_urls': mediaUrls,
+        'media_type': mediaType,
+        'video_url': videoUrl,
+        'thumbnail_url': thumbnailUrl,
+        'duration': videoDuration,
         'location': _location?['name'],
         'tags': hashtags,
         'post_type': _selectedMedia.isEmpty
             ? 'text'
-            : (_selectedMedia.length > 1 ? 'carousel' : 'image'),
+            : (_selectedMedia.length > 1 ? 'carousel' : mediaType),
         'likes_count': 0,
         'comments_count': 0,
         'shares_count': 0,
@@ -288,6 +403,11 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
       print('✅ Post created successfully: ${result['id']}');
       print('   Media URLs saved: $mediaUrls');
+      if (videoUrl != null) {
+        print('   Video URL: $videoUrl');
+        print('   Thumbnail URL: $thumbnailUrl');
+        print('   Duration: $videoDuration seconds');
+      }
 
       // Update user's post count
       await Supabase.instance.client.rpc(
@@ -330,6 +450,12 @@ class _CreatePostPageState extends State<CreatePostPage> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  /// Helper method to check if file is a video
+  bool _isVideo(String path) {
+    final extension = path.split('.').last.toLowerCase();
+    return ['mp4', 'mov', 'avi', 'webm', 'mkv'].contains(extension);
   }
 
   void _showMediaOptions() {
@@ -1465,12 +1591,31 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                   borderRadius: BorderRadius.circular(16),
                                   child: Stack(
                                     children: [
-                                      Image.file(
-                                        File(media.path),
-                                        width: 140,
-                                        height: 180,
-                                        fit: BoxFit.cover,
-                                      ),
+                                      // Show thumbnail for videos, image for photos
+                                      if (_isVideo(media.path) &&
+                                          _videoThumbnails[media.path] != null)
+                                        Image.file(
+                                          File(_videoThumbnails[media.path]!),
+                                          width: 140,
+                                          height: 180,
+                                          fit: BoxFit.cover,
+                                        )
+                                      else if (!_isVideo(media.path))
+                                        Image.file(
+                                          File(media.path),
+                                          width: 140,
+                                          height: 180,
+                                          fit: BoxFit.cover,
+                                        )
+                                      else
+                                        Container(
+                                          width: 140,
+                                          height: 180,
+                                          color: Colors.black,
+                                          child: const Center(
+                                            child: CircularProgressIndicator(),
+                                          ),
+                                        ),
                                       // Gradient overlay
                                       Container(
                                         decoration: BoxDecoration(
@@ -1484,6 +1629,62 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                           ),
                                         ),
                                       ),
+                                      // Video play icon overlay
+                                      if (_isVideo(media.path))
+                                        Center(
+                                          child: Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withOpacity(
+                                                0.6,
+                                              ),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.play_arrow,
+                                              color: Colors.white,
+                                              size: 32,
+                                            ),
+                                          ),
+                                        ),
+                                      // Video indicator badge
+                                      if (_isVideo(media.path))
+                                        Positioned(
+                                          top: 8,
+                                          left: 8,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 3,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withOpacity(
+                                                0.7,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.videocam,
+                                                  color: Colors.white,
+                                                  size: 12,
+                                                ),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  'Video',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       // Close button
                                       Positioned(
                                         top: 8,

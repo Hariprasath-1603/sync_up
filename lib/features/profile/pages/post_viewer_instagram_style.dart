@@ -5,8 +5,11 @@ import 'package:provider/provider.dart';
 import '../../../core/theme.dart';
 import '../../../core/scaffold_with_nav_bar.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/post_provider.dart';
 import '../../../core/services/post_service.dart';
+import '../../../core/widgets/custom_video_player.dart';
 import '../models/post_model.dart';
+import '../widgets/unified_post_options_sheet.dart';
 import 'widgets/floating_reactions.dart';
 
 /// Instagram-style post viewer with adaptive theme and advanced interactions
@@ -252,10 +255,28 @@ class _PostViewerInstagramStyleState extends State<PostViewerInstagramStyle>
   void _showOptionsMenu() {
     HapticFeedback.lightImpact();
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _buildOptionsSheet(),
+    final authProvider = context.read<AuthProvider>();
+    final postProvider = context.read<PostProvider>();
+    final bool isOwnPost = authProvider.isOwnPost(_currentPost.userId);
+
+    // Hide nav bar while sheet is open
+    _navBarVisibility?.value = false;
+
+    UnifiedPostOptionsSheet.show(
+      context,
+      post: _currentPost,
+      isOwnPost: isOwnPost,
+      onPostUpdated: () {
+        // Refresh the current post data if needed
+        setState(() {
+          // Post has been updated
+        });
+      },
+      onPostDeleted: () {
+        // Remove from list and navigate away
+        postProvider.removePost(_currentPost.id);
+        _handleExit();
+      },
     );
   }
 
@@ -381,6 +402,12 @@ class _PostViewerInstagramStyleState extends State<PostViewerInstagramStyle>
   }
 
   Future<void> _handleExit() async {
+    // Show nav bar with smooth animation first
+    _navBarVisibility?.value = true;
+
+    // Small delay to ensure navbar animation starts
+    await Future.delayed(const Duration(milliseconds: 50));
+
     // Animate exit
     await _exitAnimationController.forward();
 
@@ -1160,24 +1187,41 @@ class _PostViewerInstagramStyleState extends State<PostViewerInstagramStyle>
                     }
                   },
                   child: post.mediaUrls.isNotEmpty
-                      ? Image.network(
-                          post.mediaUrls[_currentMediaIndex],
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: isDark
-                                    ? [Colors.grey[800]!, Colors.grey[900]!]
-                                    : [Colors.grey[200]!, Colors.grey[300]!],
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.image_not_supported_rounded,
-                              size: 64,
-                              color: isDark ? Colors.white38 : Colors.black26,
-                            ),
-                          ),
-                        )
+                      ? (post.isVideo && post.videoUrl != null
+                            ? CustomVideoPlayer(
+                                videoUrl: post.videoUrl!,
+                                autoPlay: true,
+                                showControls: true,
+                              )
+                            : Hero(
+                                tag: 'post_${post.id}',
+                                child: Image.network(
+                                  post.mediaUrls[_currentMediaIndex],
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: isDark
+                                            ? [
+                                                Colors.grey[800]!,
+                                                Colors.grey[900]!,
+                                              ]
+                                            : [
+                                                Colors.grey[200]!,
+                                                Colors.grey[300]!,
+                                              ],
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.image_not_supported_rounded,
+                                      size: 64,
+                                      color: isDark
+                                          ? Colors.white38
+                                          : Colors.black26,
+                                    ),
+                                  ),
+                                ),
+                              ))
                       : Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
@@ -1747,451 +1791,6 @@ class _PostViewerInstagramStyleState extends State<PostViewerInstagramStyle>
 
           const SizedBox(height: 16),
         ],
-      ),
-    );
-  }
-
-  Widget _buildOptionsSheet() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final authProvider = context.read<AuthProvider>();
-    final bool isOwnPost = authProvider.isOwnPost(_currentPost.userId);
-
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          decoration: BoxDecoration(
-            color: isDark
-                ? kDarkBackground.withOpacity(0.95)
-                : kLightBackground.withOpacity(0.95),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            border: Border(
-              top: BorderSide(
-                color: isDark
-                    ? Colors.white.withOpacity(0.1)
-                    : Colors.black.withOpacity(0.1),
-                width: 1,
-              ),
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withOpacity(0.3)
-                      : Colors.black.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
-                child: Text(
-                  'Post Options',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              // Divider
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: isDark
-                    ? Colors.white.withOpacity(0.1)
-                    : Colors.black.withOpacity(0.08),
-              ),
-
-              const SizedBox(height: 8),
-
-              // Scrollable options list
-              Flexible(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Options for viewing other's posts
-                      if (!isOwnPost) ...[
-                        _buildShareOption(
-                          icon: Icons.report_outlined,
-                          label: 'Report Post',
-                          onTap: () {
-                            Navigator.pop(context);
-                            _showReportDialog();
-                          },
-                          isDark: isDark,
-                          isDestructive: true,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.link_rounded,
-                          label: 'Copy Link',
-                          onTap: () {
-                            Navigator.pop(context);
-                            HapticFeedback.lightImpact();
-                            final postLink = _postService.getPostLink(
-                              _currentPost.id,
-                            );
-                            Clipboard.setData(ClipboardData(text: postLink));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Link copied!'),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.volume_off_outlined,
-                          label: 'Mute ${_currentPost.username}',
-                          onTap: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Muted ${_currentPost.username}'),
-                              ),
-                            );
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: _currentPost.isFollowing
-                              ? Icons.person_remove_outlined
-                              : Icons.person_add_outlined,
-                          label: _currentPost.isFollowing
-                              ? 'Unfollow ${_currentPost.username}'
-                              : 'Follow ${_currentPost.username}',
-                          onTap: () {
-                            Navigator.pop(context);
-                            setState(() {
-                              _currentPost.isFollowing =
-                                  !_currentPost.isFollowing;
-                            });
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.block_outlined,
-                          label: 'Block ${_currentPost.username}',
-                          onTap: () {
-                            Navigator.pop(context);
-                            _showBlockDialog();
-                          },
-                          isDark: isDark,
-                          isDestructive: true,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.notifications_outlined,
-                          label: 'Turn on Post Notifications',
-                          onTap: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Post notifications enabled'),
-                              ),
-                            );
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.person_outlined,
-                          label: 'View Account',
-                          onTap: () {
-                            Navigator.pop(context);
-                            // TODO: Navigate to user profile
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.visibility_off_outlined,
-                          label: 'Hide this Post',
-                          onTap: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Post hidden')),
-                            );
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.not_interested_outlined,
-                          label: 'Not Interested',
-                          onTap: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'We\'ll show you fewer posts like this',
-                                ),
-                              ),
-                            );
-                          },
-                          isDark: isDark,
-                        ),
-                      ],
-
-                      // Options for own posts
-                      if (isOwnPost) ...[
-                        _buildShareOption(
-                          icon: Icons.edit_outlined,
-                          label: 'Edit Post',
-                          onTap: () {
-                            Navigator.pop(context);
-                            _showEditCaptionDialog();
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.bar_chart_rounded,
-                          label: 'View Insights',
-                          onTap: () {
-                            Navigator.pop(context);
-                            _showInsightsSheet();
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.share_outlined,
-                          label: 'Share Post',
-                          onTap: () {
-                            Navigator.pop(context);
-                            HapticFeedback.lightImpact();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Share functionality coming soon',
-                                ),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.link_rounded,
-                          label: 'Copy Link',
-                          onTap: () {
-                            Navigator.pop(context);
-                            HapticFeedback.lightImpact();
-                            final postLink = _postService.getPostLink(
-                              _currentPost.id,
-                            );
-                            Clipboard.setData(ClipboardData(text: postLink));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Link copied to clipboard'),
-                                backgroundColor: Colors.green,
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.people_outline,
-                          label: 'Post Settings',
-                          onTap: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Post settings feature coming soon',
-                                ),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.archive_outlined,
-                          label: _currentPost.isArchived
-                              ? 'Unarchive'
-                              : 'Archive',
-                          onTap: () {
-                            Navigator.pop(context);
-                            setState(() {
-                              _currentPost.isArchived =
-                                  !_currentPost.isArchived;
-                            });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  _currentPost.isArchived
-                                      ? 'Post archived'
-                                      : 'Post unarchived',
-                                ),
-                              ),
-                            );
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: _currentPost.commentsEnabled
-                              ? Icons.comments_disabled_outlined
-                              : Icons.comment_outlined,
-                          label: _currentPost.commentsEnabled
-                              ? 'Turn Off Comments'
-                              : 'Turn On Comments',
-                          onTap: () {
-                            Navigator.pop(context);
-                            setState(() {
-                              _currentPost.commentsEnabled =
-                                  !_currentPost.commentsEnabled;
-                            });
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: _currentPost.hideLikeCount
-                              ? Icons.favorite_outline
-                              : Icons.favorite_border,
-                          label: _currentPost.hideLikeCount
-                              ? 'Show Like Count'
-                              : 'Hide Like Count',
-                          onTap: () {
-                            Navigator.pop(context);
-                            setState(() {
-                              _currentPost.hideLikeCount =
-                                  !_currentPost.hideLikeCount;
-                            });
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.push_pin_outlined,
-                          label: _currentPost.isPinned
-                              ? 'Unpin from Profile'
-                              : 'Pin to Profile',
-                          onTap: () {
-                            Navigator.pop(context);
-                            setState(() {
-                              _currentPost.isPinned = !_currentPost.isPinned;
-                            });
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.campaign_outlined,
-                          label: 'Promote Post',
-                          onTap: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Opening promotion settings...'),
-                              ),
-                            );
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.people_outlined,
-                          label: 'See Who Saved This',
-                          onTap: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Showing saved users...'),
-                              ),
-                            );
-                          },
-                          isDark: isDark,
-                        ),
-
-                        _buildDivider(isDark),
-
-                        _buildShareOption(
-                          icon: Icons.delete_outline,
-                          label: 'Delete Post',
-                          onTap: () {
-                            Navigator.pop(context);
-                            _showDeleteDialog();
-                          },
-                          isDark: isDark,
-                          isDestructive: true,
-                        ),
-                      ],
-
-                      const SizedBox(height: 16),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

@@ -1,9 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import '../../../core/providers/auth_provider.dart';
-import '../../../core/providers/post_provider.dart';
 import '../../../core/services/post_service.dart';
 import '../../../core/theme.dart';
 
@@ -355,11 +352,116 @@ class UnifiedPostOptionsSheet extends StatelessWidget {
   // Action Methods
   void _editPost(BuildContext context) {
     Navigator.pop(context);
-    // TODO: Navigate to edit post screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Edit post feature coming soon'),
-        behavior: SnackBarBehavior.floating,
+    _showEditCaptionDialog(context);
+  }
+
+  void _showEditCaptionDialog(BuildContext context) {
+    final TextEditingController captionController = TextEditingController(
+      text: post.caption ?? '',
+    );
+    final TextEditingController locationController = TextEditingController(
+      text: post.location ?? '',
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Post'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: captionController,
+              decoration: const InputDecoration(
+                labelText: 'Caption',
+                hintText: 'Write a caption...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              maxLength: 2200,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: locationController,
+              decoration: const InputDecoration(
+                labelText: 'Location',
+                hintText: 'Add location',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.location_on),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+
+              // Show loading
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Text('Updating post...'),
+                    ],
+                  ),
+                  duration: const Duration(seconds: 30),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+
+              final postService = PostService();
+              final success = await postService.updatePostCaption(
+                postId: post.id ?? '',
+                caption: captionController.text,
+                location: locationController.text.isEmpty
+                    ? null
+                    : locationController.text,
+              );
+
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Post updated successfully'),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  onPostUpdated?.call();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to update post'),
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
       ),
     );
   }
@@ -394,31 +496,43 @@ class UnifiedPostOptionsSheet extends StatelessWidget {
     );
 
     try {
-      // TODO: Implement actual archive logic
-      await Future.delayed(const Duration(seconds: 1));
+      final postService = PostService();
+      final success = await postService.archivePost(post.id ?? '');
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Post archived successfully'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: 'Undo',
-              textColor: Colors.white,
-              onPressed: () {},
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Post archived successfully'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              action: SnackBarAction(
+                label: 'Undo',
+                textColor: Colors.white,
+                onPressed: () async {
+                  await postService.unarchivePost(post.id ?? '');
+                },
+              ),
             ),
-          ),
-        );
-        onPostUpdated?.call();
+          );
+          onPostUpdated?.call();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to archive post'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to archive: $e'),
+            content: Text('Error: $e'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -779,9 +893,18 @@ class _PostSettingsSheetState extends State<_PostSettingsSheet> {
     );
   }
 
-  void _saveSettings() {
-    // TODO: Save to Supabase
-    widget.onUpdated?.call();
+  void _saveSettings() async {
+    final postService = PostService();
+    final success = await postService.updatePostSettings(
+      postId: widget.post.id ?? '',
+      commentsEnabled: commentsEnabled,
+      hideLikeCount: likesHidden,
+      isPinned: isPinned,
+    );
+
+    if (success) {
+      widget.onUpdated?.call();
+    }
   }
 }
 
@@ -1355,16 +1478,18 @@ class _DeleteConfirmationSheet extends StatelessWidget {
   }
 
   void _deletePost(BuildContext context) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Navigator.pop(context);
 
-    // Show loading
-    ScaffoldMessenger.of(context).showSnackBar(
+    // Show compact loading message with shorter duration
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    scaffoldMessenger.showSnackBar(
       SnackBar(
         content: Row(
           children: [
             SizedBox(
-              width: 20,
-              height: 20,
+              width: 18,
+              height: 18,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 valueColor: AlwaysStoppedAnimation<Color>(
@@ -1372,47 +1497,69 @@ class _DeleteConfirmationSheet extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             const Text('Deleting post...'),
           ],
         ),
-        duration: const Duration(seconds: 30),
+        duration: const Duration(seconds: 5), // Reduced from 30s
         behavior: SnackBarBehavior.floating,
       ),
     );
 
     try {
-      // TODO: Implement actual delete with Supabase
-      await Future.delayed(const Duration(seconds: 1));
+      final postService = PostService();
+
+      // Delete with minimum delay for better UX
+      final deleteOperation = postService.deletePost(post.id ?? '');
+      final minimumDelay = Future.delayed(const Duration(milliseconds: 500));
+
+      await Future.wait([deleteOperation, minimumDelay]);
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
+        // Hide loading message immediately
+        scaffoldMessenger.hideCurrentSnackBar();
+
+        // Show success message
+        scaffoldMessenger.showSnackBar(
           const SnackBar(
-            content: Text('Post deleted successfully'),
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 12),
+                Text('Post deleted successfully'),
+              ],
+            ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
+            duration: Duration(milliseconds: 1500),
           ),
         );
 
-        // Refresh posts
-        final postProvider = context.read<PostProvider>();
-        final authProvider = context.read<AuthProvider>();
-        if (authProvider.currentUserId != null) {
-          postProvider.loadUserPosts(authProvider.currentUserId!);
-        }
-
+        // Trigger callback to refresh posts
         onDeleted?.call();
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
+        // Hide loading message
+        scaffoldMessenger.hideCurrentSnackBar();
+
+        // Show error message
+        scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text('Failed to delete: $e'),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Failed to delete: ${e.toString().substring(0, 50)}...',
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
           ),
         );
       }

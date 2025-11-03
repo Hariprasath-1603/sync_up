@@ -1,21 +1,22 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/post_provider.dart';
 import '../../core/theme.dart';
 import '../../core/scaffold_with_nav_bar.dart';
+import '../../core/services/image_picker_service.dart';
+import '../../core/utils/responsive_utils.dart';
 import 'edit_profile_page.dart';
 import 'followers_following_page.dart';
 import 'user_posts_page.dart';
-import 'stories_archive_page.dart';
-import '../stories/storyverse_page.dart';
 import 'models/post_model.dart' as profile_post;
 import 'pages/post_viewer_instagram_style.dart';
 import 'pages/profile_photo_viewer.dart';
-import 'highlight_viewer.dart';
 import '../settings/settings_home_page.dart';
 import 'widgets/unified_post_options_sheet.dart';
+import 'widgets/shimmer_loading_grid.dart';
 
 class MyProfilePage extends StatefulWidget {
   const MyProfilePage({super.key});
@@ -33,16 +34,89 @@ class _MyProfilePageState extends State<MyProfilePage>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
 
-    // Load user posts from Firestore
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authProvider = context.read<AuthProvider>();
-      final postProvider = context.read<PostProvider>();
-      final userId = authProvider.currentUserId;
+    // Initialize profile with proper session handling
+    _initializeProfile();
+  }
 
-      if (userId != null) {
-        postProvider.loadUserPosts(userId);
-      }
-    });
+  /// Initialize profile with Supabase session check
+  Future<void> _initializeProfile() async {
+    // Check if user is already authenticated
+    final authProvider = context.read<AuthProvider>();
+
+    // Wait a bit for AuthProvider to initialize if needed
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    if (authProvider.currentUserId != null) {
+      // User session is ready, load posts immediately
+      await _loadProfileData();
+    } else {
+      // Wait for auth state to be ready
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        // Give AuthProvider time to complete initialization
+        int attempts = 0;
+        while (attempts < 20) {
+          // Max 2 seconds wait
+          await Future.delayed(const Duration(milliseconds: 100));
+          final userId = context.read<AuthProvider>().currentUserId;
+          if (userId != null) {
+            await _loadProfileData();
+            break;
+          }
+          attempts++;
+        }
+      });
+    }
+  }
+
+  /// Load all profile data (user info + posts)
+  Future<void> _loadProfileData() async {
+    if (!mounted) return;
+
+    final authProvider = context.read<AuthProvider>();
+    final postProvider = context.read<PostProvider>();
+    final userId = authProvider.currentUserId;
+
+    if (userId == null) return;
+
+    // Reload user data to ensure latest stats (followers, following, posts count)
+    await authProvider.reloadUserData(showLoading: false);
+
+    // Load user posts
+    postProvider.loadUserPosts(userId);
+  }
+
+  /// Edit cover photo - show bottom sheet with gallery, camera, and cancel options
+  Future<void> _editCoverPhoto() async {
+    final authProvider = context.read<AuthProvider>();
+    final userId = authProvider.currentUserId;
+    final currentUser = authProvider.currentUser;
+
+    if (userId == null) return;
+
+    final imagePickerService = ImagePickerService();
+
+    await imagePickerService.showImageSourceBottomSheet(
+      context: context,
+      photoType: PhotoType.cover,
+      userId: userId,
+      currentImageUrl: currentUser?.coverPhotoUrl,
+      onImageUploaded: (url) async {
+        // Clear image cache for old cover photo
+        if (currentUser?.coverPhotoUrl != null &&
+            currentUser!.coverPhotoUrl!.isNotEmpty) {
+          final oldImage = NetworkImage(currentUser.coverPhotoUrl!);
+          await oldImage.evict();
+        }
+
+        // Reload user data to get updated cover photo
+        await authProvider.reloadUserData(showLoading: false);
+
+        // Force UI update with smooth transition
+        if (mounted) {
+          setState(() {});
+        }
+      },
+    );
   }
 
   @override
@@ -76,61 +150,75 @@ class _MyProfilePageState extends State<MyProfilePage>
         ),
         child: SafeArea(
           bottom: false,
-          child: CustomScrollView(
-            slivers: [
-              // Glassmorphism Header
-              SliverToBoxAdapter(
-                child: _buildGlassmorphicHeader(context, isDark),
-              ),
-              // Stats and Bio in Glass Card
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: _buildGlassCard(
-                    child: _buildStatsAndBio(context, isDark),
-                    isDark: isDark,
+          child: RefreshIndicator(
+            onRefresh: _loadProfileData,
+            color: kPrimary,
+            child: CustomScrollView(
+              slivers: [
+                // Glassmorphism Header
+                SliverToBoxAdapter(
+                  child: _buildGlassmorphicHeader(context, isDark),
+                ),
+                // Stats and Bio in Glass Card
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: _buildGlassCard(
+                      child: _buildStatsAndBio(context, isDark),
+                      isDark: isDark,
+                    ),
                   ),
                 ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-              // Tab Bar in Glass
-              SliverPersistentHeader(
-                delegate: _GlassmorphicTabBarDelegate(
-                  TabBar(
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                // Tab Bar in Glass
+                SliverPersistentHeader(
+                  delegate: _GlassmorphicTabBarDelegate(
+                    TabBar(
+                      controller: _tabController,
+                      labelColor: kPrimary,
+                      unselectedLabelColor: isDark
+                          ? Colors.white60
+                          : Colors.grey,
+                      indicatorColor: kPrimary,
+                      indicatorWeight: 3,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      labelStyle: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                      ),
+                      tabs: const [
+                        Tab(text: 'Posts'),
+                        Tab(text: 'Media'),
+                      ],
+                    ),
+                    isDark,
+                  ),
+                  pinned: true,
+                ),
+                // Grid Content
+                SliverFillRemaining(
+                  child: TabBarView(
                     controller: _tabController,
-                    labelColor: kPrimary,
-                    unselectedLabelColor: isDark ? Colors.white60 : Colors.grey,
-                    indicatorColor: kPrimary,
-                    indicatorWeight: 3,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    labelStyle: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                    unselectedLabelStyle: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 15,
-                    ),
-                    tabs: const [
-                      Tab(text: 'Posts'),
-                      Tab(text: 'Media'),
+                    children: [
+                      _buildPostGridFromFirestore(
+                        context,
+                        isDark,
+                        showAllPosts: true,
+                      ),
+                      _buildPostGridFromFirestore(
+                        context,
+                        isDark,
+                        showAllPosts: false,
+                      ),
                     ],
                   ),
-                  isDark,
                 ),
-                pinned: true,
-              ),
-              // Grid Content
-              SliverFillRemaining(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildPostGridFromFirestore(context, isDark),
-                    _buildPostGridFromFirestore(context, isDark),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -139,9 +227,11 @@ class _MyProfilePageState extends State<MyProfilePage>
 
   // Glassmorphic Header with Avatar and Actions
   Widget _buildGlassmorphicHeader(BuildContext context, bool isDark) {
-    const coverUrl = 'https://picsum.photos/seed/cover/1200/400';
     final authProvider = context.watch<AuthProvider>();
     final currentUser = authProvider.currentUser;
+    final coverUrl =
+        currentUser?.coverPhotoUrl ??
+        'https://picsum.photos/seed/cover/1200/400';
     final avatarUrl =
         currentUser?.photoURL ?? 'https://i.pravatar.cc/300?img=13';
     final displayName =
@@ -154,38 +244,58 @@ class _MyProfilePageState extends State<MyProfilePage>
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Background Image with Gradient Overlay - Make it tappable
+          // Background Image with Gradient Overlay - Make it tappable with smooth fade transition
           GestureDetector(
             onTap: () {
-              // TODO: Open cover photo viewer/editor
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Cover photo clicked')),
-              );
+              // View cover photo in full screen
+              // TODO: Implement full screen cover photo viewer
             },
             child: Container(
               height: 200,
-              decoration: BoxDecoration(
-                image: const DecorationImage(
-                  image: NetworkImage(coverUrl),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      (isDark ? kDarkBackground : kLightBackground).withOpacity(
-                        0.3,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Use CachedNetworkImage for smooth transitions
+                  CachedNetworkImage(
+                    imageUrl: coverUrl,
+                    fit: BoxFit.cover,
+                    fadeInDuration: const Duration(milliseconds: 300),
+                    fadeOutDuration: const Duration(milliseconds: 200),
+                    placeholder: (context, url) => Container(
+                      color: isDark ? Colors.grey[850] : Colors.grey[200],
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
+                        ),
                       ),
-                      (isDark ? kDarkBackground : kLightBackground).withOpacity(
-                        0.95,
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: isDark ? Colors.grey[800] : Colors.grey[300],
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        size: 48,
+                        color: isDark ? Colors.white24 : Colors.grey[400],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  // Gradient overlay
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          (isDark ? kDarkBackground : kLightBackground)
+                              .withOpacity(0.3),
+                          (isDark ? kDarkBackground : kLightBackground)
+                              .withOpacity(0.95),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -193,12 +303,7 @@ class _MyProfilePageState extends State<MyProfilePage>
           Positioned(
             top: 16,
             left: 16,
-            child: _buildGlassIconButton(Icons.edit, isDark, () {
-              // TODO: Implement cover photo edit
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Edit cover photo')));
-            }),
+            child: _buildGlassIconButton(Icons.edit, isDark, _editCoverPhoto),
           ),
           // Settings Button (Top Right)
           Positioned(
@@ -247,9 +352,44 @@ class _MyProfilePageState extends State<MyProfilePage>
                     onTap: () => _openProfilePhotoViewer(context, avatarUrl),
                     child: Hero(
                       tag: heroTag,
-                      child: CircleAvatar(
-                        radius: 50,
-                        backgroundImage: NetworkImage(avatarUrl),
+                      child: ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: avatarUrl,
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                          fadeInDuration: const Duration(milliseconds: 300),
+                          fadeOutDuration: const Duration(milliseconds: 200),
+                          placeholder: (context, url) => Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: kPrimary.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  kPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: kPrimary.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.person_rounded,
+                              size: 50,
+                              color: kPrimary,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -526,13 +666,16 @@ class _MyProfilePageState extends State<MyProfilePage>
       children: [
         Text(
           count,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: context.rFontSize(20),
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: context.rSpacing(4)),
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: context.rFontSize(12),
             color: isDark ? Colors.white60 : Colors.grey[600],
           ),
         ),
@@ -542,9 +685,12 @@ class _MyProfilePageState extends State<MyProfilePage>
     if (onTap != null) {
       return InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(context.rRadius(12)),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: context.rSpacing(12),
+            vertical: context.rSpacing(8),
+          ),
           child: statWidget,
         ),
       );
@@ -553,7 +699,11 @@ class _MyProfilePageState extends State<MyProfilePage>
     return statWidget;
   }
 
-  Widget _buildPostGridFromFirestore(BuildContext context, bool isDark) {
+  Widget _buildPostGridFromFirestore(
+    BuildContext context,
+    bool isDark, {
+    bool showAllPosts = true,
+  }) {
     final bottomSafeArea = MediaQuery.of(context).padding.bottom;
     final bottomPadding = bottomSafeArea + 210;
 
@@ -585,7 +735,23 @@ class _MyProfilePageState extends State<MyProfilePage>
       );
     }
 
-    final userPosts = postProvider.getUserPosts(userId);
+    // Get all user posts and filter based on tab
+    var userPosts = postProvider.getUserPosts(userId);
+
+    // If on Media tab, only show posts with images/videos
+    if (!showAllPosts) {
+      userPosts = userPosts
+          .where(
+            (post) =>
+                post.mediaUrls.isNotEmpty &&
+                (post.mediaUrls.first.contains('.jpg') ||
+                    post.mediaUrls.first.contains('.jpeg') ||
+                    post.mediaUrls.first.contains('.png') ||
+                    post.mediaUrls.first.contains('.mp4') ||
+                    post.mediaUrls.first.contains('.mov')),
+          )
+          .toList();
+    }
 
     if (userPosts.isEmpty) {
       return Center(
@@ -623,129 +789,237 @@ class _MyProfilePageState extends State<MyProfilePage>
       );
     }
 
+    // Show shimmer loading while posts are being fetched (when list is empty on first load)
+    final hasNeverLoaded =
+        userPosts.isEmpty && postProvider.getUserPosts(userId).isEmpty;
+    if (hasNeverLoaded) {
+      return const ShimmerLoadingGrid(itemCount: 6);
+    }
+
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
       itemCount: userPosts.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.gridColumns,
+        mainAxisSpacing: context.rSpacing(12),
+        crossAxisSpacing: context.rSpacing(12),
         childAspectRatio: 0.75,
       ),
       itemBuilder: (context, index) {
         final post = userPosts[index];
+        // Use thumbnail URL for videos, first media URL for images
+        final thumbnailUrl = post.isVideo
+            ? (post.thumbnailUrl.isNotEmpty
+                  ? post.thumbnailUrl
+                  : post.videoUrlOrFirst)
+            : (post.mediaUrls.isNotEmpty ? post.mediaUrls.first : '');
+
         return GestureDetector(
           onTap: () => _openFirestorePostViewer(context, userPosts, index),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.network(
-                  post.thumbnailUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: isDark ? Colors.grey[800] : Colors.grey[200],
-                    child: Icon(
-                      Icons.image_not_supported_outlined,
-                      size: 48,
-                      color: isDark ? Colors.white24 : Colors.grey[400],
-                    ),
-                  ),
-                ),
-                // Glass overlay
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.3),
-                      ],
-                    ),
-                  ),
-                ),
-                // Post stats overlay
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.favorite,
-                          size: 14,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _formatCount(post.likes),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+          child: Hero(
+            tag: 'post_${post.id}',
+            child: Material(
+              color: Colors.transparent,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(context.rRadius(20)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Use CachedNetworkImage for better performance
+                    CachedNetworkImage(
+                      imageUrl: thumbnailUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: isDark ? Colors.grey[850] : Colors.grey[200],
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
                           ),
                         ),
-                      ],
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              isDark ? Colors.grey[850]! : Colors.grey[200]!,
+                              isDark ? Colors.grey[800]! : Colors.grey[300]!,
+                            ],
+                          ),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                post.isVideo
+                                    ? Icons.videocam_rounded
+                                    : Icons.image_not_supported_outlined,
+                                size: context.rIconSize(48),
+                                color: isDark
+                                    ? Colors.white24
+                                    : Colors.grey[400],
+                              ),
+                              if (post.isVideo) ...[
+                                SizedBox(height: context.rSpacing(8)),
+                                Text(
+                                  'Video',
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? Colors.white24
+                                        : Colors.grey[400],
+                                    fontSize: context.rFontSize(12),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      fadeInDuration: const Duration(milliseconds: 300),
+                      fadeOutDuration: const Duration(milliseconds: 100),
                     ),
-                  ),
-                ),
-                // Three-dot menu button (own posts)
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: GestureDetector(
-                    onTap: () {
-                      UnifiedPostOptionsSheet.show(
-                        context,
-                        post: post,
-                        isOwnPost: true,
-                        onPostUpdated: () {
-                          final postProvider = context.read<PostProvider>();
-                          final authProvider = context.read<AuthProvider>();
-                          if (authProvider.currentUserId != null) {
-                            postProvider.loadUserPosts(
-                              authProvider.currentUserId!,
-                            );
-                          }
-                        },
-                        onPostDeleted: () {
-                          final postProvider = context.read<PostProvider>();
-                          final authProvider = context.read<AuthProvider>();
-                          if (authProvider.currentUserId != null) {
-                            postProvider.loadUserPosts(
-                              authProvider.currentUserId!,
-                            );
-                          }
-                        },
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
+                    // Glass overlay
+                    Container(
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.more_vert,
-                        size: 18,
-                        color: Colors.white,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.3),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
+                    // Video indicator (top-left)
+                    if (post.isVideo)
+                      Positioned(
+                        top: context.rSpacing(8),
+                        left: context.rSpacing(8),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: context.rSpacing(8),
+                            vertical: context.rSpacing(4),
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(
+                              context.rRadius(12),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.play_arrow_rounded,
+                                size: context.rIconSize(16),
+                                color: Colors.white,
+                              ),
+                              if (post.videoDuration != null) ...[
+                                SizedBox(width: context.rSpacing(4)),
+                                Text(
+                                  _formatDuration(post.videoDuration!),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: context.rFontSize(11),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    // Post stats overlay (top-right)
+                    Positioned(
+                      top: context.rSpacing(8),
+                      right: context.rSpacing(8),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: context.rSpacing(8),
+                          vertical: context.rSpacing(4),
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(
+                            context.rRadius(12),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.favorite,
+                              size: context.rIconSize(14),
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: context.rSpacing(4)),
+                            Text(
+                              _formatCount(post.likes),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: context.rFontSize(12),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Three-dot menu button (bottom-right, repositioned to avoid overlap)
+                    Positioned(
+                      bottom: context.rSpacing(8),
+                      right: context.rSpacing(8),
+                      child: GestureDetector(
+                        onTap: () {
+                          UnifiedPostOptionsSheet.show(
+                            context,
+                            post: post,
+                            isOwnPost: true,
+                            onPostUpdated: () {
+                              final postProvider = context.read<PostProvider>();
+                              final authProvider = context.read<AuthProvider>();
+                              if (authProvider.currentUserId != null) {
+                                postProvider.loadUserPosts(
+                                  authProvider.currentUserId!,
+                                );
+                              }
+                            },
+                            onPostDeleted: () {
+                              // Remove post immediately from cache for instant UI update
+                              final postProvider = context.read<PostProvider>();
+                              postProvider.removePost(post.id);
+
+                              // Also reload user stats
+                              final authProvider = context.read<AuthProvider>();
+                              if (authProvider.currentUserId != null) {
+                                authProvider.reloadUserData(showLoading: false);
+                              }
+                            },
+                          );
+                        },
+                        child: Container(
+                          padding: EdgeInsets.all(context.rSpacing(6)),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.more_vert,
+                            size: context.rIconSize(18),
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -762,6 +1036,15 @@ class _MyProfilePageState extends State<MyProfilePage>
     return count.toString();
   }
 
+  String _formatDuration(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    if (minutes > 0) {
+      return '${minutes}:${remainingSeconds.toString().padLeft(2, '0')}';
+    }
+    return '0:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
   void _openFirestorePostViewer(
     BuildContext context,
     List<dynamic> posts,
@@ -772,13 +1055,18 @@ class _MyProfilePageState extends State<MyProfilePage>
       return profile_post.PostModel(
         id: post.id,
         userId: post.userId,
-        type: profile_post.PostType.image,
+        type: post.isVideo
+            ? profile_post.PostType.video
+            : profile_post.PostType.image,
         mediaUrls: post.mediaUrls,
         thumbnailUrl: post.thumbnailUrl,
         username: post.username,
         userAvatar: post.userAvatar,
         timestamp: post.timestamp,
         caption: post.caption,
+        videoUrl: post.videoUrl,
+        videoDuration: post.videoDuration,
+        mediaType: post.mediaType,
         likes: post.likes,
         comments: post.comments,
         shares: post.shares,

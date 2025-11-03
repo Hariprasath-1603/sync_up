@@ -5,7 +5,7 @@ import '../../core/theme.dart';
 import 'create_post_page.dart';
 import 'drafts_page.dart';
 import 'scheduled_posts_page.dart';
-import '../reels/create_reel_page.dart';
+import '../reels/pages/upload_reel_page.dart';
 import '../live/go_live_page.dart';
 import '../stories/storyverse_page.dart';
 
@@ -379,7 +379,7 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
   void _showCreateReelSheet(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const CreateReelPage()),
+      MaterialPageRoute(builder: (context) => const UploadReelPage()),
     );
   }
 

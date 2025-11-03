@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/post_provider.dart';
+import 'pages/post_viewer_instagram_style.dart';
+import 'models/post_model.dart';
 
 class UserPostsPage extends StatefulWidget {
   const UserPostsPage({super.key});
@@ -34,7 +36,9 @@ class _UserPostsPageState extends State<UserPostsPage> {
     final postProvider = context.watch<PostProvider>();
     final userId = authProvider.currentUserId;
 
-    final userPosts = userId != null ? postProvider.getUserPosts(userId) : [];
+    final List<PostModel> userPosts = userId != null
+        ? postProvider.getUserPosts(userId)
+        : [];
 
     return Scaffold(
       body: Container(
@@ -142,19 +146,43 @@ class _UserPostsPageState extends State<UserPostsPage> {
                         itemCount: userPosts.length,
                         itemBuilder: (context, index) {
                           final post = userPosts[index];
-                          return _buildPostCard(
-                            post.mediaUrls.isNotEmpty
-                                ? post.mediaUrls.first
-                                : '',
-                            post.likes.toString(),
-                            post.comments.toString(),
-                            isDark,
+                          return GestureDetector(
+                            onTap: () =>
+                                _openPostViewer(context, userPosts, index),
+                            child: _buildPostCard(
+                              post.mediaUrls.isNotEmpty
+                                  ? post.mediaUrls.first
+                                  : '',
+                              post.likes.toString(),
+                              post.comments.toString(),
+                              isDark,
+                            ),
                           );
                         },
                       ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Open post viewer with all posts
+  void _openPostViewer(
+    BuildContext context,
+    List<PostModel> posts,
+    int initialIndex,
+  ) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PostViewerInstagramStyle(
+          initialPost: posts[initialIndex],
+          allPosts: posts,
+          onPostChanged: (post) {
+            // Optional: Handle post changes
+          },
         ),
       ),
     );

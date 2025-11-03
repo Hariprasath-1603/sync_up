@@ -1,9 +1,10 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/scaffold_with_nav_bar.dart';
 import '../../core/theme.dart';
 import '../profile/pages/widgets/floating_reactions.dart';
 import '../profile/other_user_profile_page.dart';
+import 'pages/upload_reel_page.dart';
 
 // Global key for accessing ReelsPageNew state from anywhere
 final GlobalKey<_ReelsPageNewState> reelsPageKey =
@@ -39,378 +40,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
   bool _autoScroll = true; // Auto-scroll feature (on by default)
 
   // For You Reels (all reels)
-  final List<ReelData> _forYouReels = [
-    ReelData(
-      id: 'r12345',
-      userId: 'user_ynxz_001',
-      username: '@YNxz',
-      profilePic: 'https://i.pravatar.cc/150?img=1',
-      caption: 'It is not easy to meet each other in such a big world 🌍',
-      musicName: 'Something Just Like This',
-      musicArtist: '@Coldplay',
-      videoUrl: 'https://picsum.photos/seed/reel1/1080/1920',
-      likes: 15300,
-      comments: 6686,
-      shares: 2333,
-      views: 120000,
-      isLiked: false,
-      isSaved: false,
-      isFollowing: false,
-      location: 'New York, USA',
-    ),
-    ReelData(
-      id: 'r12346',
-      userId: 'user_alex_002',
-      username: '@alex_travel',
-      profilePic: 'https://i.pravatar.cc/150?img=2',
-      caption: 'Paradise found 🏝️ Living my best life! #travel #adventure',
-      musicName: 'Blinding Lights',
-      musicArtist: '@TheWeeknd',
-      videoUrl: 'https://picsum.photos/seed/reel2/1080/1920',
-      likes: 28400,
-      comments: 8945,
-      shares: 4120,
-      views: 250000,
-      isLiked: false,
-      isSaved: false,
-      isFollowing: true,
-      location: 'Bali, Indonesia',
-    ),
-    ReelData(
-      id: 'r12347',
-      userId: 'user_fitness_003',
-      username: '@fitness_king',
-      profilePic: 'https://i.pravatar.cc/150?img=3',
-      caption: 'No excuses! 💪 Day 30 of the challenge #fitness #motivation',
-      musicName: 'Eye of the Tiger',
-      musicArtist: '@Survivor',
-      videoUrl: 'https://picsum.photos/seed/reel3/1080/1920',
-      likes: 45600,
-      comments: 12300,
-      shares: 5678,
-      views: 380000,
-      isLiked: true,
-      isSaved: true,
-      isFollowing: false,
-      location: 'Los Angeles, CA',
-    ),
-    ReelData(
-      id: 'r12348',
-      userId: 'user_foodie_004',
-      username: '@foodie_life',
-      profilePic: 'https://i.pravatar.cc/150?img=4',
-      caption: 'Homemade pasta from scratch 🍝 Recipe in bio! #cooking #food',
-      musicName: 'Italian Kitchen',
-      musicArtist: '@ChefVibes',
-      videoUrl: 'https://picsum.photos/seed/reel4/1080/1920',
-      likes: 19800,
-      comments: 5432,
-      shares: 3214,
-      views: 150000,
-      isLiked: false,
-      isSaved: false,
-      isFollowing: true,
-      location: 'Rome, Italy',
-    ),
-    ReelData(
-      id: 'r12349',
-      userId: 'user_dance_005',
-      username: '@dance_queen',
-      profilePic: 'https://i.pravatar.cc/150?img=5',
-      caption: 'New choreography alert! 💃 Who wants to learn? #dance #viral',
-      musicName: 'Levitating',
-      musicArtist: '@DuaLipa',
-      videoUrl: 'https://picsum.photos/seed/reel5/1080/1920',
-      likes: 67800,
-      comments: 15600,
-      shares: 8900,
-      views: 520000,
-      isLiked: false,
-      isSaved: false,
-      isFollowing: false,
-      location: 'Mumbai, India',
-    ),
-    ReelData(
-      id: 'r12350',
-      userId: 'user_tech_006',
-      username: '@tech_guru',
-      profilePic: 'https://i.pravatar.cc/150?img=6',
-      caption:
-          'iPhone 16 Pro Max Unboxing! 📱 This camera is insane! #tech #apple',
-      musicName: 'Tech Talk',
-      musicArtist: '@TechBeats',
-      videoUrl: 'https://picsum.photos/seed/reel6/1080/1920',
-      likes: 34500,
-      comments: 9876,
-      shares: 5432,
-      views: 290000,
-      isLiked: false,
-      isSaved: false,
-      isFollowing: true,
-      location: 'San Francisco, CA',
-    ),
-    ReelData(
-      id: 'r12351',
-      userId: 'user_artist_007',
-      username: '@art_by_emma',
-      profilePic: 'https://i.pravatar.cc/150?img=7',
-      caption:
-          'Time-lapse of my latest painting 🎨 What do you think? #art #painting',
-      musicName: 'Creative Flow',
-      musicArtist: '@ArtistVibes',
-      videoUrl: 'https://picsum.photos/seed/reel7/1080/1920',
-      likes: 23400,
-      comments: 6543,
-      shares: 3210,
-      views: 180000,
-      isLiked: false,
-      isSaved: true,
-      isFollowing: false,
-      location: 'Paris, France',
-    ),
-    ReelData(
-      id: 'r12352',
-      userId: 'user_pet_008',
-      username: '@cute_pets',
-      profilePic: 'https://i.pravatar.cc/150?img=8',
-      caption: 'My dog learned a new trick! 🐕 Cutest thing ever! #pets #dogs',
-      musicName: 'Happy Puppy',
-      musicArtist: '@PetSounds',
-      videoUrl: 'https://picsum.photos/seed/reel8/1080/1920',
-      likes: 89000,
-      comments: 21000,
-      shares: 12000,
-      views: 650000,
-      isLiked: true,
-      isSaved: false,
-      isFollowing: true,
-      location: 'London, UK',
-    ),
-    ReelData(
-      id: 'r12353',
-      userId: 'user_comedy_009',
-      username: '@funny_moments',
-      profilePic: 'https://i.pravatar.cc/150?img=9',
-      caption:
-          'When your friend says they paid for dinner 😂 #comedy #relatable',
-      musicName: 'Comedy Gold',
-      musicArtist: '@LaughTrack',
-      videoUrl: 'https://picsum.photos/seed/reel9/1080/1920',
-      likes: 145000,
-      comments: 34000,
-      shares: 23000,
-      views: 1200000,
-      isLiked: false,
-      isSaved: false,
-      isFollowing: false,
-      location: 'Toronto, Canada',
-    ),
-    ReelData(
-      id: 'r12354',
-      userId: 'user_nature_010',
-      username: '@nature_shots',
-      profilePic: 'https://i.pravatar.cc/150?img=10',
-      caption:
-          'Sunrise in the mountains 🏔️ Nature is beautiful! #nature #landscape',
-      musicName: 'Mountain Echo',
-      musicArtist: '@NatureSounds',
-      videoUrl: 'https://picsum.photos/seed/reel10/1080/1920',
-      likes: 56700,
-      comments: 13400,
-      shares: 7890,
-      views: 450000,
-      isLiked: false,
-      isSaved: true,
-      isFollowing: true,
-      location: 'Swiss Alps',
-    ),
-    ReelData(
-      id: 'r12355',
-      userId: 'user_fashion_011',
-      username: '@style_icon',
-      profilePic: 'https://i.pravatar.cc/150?img=11',
-      caption: 'OOTD: Street style vibes 👗 Links in bio! #fashion #style',
-      musicName: 'Fashion Week',
-      musicArtist: '@StyleBeats',
-      videoUrl: 'https://picsum.photos/seed/reel11/1080/1920',
-      likes: 43200,
-      comments: 11200,
-      shares: 6543,
-      views: 340000,
-      isLiked: false,
-      isSaved: false,
-      isFollowing: false,
-      location: 'Milan, Italy',
-    ),
-    ReelData(
-      id: 'r12356',
-      userId: 'user_gaming_012',
-      username: '@pro_gamer',
-      profilePic: 'https://i.pravatar.cc/150?img=12',
-      caption:
-          'Epic gaming moment! 🎮 Did you see that headshot? #gaming #esports',
-      musicName: 'Game On',
-      musicArtist: '@GamerMusic',
-      videoUrl: 'https://picsum.photos/seed/reel12/1080/1920',
-      likes: 78900,
-      comments: 19800,
-      shares: 10200,
-      views: 580000,
-      isLiked: true,
-      isSaved: true,
-      isFollowing: true,
-      location: 'Seoul, South Korea',
-    ),
-    ReelData(
-      id: 'r12357',
-      userId: 'user_music_013',
-      username: '@music_cover',
-      profilePic: 'https://i.pravatar.cc/150?img=13',
-      caption: 'Cover of my favorite song 🎵 Hope you like it! #music #cover',
-      musicName: 'Acoustic Dreams',
-      musicArtist: '@IndieArtist',
-      videoUrl: 'https://picsum.photos/seed/reel13/1080/1920',
-      likes: 34500,
-      comments: 8900,
-      shares: 4321,
-      views: 270000,
-      isLiked: false,
-      isSaved: false,
-      isFollowing: false,
-      location: 'Nashville, TN',
-    ),
-    ReelData(
-      id: 'r12358',
-      userId: 'user_diy_014',
-      username: '@diy_projects',
-      profilePic: 'https://i.pravatar.cc/150?img=14',
-      caption: 'Easy DIY home decor! 🏡 Save this for later! #diy #homedecor',
-      musicName: 'Crafty Vibes',
-      musicArtist: '@DIYMusic',
-      videoUrl: 'https://picsum.photos/seed/reel14/1080/1920',
-      likes: 29800,
-      comments: 7654,
-      shares: 5678,
-      views: 220000,
-      isLiked: false,
-      isSaved: true,
-      isFollowing: true,
-      location: 'Austin, TX',
-    ),
-    ReelData(
-      id: 'r12359',
-      userId: 'user_car_015',
-      username: '@car_enthusiast',
-      profilePic: 'https://i.pravatar.cc/150?img=15',
-      caption: 'New Tesla Model S! ⚡ Electric future is here! #cars #tesla',
-      musicName: 'Speed Drive',
-      musicArtist: '@CarBeats',
-      videoUrl: 'https://picsum.photos/seed/reel15/1080/1920',
-      likes: 61200,
-      comments: 15400,
-      shares: 8765,
-      views: 480000,
-      isLiked: false,
-      isSaved: false,
-      isFollowing: false,
-      location: 'Dubai, UAE',
-    ),
-    ReelData(
-      id: 'r12360',
-      userId: 'user_yoga_016',
-      username: '@yoga_daily',
-      profilePic: 'https://i.pravatar.cc/150?img=16',
-      caption: 'Morning yoga routine ☀️ Start your day right! #yoga #wellness',
-      musicName: 'Peaceful Mind',
-      musicArtist: '@YogaMusic',
-      videoUrl: 'https://picsum.photos/seed/reel16/1080/1920',
-      likes: 38900,
-      comments: 9876,
-      shares: 5432,
-      views: 310000,
-      isLiked: false,
-      isSaved: true,
-      isFollowing: true,
-      location: 'Bali, Indonesia',
-    ),
-    ReelData(
-      id: 'r12361',
-      userId: 'user_magic_017',
-      username: '@magic_tricks',
-      profilePic: 'https://i.pravatar.cc/150?img=17',
-      caption:
-          'Mind-blowing magic trick! ✨ Can you figure it out? #magic #illusion',
-      musicName: 'Mystery Box',
-      musicArtist: '@MagicSounds',
-      videoUrl: 'https://picsum.photos/seed/reel17/1080/1920',
-      likes: 92300,
-      comments: 23400,
-      shares: 14500,
-      views: 780000,
-      isLiked: true,
-      isSaved: false,
-      isFollowing: false,
-      location: 'Las Vegas, NV',
-    ),
-    ReelData(
-      id: 'r12362',
-      userId: 'user_dessert_018',
-      username: '@sweet_treats',
-      profilePic: 'https://i.pravatar.cc/150?img=18',
-      caption:
-          'Decadent chocolate cake recipe 🍰 So satisfying! #dessert #baking',
-      musicName: 'Sugar Rush',
-      musicArtist: '@BakingBeats',
-      videoUrl: 'https://picsum.photos/seed/reel18/1080/1920',
-      likes: 47600,
-      comments: 12100,
-      shares: 6890,
-      views: 370000,
-      isLiked: false,
-      isSaved: true,
-      isFollowing: true,
-      location: 'Paris, France',
-    ),
-    ReelData(
-      id: 'r12363',
-      userId: 'user_skate_019',
-      username: '@skate_life',
-      profilePic: 'https://i.pravatar.cc/150?img=19',
-      caption:
-          'Landed my first kickflip! 🛹 Practice makes perfect! #skateboarding #extreme',
-      musicName: 'Skate Punk',
-      musicArtist: '@SkateMusic',
-      videoUrl: 'https://picsum.photos/seed/reel19/1080/1920',
-      likes: 54300,
-      comments: 13200,
-      shares: 7543,
-      views: 420000,
-      isLiked: false,
-      isSaved: false,
-      isFollowing: false,
-      location: 'Venice Beach, CA',
-    ),
-    ReelData(
-      id: 'r12364',
-      userId: 'user_baby_020',
-      username: '@baby_moments',
-      profilePic: 'https://i.pravatar.cc/150?img=20',
-      caption:
-          'Baby\'s first steps! 👶 Such a precious moment! #baby #milestone',
-      musicName: 'Baby Love',
-      musicArtist: '@FamilyMusic',
-      videoUrl: 'https://picsum.photos/seed/reel20/1080/1920',
-      likes: 123000,
-      comments: 31000,
-      shares: 19000,
-      views: 950000,
-      isLiked: true,
-      isSaved: true,
-      isFollowing: true,
-      location: 'Sydney, Australia',
-    ),
-  ];
-
+  final List<ReelData> _forYouReels = [];
   // Following Reels (only from followed users)
   List<ReelData> get _followingReels {
     return _forYouReels.where((reel) => reel.isFollowing).toList();
@@ -446,9 +76,6 @@ class _ReelsPageNewState extends State<ReelsPageNew>
             }
           });
 
-    // Start progress for first reel
-    _progressController.forward();
-
     // If an initial reel is provided, add it to the beginning of the list
     if (widget.initialReel != null) {
       _forYouReels.insert(0, widget.initialReel!);
@@ -463,6 +90,11 @@ class _ReelsPageNewState extends State<ReelsPageNew>
         }
       });
     }
+
+    // Start progress only if there are reels
+    if (_currentReels.isNotEmpty) {
+      _progressController.forward();
+    }
   }
 
   @override
@@ -476,9 +108,11 @@ class _ReelsPageNewState extends State<ReelsPageNew>
     setState(() {
       _isFollowingTab = isFollowing;
       _currentReelIndex = 0;
-      _pageController.jumpToPage(0);
-      _progressController.reset();
-      _progressController.forward();
+      if (_currentReels.isNotEmpty) {
+        _pageController.jumpToPage(0);
+        _progressController.reset();
+        _progressController.forward();
+      }
     });
   }
 
@@ -498,17 +132,21 @@ class _ReelsPageNewState extends State<ReelsPageNew>
       _forYouReels.shuffle();
       _isRefreshing = false;
       _currentReelIndex = 0;
-      _progressController.reset();
-      _progressController.forward();
+      if (_currentReels.isNotEmpty) {
+        _progressController.reset();
+        _progressController.forward();
+      }
     });
 
-    // Jump to first reel
-    if (_pageController.hasClients) {
+    // Jump to first reel if there are reels
+    if (_pageController.hasClients && _currentReels.isNotEmpty) {
       _pageController.jumpToPage(0);
     }
   }
 
   void _onPageChanged(int index) {
+    if (_currentReels.isEmpty) return;
+
     setState(() {
       _currentReelIndex = index;
       _progressController.reset();
@@ -525,7 +163,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
     _progressController.forward(from: newValue);
 
     // Show visual feedback
-    _showSeekFeedback('⏪ -5s', Icons.fast_rewind_rounded);
+    _showSeekFeedback('âª -5s', Icons.fast_rewind_rounded);
   }
 
   void _seekForward() {
@@ -537,7 +175,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
     _progressController.forward(from: newValue);
 
     // Show visual feedback
-    _showSeekFeedback('⏩ +5s', Icons.fast_forward_rounded);
+    _showSeekFeedback('â© +5s', Icons.fast_forward_rounded);
   }
 
   void _showSeekFeedback(String text, IconData icon) {
@@ -546,12 +184,14 @@ class _ReelsPageNewState extends State<ReelsPageNew>
   }
 
   void _toggleLike(int index) {
+    if (index < 0 || index >= _currentReels.length) return;
+
     setState(() {
       _currentReels[index].isLiked = !_currentReels[index].isLiked;
       if (_currentReels[index].isLiked) {
         _currentReels[index].likes++;
         // Add multiple floating hearts from bottom
-        _reactionsKey.currentState?.addReaction('❤️');
+        _reactionsKey.currentState?.addReaction('â¤ï¸');
       } else {
         _currentReels[index].likes--;
       }
@@ -559,12 +199,16 @@ class _ReelsPageNewState extends State<ReelsPageNew>
   }
 
   void _toggleSave(int index) {
+    if (index < 0 || index >= _currentReels.length) return;
+
     setState(() {
       _currentReels[index].isSaved = !_currentReels[index].isSaved;
     });
   }
 
   void _toggleFollow(int index) async {
+    if (index < 0 || index >= _currentReels.length) return;
+
     final reel = _currentReels[index];
 
     // If already following, show confirmation dialog
@@ -698,77 +342,192 @@ class _ReelsPageNewState extends State<ReelsPageNew>
             color: Colors.white,
             backgroundColor: Colors.black87,
             displacement: 50,
-            child: PageView.builder(
-              controller: _pageController,
-              scrollDirection: Axis.vertical,
-              itemCount: _currentReels.length,
-              onPageChanged: _onPageChanged,
-              itemBuilder: (context, index) {
-                return _buildReelItem(_currentReels[index], index);
-              },
-            ),
-          ),
-
-          // Enhanced Progress Indicator at the top - Shows current video progress
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              bottom: false,
-              child: Container(
-                height: 3,
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(3),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: Stack(
-                    children: [
-                      // Background - All reels indicator
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(3),
+            child: _currentReels.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.video_library_outlined,
+                          size: 80,
+                          color: Colors.grey.shade600,
                         ),
-                      ),
-                      // Current video progress
-                      FractionallySizedBox(
-                        widthFactor: _progressController.value,
-                        child: Container(
+                        const SizedBox(height: 16),
+                        Text(
+                          'No reels available',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade300,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _isFollowingTab
+                              ? 'Follow users to see their reels here'
+                              : 'Be the first to create a reel!',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Container(
                           decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(30),
                             gradient: const LinearGradient(
                               colors: [
                                 Color(0xFF4A6CF7),
                                 Color(0xFF7C3AED),
                                 Color(0xFFEC4899),
                               ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                            borderRadius: BorderRadius.circular(3),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF4A6CF7).withOpacity(0.5),
-                                blurRadius: 8,
+                                color: const Color(0xFF4A6CF7).withOpacity(0.4),
+                                blurRadius: 20,
+                                spreadRadius: 2,
+                                offset: const Offset(0, 8),
+                              ),
+                              BoxShadow(
+                                color: const Color(0xFFEC4899).withOpacity(0.3),
+                                blurRadius: 15,
                                 spreadRadius: 1,
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(30),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const UploadReelPage(),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                  vertical: 16,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: const Icon(
+                                        Icons.add_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'Create Reel',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
+                      ],
+                    ),
+                  )
+                : PageView.builder(
+                    controller: _pageController,
+                    scrollDirection: Axis.vertical,
+                    itemCount: _currentReels.length,
+                    onPageChanged: _onPageChanged,
+                    itemBuilder: (context, index) {
+                      return _buildReelItem(_currentReels[index], index);
+                    },
+                  ),
+          ),
+
+          // Enhanced Progress Indicator at the top - Shows current video progress
+          if (_currentReels.isNotEmpty)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Container(
+                  height: 3,
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: Stack(
+                      children: [
+                        // Background - All reels indicator
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                        // Current video progress
+                        FractionallySizedBox(
+                          widthFactor: _progressController.value,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF4A6CF7),
+                                  Color(0xFF7C3AED),
+                                  Color(0xFFEC4899),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF4A6CF7,
+                                  ).withOpacity(0.5),
+                                  blurRadius: 8,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
 
           // Loading indicator when refreshing - Simple centered spinner
           if (_isRefreshing)
@@ -930,51 +689,52 @@ class _ReelsPageNewState extends State<ReelsPageNew>
                     ),
 
                     // View Count with Glass Effect
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.black.withOpacity(0.4),
-                            Colors.black.withOpacity(0.2),
+                    if (_currentReels.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.black.withOpacity(0.4),
+                              Colors.black.withOpacity(0.2),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.visibility_rounded,
+                              color: Colors.white.withOpacity(0.9),
+                              size: 16,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _formatViewCount(
+                                _isFollowingTab
+                                    ? _followingReels[_currentReelIndex].views
+                                    : _forYouReels[_currentReelIndex].views,
+                              ),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                shadows: [
+                                  Shadow(color: Colors.black45, blurRadius: 4),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
-                          width: 1,
-                        ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.visibility_rounded,
-                            color: Colors.white.withOpacity(0.9),
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            _formatViewCount(
-                              _isFollowingTab
-                                  ? _followingReels[_currentReelIndex].views
-                                  : _forYouReels[_currentReelIndex].views,
-                            ),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              shadows: [
-                                Shadow(color: Colors.black45, blurRadius: 4),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -1422,7 +1182,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
                           const SizedBox(width: 10),
                           Flexible(
                             child: Text(
-                              '${reel.musicName} • ${reel.musicArtist}',
+                              '${reel.musicName} â€¢ ${reel.musicArtist}',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 13,
@@ -1618,7 +1378,7 @@ class _CommentsModalState extends State<CommentsModal> {
           },
           {
             'username': '@replier_2',
-            'text': 'Agreed! 💯',
+            'text': 'Agreed! ðŸ’¯',
             'time': '${i + 1}m',
             'avatar': 'https://i.pravatar.cc/150?img=${i + 21}',
           },
@@ -1763,7 +1523,7 @@ class _CommentsModalState extends State<CommentsModal> {
                           index,
                           '@user_${index + 1}',
                           '${index + 1}h',
-                          'Amazing content! Keep it up 🔥',
+                          'Amazing content! Keep it up ðŸ”¥',
                           isLiked,
                           likeCount,
                           'https://i.pravatar.cc/150?img=${index + 10}',

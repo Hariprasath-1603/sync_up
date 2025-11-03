@@ -8,6 +8,10 @@ class Post {
   final String likes;
   final String comments;
   final String shares;
+  final String? videoUrl;
+  final String? thumbnailUrl;
+  final int? videoDuration; // Duration in seconds
+  final String? mediaType; // 'image', 'video', 'carousel'
 
   Post({
     required this.id,
@@ -19,5 +23,11 @@ class Post {
     required this.likes,
     required this.comments,
     required this.shares,
+    this.videoUrl,
+    this.thumbnailUrl,
+    this.videoDuration,
+    this.mediaType,
   });
+
+  bool get isVideo => mediaType == 'video' || videoUrl != null;
 }

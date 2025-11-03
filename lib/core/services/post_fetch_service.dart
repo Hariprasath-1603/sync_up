@@ -322,9 +322,11 @@ class PostFetchService {
         userId: postData['user_id'],
         type: _getPostType(postData['post_type']),
         mediaUrls: validMediaUrls,
-        thumbnailUrl: validMediaUrls.isNotEmpty
-            ? validMediaUrls[0]
-            : 'https://via.placeholder.com/400', // Fallback placeholder
+        thumbnailUrl:
+            postData['thumbnail_url'] ??
+            (validMediaUrls.isNotEmpty
+                ? validMediaUrls[0]
+                : 'https://via.placeholder.com/400'), // Use video thumbnail or fallback
         username: username,
         userAvatar: user['photo_url']?.toString().isNotEmpty == true
             ? user['photo_url']
@@ -332,6 +334,9 @@ class PostFetchService {
         timestamp: DateTime.parse(postData['created_at']),
         caption: postData['caption'] ?? '',
         location: postData['location'],
+        videoUrl: postData['video_url'],
+        videoDuration: postData['duration'],
+        mediaType: postData['media_type'],
         likes: postData['likes_count'] ?? 0,
         comments: postData['comments_count'] ?? 0,
         shares: postData['shares_count'] ?? 0,

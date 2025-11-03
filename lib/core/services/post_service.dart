@@ -295,6 +295,36 @@ class PostService {
       final currentUserId = userId ?? _supabase.auth.currentUser?.id;
       if (currentUserId == null) return;
 
+      // First, get the post to verify ownership and get media URLs for deletion
+      final postResult = await _supabase
+          .from('posts')
+          .select('user_id, media_urls')
+          .eq('id', postId)
+          .single();
+
+      // Verify ownership
+      if (postResult['user_id'] != currentUserId) {
+        print('❌ User does not own this post');
+        return;
+      }
+
+      // Delete media files from storage
+      final mediaUrls =
+          (postResult['media_urls'] as List?)?.cast<String>() ?? [];
+      for (final url in mediaUrls) {
+        try {
+          // Extract file path from URL
+          final uri = Uri.parse(url);
+          final path = uri.pathSegments
+              .skip(4)
+              .join('/'); // Skip 'storage/v1/object/public/posts/'
+          await _supabase.storage.from('posts').remove([path]);
+        } catch (e) {
+          print('⚠️ Failed to delete media file: $e');
+        }
+      }
+
+      // Delete the post (cascades will delete likes, comments, etc.)
       await _supabase
           .from('posts')
           .delete()
@@ -302,8 +332,121 @@ class PostService {
           .eq('user_id', currentUserId);
 
       await _decrementPostCount(currentUserId);
+      print('✅ Post deleted successfully');
     } catch (e) {
       print('❌ Error deleting post: $e');
+      rethrow;
+    }
+  }
+
+  /// Archive a post
+  Future<bool> archivePost(String postId, [String? userId]) async {
+    try {
+      final currentUserId = userId ?? _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return false;
+
+      await _supabase
+          .from('posts')
+          .update({
+            'archived': true,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', postId)
+          .eq('user_id', currentUserId);
+
+      print('✅ Post archived');
+      return true;
+    } catch (e) {
+      print('❌ Error archiving post: $e');
+      return false;
+    }
+  }
+
+  /// Unarchive a post
+  Future<bool> unarchivePost(String postId, [String? userId]) async {
+    try {
+      final currentUserId = userId ?? _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return false;
+
+      await _supabase
+          .from('posts')
+          .update({
+            'archived': false,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', postId)
+          .eq('user_id', currentUserId);
+
+      print('✅ Post unarchived');
+      return true;
+    } catch (e) {
+      print('❌ Error unarchiving post: $e');
+      return false;
+    }
+  }
+
+  /// Update post caption and location
+  Future<bool> updatePostCaption({
+    required String postId,
+    String? caption,
+    String? location,
+    String? userId,
+  }) async {
+    try {
+      final currentUserId = userId ?? _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return false;
+
+      final updates = <String, dynamic>{
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      if (caption != null) updates['caption'] = caption;
+      if (location != null) updates['location'] = location;
+
+      await _supabase
+          .from('posts')
+          .update(updates)
+          .eq('id', postId)
+          .eq('user_id', currentUserId);
+
+      print('✅ Post updated');
+      return true;
+    } catch (e) {
+      print('❌ Error updating post: $e');
+      return false;
+    }
+  }
+
+  /// Toggle post settings
+  Future<bool> updatePostSettings({
+    required String postId,
+    bool? commentsEnabled,
+    bool? hideLikeCount,
+    bool? isPinned,
+    String? userId,
+  }) async {
+    try {
+      final currentUserId = userId ?? _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return false;
+
+      final updates = <String, dynamic>{
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      if (commentsEnabled != null)
+        updates['comments_enabled'] = commentsEnabled;
+      if (hideLikeCount != null) updates['hide_like_count'] = hideLikeCount;
+      if (isPinned != null) updates['is_pinned'] = isPinned;
+
+      await _supabase
+          .from('posts')
+          .update(updates)
+          .eq('id', postId)
+          .eq('user_id', currentUserId);
+
+      print('✅ Post settings updated');
+      return true;
+    } catch (e) {
+      print('❌ Error updating post settings: $e');
+      return false;
     }
   }
 
