@@ -1,7 +1,10 @@
 ﻿import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/scaffold_with_nav_bar.dart';
 import '../../core/theme.dart';
+import '../../core/services/reel_service.dart';
+import '../../core/models/reel_model.dart';
 import '../profile/pages/widgets/floating_reactions.dart';
 import '../profile/other_user_profile_page.dart';
 import 'pages/upload_reel_page.dart';
@@ -14,12 +17,18 @@ class ReelsPageNew extends StatefulWidget {
   final ReelData? initialReel;
   final int? initialIndex;
   final bool shouldRefresh;
+  final bool isOwnProfile;
+  final String? userId;
+  final List<ReelModel>? initialUserReels;
 
   const ReelsPageNew({
     super.key,
     this.initialReel,
     this.initialIndex,
     this.shouldRefresh = false,
+    this.isOwnProfile = false,
+    this.userId,
+    this.initialUserReels,
   });
 
   @override
@@ -29,6 +38,7 @@ class ReelsPageNew extends StatefulWidget {
 class _ReelsPageNewState extends State<ReelsPageNew>
     with SingleTickerProviderStateMixin {
   final PageController _pageController = PageController();
+  final ReelService _reelService = ReelService();
   int _currentReelIndex = 0;
   bool _isFollowingTab = false;
   final GlobalKey<FloatingReactionsState> _reactionsKey = GlobalKey();
@@ -37,17 +47,27 @@ class _ReelsPageNewState extends State<ReelsPageNew>
   late AnimationController _progressController;
   bool _isLongPressing = false;
   bool _isRefreshing = false;
+  bool _isLoading = true;
   bool _autoScroll = true; // Auto-scroll feature (on by default)
 
   // For You Reels (all reels)
   final List<ReelData> _forYouReels = [];
+
+  // Profile reels (owned by current user)
+  final List<ReelData> _profileReels = [];
+
   // Following Reels (only from followed users)
   List<ReelData> get _followingReels {
     return _forYouReels.where((reel) => reel.isFollowing).toList();
   }
 
-  // Current reels based on selected tab
+  bool get _isProfileMode => widget.isOwnProfile;
+
+  // Current reels based on mode/tab selection
   List<ReelData> get _currentReels {
+    if (_isProfileMode) {
+      return _profileReels;
+    }
     return _isFollowingTab ? _followingReels : _forYouReels;
   }
 
@@ -76,9 +96,20 @@ class _ReelsPageNewState extends State<ReelsPageNew>
             }
           });
 
-    // If an initial reel is provided, add it to the beginning of the list
-    if (widget.initialReel != null) {
+    // Seed data if provided (global mode)
+    if (!_isProfileMode && widget.initialReel != null) {
       _forYouReels.insert(0, widget.initialReel!);
+    }
+
+    // Seed profile reels if provided
+    if (_isProfileMode && widget.initialUserReels != null) {
+      final seeded = widget.initialUserReels!
+          .map((reel) => _convertToReelData(reel))
+          .toList();
+      _profileReels
+        ..clear()
+        ..addAll(seeded);
+      _isLoading = false;
     }
 
     // If an initial index is provided, jump to that index
@@ -91,10 +122,8 @@ class _ReelsPageNewState extends State<ReelsPageNew>
       });
     }
 
-    // Start progress only if there are reels
-    if (_currentReels.isNotEmpty) {
-      _progressController.forward();
-    }
+    // Fetch reels from database
+    _fetchReels();
   }
 
   @override
@@ -123,25 +152,140 @@ class _ReelsPageNewState extends State<ReelsPageNew>
       _isRefreshing = true;
     });
 
-    // Simulate loading new reels with animation
-    await Future.delayed(const Duration(milliseconds: 1500));
+    // Fetch fresh reels from database
+    await _fetchReels();
 
-    // In a real app, you would fetch new reels from an API here
-    // For now, we'll shuffle the existing reels
     setState(() {
-      _forYouReels.shuffle();
       _isRefreshing = false;
-      _currentReelIndex = 0;
-      if (_currentReels.isNotEmpty) {
-        _progressController.reset();
-        _progressController.forward();
-      }
     });
+  }
 
-    // Jump to first reel if there are reels
-    if (_pageController.hasClients && _currentReels.isNotEmpty) {
-      _pageController.jumpToPage(0);
+  /// Fetch reels from database
+  Future<void> _fetchReels() async {
+    try {
+      if (mounted) {
+        setState(() {
+          if (_currentReels.isEmpty) {
+            _isLoading = true;
+          }
+        });
+      }
+
+      if (_isProfileMode) {
+        final userId =
+            widget.userId ?? Supabase.instance.client.auth.currentUser?.id;
+        if (userId == null) {
+          throw Exception('User not logged in');
+        }
+
+        final reels = await _reelService.fetchUserReels(
+          userId: userId,
+          limit: 50,
+        );
+
+        debugPrint('📱 Fetched ${reels.length} profile reels');
+
+        final reelDataList = reels
+            .map((reel) => _convertToReelData(reel))
+            .toList();
+
+        if (!mounted) return;
+
+        setState(() {
+          _profileReels
+            ..clear()
+            ..addAll(reelDataList);
+          _isLoading = false;
+          if (widget.initialIndex != null &&
+              widget.initialIndex! < _profileReels.length) {
+            _currentReelIndex = widget.initialIndex!;
+          } else {
+            _currentReelIndex = 0;
+          }
+
+          if (_currentReels.isNotEmpty) {
+            _progressController.reset();
+            _progressController.forward();
+          }
+        });
+
+        if (_pageController.hasClients && _currentReels.isNotEmpty) {
+          _pageController.jumpToPage(_currentReelIndex);
+        }
+
+        return;
+      }
+
+      // Global feed mode
+      final reels = await _reelService.fetchFeedReels(limit: 50);
+
+      debugPrint('📱 Fetched ${reels.length} reels from database');
+
+      // Convert ReelModel to ReelData
+      final reelDataList = reels
+          .map((reel) => _convertToReelData(reel))
+          .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        _forYouReels
+          ..clear()
+          ..addAll(reelDataList);
+        _isLoading = false;
+        _currentReelIndex = 0;
+
+        // Start progress if there are reels
+        if (_currentReels.isNotEmpty) {
+          _progressController.reset();
+          _progressController.forward();
+        }
+      });
+
+      // Jump to first reel if there are reels
+      if (_pageController.hasClients && _currentReels.isNotEmpty) {
+        _pageController.jumpToPage(0);
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching reels: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+
+      // Show error to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load reels: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  /// Convert ReelModel from database to ReelData for UI
+  ReelData _convertToReelData(ReelModel reel) {
+    return ReelData(
+      id: reel.id,
+      userId: reel.userId,
+      username: reel.username ?? 'Unknown',
+      profilePic: reel.userPhotoUrl ?? 'https://via.placeholder.com/150',
+      caption: reel.caption ?? '',
+      musicName: 'Original Audio', // TODO: Add music support
+      musicArtist: reel.username ?? 'Unknown',
+      videoUrl: reel.videoUrl,
+      likes: reel.likesCount,
+      comments: reel.commentsCount,
+      shares: reel.sharesCount,
+      views: reel.viewsCount,
+      isLiked: reel.isLiked,
+      isSaved: reel.isSaved,
+      isFollowing: false, // TODO: Add following status check
+      location: null,
+    );
   }
 
   void _onPageChanged(int index) {
@@ -342,7 +486,28 @@ class _ReelsPageNewState extends State<ReelsPageNew>
             color: Colors.white,
             backgroundColor: Colors.black87,
             displacement: 50,
-            child: _currentReels.isEmpty
+            child: _isLoading
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Loading reels...',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _currentReels.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,

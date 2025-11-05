@@ -7,6 +7,8 @@ import '../../core/providers/post_provider.dart';
 import '../../core/theme.dart';
 import '../../core/scaffold_with_nav_bar.dart';
 import '../../core/services/image_picker_service.dart';
+import '../../core/services/reel_service.dart';
+import '../../core/models/reel_model.dart';
 import '../../core/utils/responsive_utils.dart';
 import 'edit_profile_page.dart';
 import 'followers_following_page.dart';
@@ -15,6 +17,7 @@ import 'models/post_model.dart' as profile_post;
 import 'pages/post_viewer_instagram_style.dart';
 import 'pages/profile_photo_viewer.dart';
 import '../settings/settings_home_page.dart';
+import '../reels/pages/reel_feed_page.dart';
 import 'widgets/unified_post_options_sheet.dart';
 import 'widgets/shimmer_loading_grid.dart';
 
@@ -28,11 +31,13 @@ class MyProfilePage extends StatefulWidget {
 class _MyProfilePageState extends State<MyProfilePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final ReelService _reelService = ReelService();
+  List<ReelModel> _userReels = [];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
 
     // Initialize profile with proper session handling
     _initializeProfile();
@@ -68,7 +73,7 @@ class _MyProfilePageState extends State<MyProfilePage>
     }
   }
 
-  /// Load all profile data (user info + posts)
+  /// Load all profile data (user info + posts + reels)
   Future<void> _loadProfileData() async {
     if (!mounted) return;
 
@@ -83,6 +88,19 @@ class _MyProfilePageState extends State<MyProfilePage>
 
     // Load user posts
     postProvider.loadUserPosts(userId);
+
+    // Load user reels
+    try {
+      final reels = await _reelService.fetchUserReels(userId: userId);
+      if (mounted) {
+        setState(() {
+          _userReels = reels;
+        });
+      }
+      debugPrint('📱 Loaded ${reels.length} reels for user profile');
+    } catch (e) {
+      debugPrint('❌ Error loading user reels: $e');
+    }
   }
 
   /// Edit cover photo - show bottom sheet with gallery, camera, and cancel options
@@ -192,6 +210,7 @@ class _MyProfilePageState extends State<MyProfilePage>
                       ),
                       tabs: const [
                         Tab(text: 'Posts'),
+                        Tab(text: 'Reels'),
                         Tab(text: 'Media'),
                       ],
                     ),
@@ -209,6 +228,7 @@ class _MyProfilePageState extends State<MyProfilePage>
                         isDark,
                         showAllPosts: true,
                       ),
+                      _buildReelsGrid(context, isDark),
                       _buildPostGridFromFirestore(
                         context,
                         isDark,
@@ -250,7 +270,7 @@ class _MyProfilePageState extends State<MyProfilePage>
               // View cover photo in full screen
               // TODO: Implement full screen cover photo viewer
             },
-            child: Container(
+            child: SizedBox(
               height: 200,
               child: Stack(
                 fit: StackFit.expand,
@@ -753,7 +773,10 @@ class _MyProfilePageState extends State<MyProfilePage>
           .toList();
     }
 
-    if (userPosts.isEmpty) {
+    // Combine user posts and reels
+    final totalItems = userPosts.length + _userReels.length;
+
+    if (totalItems == 0) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32.0),
@@ -799,7 +822,7 @@ class _MyProfilePageState extends State<MyProfilePage>
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
-      itemCount: userPosts.length,
+      itemCount: totalItems,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: context.gridColumns,
         mainAxisSpacing: context.rSpacing(12),
@@ -807,221 +830,518 @@ class _MyProfilePageState extends State<MyProfilePage>
         childAspectRatio: 0.75,
       ),
       itemBuilder: (context, index) {
-        final post = userPosts[index];
-        // Use thumbnail URL for videos, first media URL for images
-        final thumbnailUrl = post.isVideo
-            ? (post.thumbnailUrl.isNotEmpty
-                  ? post.thumbnailUrl
-                  : post.videoUrlOrFirst)
-            : (post.mediaUrls.isNotEmpty ? post.mediaUrls.first : '');
+        // Show reels first, then posts
+        if (index < _userReels.length) {
+          // This is a reel
+          final reel = _userReels[index];
+          return _buildReelGridItem(context, reel, isDark);
+        } else {
+          // This is a post
+          final postIndex = index - _userReels.length;
+          final post = userPosts[postIndex];
+          return _buildPostGridItem(
+            context,
+            post,
+            userPosts,
+            postIndex,
+            isDark,
+          );
+        }
+      },
+    );
+  }
 
-        return GestureDetector(
-          onTap: () => _openFirestorePostViewer(context, userPosts, index),
-          child: Hero(
-            tag: 'post_${post.id}',
-            child: Material(
-              color: Colors.transparent,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(context.rRadius(20)),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Use CachedNetworkImage for better performance
-                    CachedNetworkImage(
-                      imageUrl: thumbnailUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        color: isDark ? Colors.grey[850] : Colors.grey[200],
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
-                          ),
-                        ),
+  /// Build a grid item for a reel
+  Widget _buildReelGridItem(BuildContext context, ReelModel reel, bool isDark) {
+    final thumbnailUrl = reel.thumbnailUrl ?? reel.videoUrl;
+
+    return GestureDetector(
+      onTap: () {
+        // Navigate to reel feed page with all user reels starting from this one
+        final index = _userReels.indexWhere((r) => r.id == reel.id);
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ReelFeedPage(
+              initialReels: _userReels,
+              initialIndex: index >= 0 ? index : 0,
+            ),
+          ),
+        );
+      },
+      child: Hero(
+        tag: 'reel_${reel.id}',
+        child: Material(
+          color: Colors.transparent,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(context.rRadius(20)),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Thumbnail image
+                CachedNetworkImage(
+                  imageUrl: thumbnailUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: isDark ? Colors.grey[850] : Colors.grey[200],
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
                       ),
-                      errorWidget: (context, url, error) => Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              isDark ? Colors.grey[850]! : Colors.grey[200]!,
-                              isDark ? Colors.grey[800]! : Colors.grey[300]!,
-                            ],
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          isDark ? Colors.grey[850]! : Colors.grey[200]!,
+                          isDark ? Colors.grey[800]! : Colors.grey[300]!,
+                        ],
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.movie_outlined,
+                        size: context.rIconSize(48),
+                        color: isDark ? Colors.white24 : Colors.grey[400],
+                      ),
+                    ),
+                  ),
+                  fadeInDuration: const Duration(milliseconds: 300),
+                  fadeOutDuration: const Duration(milliseconds: 100),
+                ),
+                // Glass overlay
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.4),
+                      ],
+                    ),
+                  ),
+                ),
+                // Play icon (top-left)
+                Positioned(
+                  top: context.rSpacing(8),
+                  left: context.rSpacing(8),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: context.rSpacing(8),
+                      vertical: context.rSpacing(4),
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(context.rRadius(12)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.play_arrow_rounded,
+                          size: context.rIconSize(16),
+                          color: Colors.white,
+                        ),
+                        if (reel.duration != null) ...[
+                          SizedBox(width: context.rSpacing(4)),
+                          Text(
+                            _formatDuration(reel.duration!),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: context.rFontSize(11),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                // REEL indicator badge (bottom-center) - THIS IS THE KEY FEATURE
+                Positioned(
+                  bottom: context.rSpacing(8),
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: context.rSpacing(12),
+                        vertical: context.rSpacing(6),
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF4A6CF7),
+                            Color(0xFF7C3AED),
+                            Color(0xFFEC4899),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(
+                          context.rRadius(16),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4A6CF7).withOpacity(0.5),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.movie_filter_rounded,
+                            size: context.rIconSize(14),
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: context.rSpacing(4)),
+                          Text(
+                            'REEL',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: context.rFontSize(10),
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Views count (bottom-right)
+                Positioned(
+                  bottom: context.rSpacing(8),
+                  right: context.rSpacing(8),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: context.rSpacing(8),
+                      vertical: context.rSpacing(4),
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(context.rRadius(12)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.play_circle_filled,
+                          size: context.rIconSize(14),
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: context.rSpacing(4)),
+                        Text(
+                          _formatCount(reel.viewsCount),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: context.rFontSize(11),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                post.isVideo
-                                    ? Icons.videocam_rounded
-                                    : Icons.image_not_supported_outlined,
-                                size: context.rIconSize(48),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build a grid item for a post
+  Widget _buildPostGridItem(
+    BuildContext context,
+    dynamic post,
+    List<dynamic> allPosts,
+    int postIndex,
+    bool isDark,
+  ) {
+    // Use thumbnail URL for videos, first media URL for images
+    final thumbnailUrl = post.isVideo
+        ? (post.thumbnailUrl.isNotEmpty
+              ? post.thumbnailUrl
+              : post.videoUrlOrFirst)
+        : (post.mediaUrls.isNotEmpty ? post.mediaUrls.first : '');
+
+    return GestureDetector(
+      onTap: () => _openFirestorePostViewer(context, allPosts, postIndex),
+      child: Hero(
+        tag: 'post_${post.id}',
+        child: Material(
+          color: Colors.transparent,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(context.rRadius(20)),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Use CachedNetworkImage for better performance
+                CachedNetworkImage(
+                  imageUrl: thumbnailUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: isDark ? Colors.grey[850] : Colors.grey[200],
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          isDark ? Colors.grey[850]! : Colors.grey[200]!,
+                          isDark ? Colors.grey[800]! : Colors.grey[300]!,
+                        ],
+                      ),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            post.isVideo
+                                ? Icons.videocam_rounded
+                                : Icons.image_not_supported_outlined,
+                            size: context.rIconSize(48),
+                            color: isDark ? Colors.white24 : Colors.grey[400],
+                          ),
+                          if (post.isVideo) ...[
+                            SizedBox(height: context.rSpacing(8)),
+                            Text(
+                              'Video',
+                              style: TextStyle(
                                 color: isDark
                                     ? Colors.white24
                                     : Colors.grey[400],
-                              ),
-                              if (post.isVideo) ...[
-                                SizedBox(height: context.rSpacing(8)),
-                                Text(
-                                  'Video',
-                                  style: TextStyle(
-                                    color: isDark
-                                        ? Colors.white24
-                                        : Colors.grey[400],
-                                    fontSize: context.rFontSize(12),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      fadeInDuration: const Duration(milliseconds: 300),
-                      fadeOutDuration: const Duration(milliseconds: 100),
-                    ),
-                    // Glass overlay
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.3),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Video indicator (top-left)
-                    if (post.isVideo)
-                      Positioned(
-                        top: context.rSpacing(8),
-                        left: context.rSpacing(8),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: context.rSpacing(8),
-                            vertical: context.rSpacing(4),
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(
-                              context.rRadius(12),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.play_arrow_rounded,
-                                size: context.rIconSize(16),
-                                color: Colors.white,
-                              ),
-                              if (post.videoDuration != null) ...[
-                                SizedBox(width: context.rSpacing(4)),
-                                Text(
-                                  _formatDuration(post.videoDuration!),
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: context.rFontSize(11),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    // Post stats overlay (top-right)
-                    Positioned(
-                      top: context.rSpacing(8),
-                      right: context.rSpacing(8),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: context.rSpacing(8),
-                          vertical: context.rSpacing(4),
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(
-                            context.rRadius(12),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.favorite,
-                              size: context.rIconSize(14),
-                              color: Colors.white,
-                            ),
-                            SizedBox(width: context.rSpacing(4)),
-                            Text(
-                              _formatCount(post.likes),
-                              style: TextStyle(
-                                color: Colors.white,
                                 fontSize: context.rFontSize(12),
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
-                    // Three-dot menu button (bottom-right, repositioned to avoid overlap)
-                    Positioned(
-                      bottom: context.rSpacing(8),
-                      right: context.rSpacing(8),
-                      child: GestureDetector(
-                        onTap: () {
-                          UnifiedPostOptionsSheet.show(
-                            context,
-                            post: post,
-                            isOwnPost: true,
-                            onPostUpdated: () {
-                              final postProvider = context.read<PostProvider>();
-                              final authProvider = context.read<AuthProvider>();
-                              if (authProvider.currentUserId != null) {
-                                postProvider.loadUserPosts(
-                                  authProvider.currentUserId!,
-                                );
-                              }
-                            },
-                            onPostDeleted: () {
-                              // Remove post immediately from cache for instant UI update
-                              final postProvider = context.read<PostProvider>();
-                              postProvider.removePost(post.id);
-
-                              // Also reload user stats
-                              final authProvider = context.read<AuthProvider>();
-                              if (authProvider.currentUserId != null) {
-                                authProvider.reloadUserData(showLoading: false);
-                              }
-                            },
-                          );
-                        },
-                        child: Container(
-                          padding: EdgeInsets.all(context.rSpacing(6)),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.more_vert,
-                            size: context.rIconSize(18),
+                  ),
+                  fadeInDuration: const Duration(milliseconds: 300),
+                  fadeOutDuration: const Duration(milliseconds: 100),
+                ),
+                // Glass overlay
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.3),
+                      ],
+                    ),
+                  ),
+                ),
+                // Video indicator (top-left)
+                if (post.isVideo)
+                  Positioned(
+                    top: context.rSpacing(8),
+                    left: context.rSpacing(8),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: context.rSpacing(8),
+                        vertical: context.rSpacing(4),
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(
+                          context.rRadius(12),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.play_arrow_rounded,
+                            size: context.rIconSize(16),
                             color: Colors.white,
                           ),
-                        ),
+                          if (post.videoDuration != null) ...[
+                            SizedBox(width: context.rSpacing(4)),
+                            Text(
+                              _formatDuration(post.videoDuration!),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: context.rFontSize(11),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                  ],
+                  ),
+                // Post stats overlay (top-right)
+                Positioned(
+                  top: context.rSpacing(8),
+                  right: context.rSpacing(8),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: context.rSpacing(8),
+                      vertical: context.rSpacing(4),
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(context.rRadius(12)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.favorite,
+                          size: context.rIconSize(14),
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: context.rSpacing(4)),
+                        Text(
+                          _formatCount(post.likes),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: context.rFontSize(12),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+                // Three-dot menu button (bottom-right, repositioned to avoid overlap)
+                Positioned(
+                  bottom: context.rSpacing(8),
+                  right: context.rSpacing(8),
+                  child: GestureDetector(
+                    onTap: () {
+                      UnifiedPostOptionsSheet.show(
+                        context,
+                        post: post,
+                        isOwnPost: true,
+                        onPostUpdated: () {
+                          final postProvider = context.read<PostProvider>();
+                          final authProvider = context.read<AuthProvider>();
+                          if (authProvider.currentUserId != null) {
+                            postProvider.loadUserPosts(
+                              authProvider.currentUserId!,
+                            );
+                          }
+                        },
+                        onPostDeleted: () {
+                          // Remove post immediately from cache for instant UI update
+                          final postProvider = context.read<PostProvider>();
+                          postProvider.removePost(post.id);
+
+                          // Also reload user stats
+                          final authProvider = context.read<AuthProvider>();
+                          if (authProvider.currentUserId != null) {
+                            authProvider.reloadUserData(showLoading: false);
+                          }
+                        },
+                      );
+                    },
+                    child: Container(
+                      padding: EdgeInsets.all(context.rSpacing(6)),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.more_vert,
+                        size: context.rIconSize(18),
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReelsGrid(BuildContext context, bool isDark) {
+    final bottomSafeArea = MediaQuery.of(context).padding.bottom;
+    final bottomPadding = bottomSafeArea + 210;
+
+    if (_userReels.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.video_library_outlined,
+                size: 64,
+                color: isDark ? Colors.white24 : Colors.grey[300],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No reels yet',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Create your first reel!',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.white60 : Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
+      itemCount: _userReels.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.gridColumns,
+        mainAxisSpacing: context.rSpacing(12),
+        crossAxisSpacing: context.rSpacing(12),
+        childAspectRatio: 0.75,
+      ),
+      itemBuilder: (context, index) {
+        final reel = _userReels[index];
+        return GestureDetector(
+          onTap: () {
+            // Navigate to reel feed page starting from this reel
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) =>
+                    ReelFeedPage(initialReels: _userReels, initialIndex: index),
+              ),
+            );
+          },
+          child: _buildReelGridItem(context, reel, isDark),
         );
       },
     );
@@ -1040,7 +1360,7 @@ class _MyProfilePageState extends State<MyProfilePage>
     final minutes = seconds ~/ 60;
     final remainingSeconds = seconds % 60;
     if (minutes > 0) {
-      return '${minutes}:${remainingSeconds.toString().padLeft(2, '0')}';
+      return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
     }
     return '0:${remainingSeconds.toString().padLeft(2, '0')}';
   }

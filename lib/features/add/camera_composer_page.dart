@@ -5,8 +5,9 @@ import 'package:image_picker/image_picker.dart';
 
 class CameraComposerPage extends StatefulWidget {
   final String type; // 'story', 'reel', or 'post'
+  final String? videoPath; // Optional pre-recorded video path
 
-  const CameraComposerPage({super.key, this.type = 'story'});
+  const CameraComposerPage({super.key, this.type = 'story', this.videoPath});
 
   @override
   State<CameraComposerPage> createState() => _CameraComposerPageState();
@@ -99,6 +100,12 @@ class _CameraComposerPageState extends State<CameraComposerPage>
       vsync: this,
       duration: const Duration(seconds: 1),
     );
+
+    // Load pre-recorded video if provided
+    if (widget.videoPath != null) {
+      _capturedMedia = XFile(widget.videoPath!);
+      _isVideo = true;
+    }
   }
 
   @override

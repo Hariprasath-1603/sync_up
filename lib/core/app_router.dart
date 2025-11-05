@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'scaffold_with_nav_bar.dart';
-import 'services/preferences_service.dart';
 import '../features/auth/forgot_password_page.dart';
 import '../features/auth/reset_confirmation_page.dart';
 import '../features/auth/sign_in_page.dart';
@@ -20,40 +18,16 @@ import '../features/profile/change_username_page.dart';
 import '../features/explore/explore_page.dart';
 import '../features/reels/reels_page_new.dart';
 import '../features/chat/chat_page.dart';
+import '../features/splash/splash_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
-// Determine initial location based on user state
-String _getInitialLocation() {
-  // Check if user has active Supabase session (most reliable)
-  final session = Supabase.instance.client.auth.currentSession;
-  if (session != null) {
-    print('✅ User session found: ${session.user.email}');
-    return '/home';
-  }
-
-  // Check if user is logged in via preferences (backup)
-  if (PreferencesService.isLoggedIn()) {
-    print('✅ User logged in via preferences');
-    return '/home';
-  }
-
-  // Check if user has seen onboarding
-  if (PreferencesService.hasSeenOnboarding()) {
-    print('👋 Returning user - show sign in');
-    return '/signin';
-  }
-
-  // Show onboarding for first-time users
-  print('🎉 First time user - show onboarding');
-  return '/onboarding';
-}
-
 final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
-  initialLocation: _getInitialLocation(),
+  initialLocation: '/splash',
   routes: [
-    // Standalone routes (no nav bar)
+    // Splash Screen - Always show first
+    GoRoute(path: '/splash', builder: (context, state) => const SplashScreen()),
     GoRoute(
       path: '/onboarding',
       builder: (context, state) => const OnboardingPage(),

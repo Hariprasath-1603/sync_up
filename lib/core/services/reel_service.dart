@@ -23,6 +23,8 @@ class ReelService {
   static const String _tableName = 'reels';
   static const String _likesTableName = 'reel_likes';
   static const String _viewsTableName = 'reel_views';
+  static const String _commentsTableName = 'reel_comments';
+  static const String _sharesTableName = 'reel_shares';
 
   // ========================================
   // UPLOAD REEL
@@ -147,25 +149,69 @@ class ReelService {
   /// Generate thumbnail from video file
   Future<File?> _generateThumbnail(File videoFile) async {
     try {
-      final tempDir = await getTemporaryDirectory();
-      final thumbnailPath = await VideoThumbnail.thumbnailFile(
-        video: videoFile.path,
-        thumbnailPath: tempDir.path,
-        imageFormat: ImageFormat.JPEG,
-        maxWidth: 1080,
-        maxHeight: 1920,
-        quality: 75,
-        timeMs: 0, // Get first frame
-      );
-
-      if (thumbnailPath == null) {
-        debugPrint('❌ Thumbnail generation returned null');
+      // Verify video file exists and is readable
+      if (!await videoFile.exists()) {
+        debugPrint('❌ Video file does not exist: ${videoFile.path}');
         return null;
       }
 
-      return File(thumbnailPath);
-    } catch (e) {
+      final fileSize = await videoFile.length();
+      debugPrint('📹 Video file size: ${fileSize / 1024 / 1024} MB');
+
+      // Wait a moment for file to be fully written (especially after compression)
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      final tempDir = await getTemporaryDirectory();
+
+      // Try to generate thumbnail with retry logic
+      int attempts = 0;
+      const maxAttempts = 3;
+      String? thumbnailPath;
+
+      while (attempts < maxAttempts && thumbnailPath == null) {
+        attempts++;
+        debugPrint('🖼️ Thumbnail generation attempt $attempts/$maxAttempts');
+
+        try {
+          thumbnailPath = await VideoThumbnail.thumbnailFile(
+            video: videoFile.path,
+            thumbnailPath: tempDir.path,
+            imageFormat: ImageFormat.JPEG,
+            maxWidth: 1080,
+            maxHeight: 1920,
+            quality: 75,
+            timeMs: 1000, // Get frame at 1 second (more reliable than 0)
+          );
+        } catch (e) {
+          debugPrint('⚠️ Attempt $attempts failed: $e');
+          if (attempts < maxAttempts) {
+            await Future.delayed(
+              Duration(seconds: attempts),
+            ); // Progressive delay
+          }
+        }
+      }
+
+      if (thumbnailPath == null) {
+        debugPrint(
+          '❌ Thumbnail generation returned null after $maxAttempts attempts',
+        );
+        return null;
+      }
+
+      final thumbnailFile = File(thumbnailPath);
+      if (!await thumbnailFile.exists()) {
+        debugPrint('❌ Thumbnail file was not created at: $thumbnailPath');
+        return null;
+      }
+
+      final thumbSize = await thumbnailFile.length();
+      debugPrint('✅ Thumbnail generated: ${thumbSize / 1024} KB');
+
+      return thumbnailFile;
+    } catch (e, stackTrace) {
       debugPrint('❌ Error generating thumbnail: $e');
+      debugPrint('Stack trace: $stackTrace');
       return null;
     }
   }
@@ -270,27 +316,70 @@ class ReelService {
     try {
       debugPrint('📥 Fetching reels for user: $userId');
 
-      final response = await _supabase
-          .from(_tableName)
-          .select('''
-            *,
-            users!reels_user_id_fkey (
-              uid,
-              username,
-              photo_url,
-              full_name
-            )
-          ''')
-          .eq('user_id', userId)
-          .order('created_at', ascending: false)
-          .range(offset, offset + limit - 1);
+      // Try with foreign key first
+      try {
+        final response = await _supabase
+            .from(_tableName)
+            .select('''
+              *,
+              users!reels_user_id_fkey (
+                uid,
+                username,
+                photo_url,
+                full_name
+              )
+            ''')
+            .eq('user_id', userId)
+            .order('created_at', ascending: false)
+            .range(offset, offset + limit - 1);
 
-      final reels = (response as List)
-          .map((json) => _parseReelWithUser(json))
-          .toList();
+        final reels = (response as List)
+            .map((json) => _parseReelWithUser(json))
+            .toList();
 
-      debugPrint('✅ Fetched ${reels.length} reels');
-      return reels;
+        debugPrint('✅ Fetched ${reels.length} reels');
+        return reels;
+      } catch (fkError) {
+        debugPrint(
+          '⚠️ Foreign key constraint missing, fetching without join: $fkError',
+        );
+
+        // Fallback: Fetch reels without user join
+        final reelsResponse = await _supabase
+            .from(_tableName)
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', ascending: false)
+            .range(offset, offset + limit - 1);
+
+        final reels = <ReelModel>[];
+
+        // Fetch user info once (since all reels are from same user)
+        Map<String, dynamic>? userInfo;
+        try {
+          userInfo = await _supabase
+              .from('users')
+              .select('uid, username, photo_url, full_name')
+              .eq('uid', userId)
+              .single();
+        } catch (e) {
+          debugPrint('⚠️ Could not fetch user $userId: $e');
+          userInfo = {
+            'uid': userId,
+            'username': 'Unknown',
+            'photo_url': null,
+            'full_name': 'Unknown User',
+          };
+        }
+
+        for (final reelJson in reelsResponse as List) {
+          reelJson['users'] = userInfo;
+          reels.add(_parseReelWithUser(reelJson));
+        }
+
+        debugPrint('✅ Fetched ${reels.length} reels (fallback mode)');
+        return reels;
+      }
     } catch (e) {
       debugPrint('❌ Error fetching user reels: $e');
       return [];
@@ -316,28 +405,69 @@ class ReelService {
 
       debugPrint('📥 Fetching feed reels...');
 
-      // TODO: Add logic to fetch only from followed users
-      // For now, fetch all reels
-      final response = await _supabase
-          .from(_tableName)
-          .select('''
-            *,
-            users!reels_user_id_fkey (
-              uid,
-              username,
-              photo_url,
-              full_name
-            )
-          ''')
-          .order('created_at', ascending: false)
-          .range(offset, offset + limit - 1);
+      // Try with foreign key first
+      try {
+        final response = await _supabase
+            .from(_tableName)
+            .select('''
+              *,
+              users!reels_user_id_fkey (
+                uid,
+                username,
+                photo_url,
+                full_name
+              )
+            ''')
+            .order('created_at', ascending: false)
+            .range(offset, offset + limit - 1);
 
-      final reels = (response as List)
-          .map((json) => _parseReelWithUser(json))
-          .toList();
+        final reels = (response as List)
+            .map((json) => _parseReelWithUser(json))
+            .toList();
 
-      debugPrint('✅ Fetched ${reels.length} feed reels');
-      return reels;
+        debugPrint('✅ Fetched ${reels.length} feed reels');
+        return reels;
+      } catch (fkError) {
+        debugPrint(
+          '⚠️ Foreign key constraint missing, fetching without join: $fkError',
+        );
+
+        // Fallback: Fetch reels without user join
+        final reelsResponse = await _supabase
+            .from(_tableName)
+            .select('*')
+            .order('created_at', ascending: false)
+            .range(offset, offset + limit - 1);
+
+        final reels = <ReelModel>[];
+        for (final reelJson in reelsResponse as List) {
+          // Fetch user separately for each reel
+          final userId = reelJson['user_id'] as String;
+          try {
+            final userResponse = await _supabase
+                .from('users')
+                .select('uid, username, photo_url, full_name')
+                .eq('uid', userId)
+                .single();
+
+            reelJson['users'] = userResponse;
+          } catch (e) {
+            debugPrint('⚠️ Could not fetch user $userId: $e');
+            // Create minimal user object
+            reelJson['users'] = {
+              'uid': userId,
+              'username': 'Unknown',
+              'photo_url': null,
+              'full_name': 'Unknown User',
+            };
+          }
+
+          reels.add(_parseReelWithUser(reelJson));
+        }
+
+        debugPrint('✅ Fetched ${reels.length} feed reels (fallback mode)');
+        return reels;
+      }
     } catch (e) {
       debugPrint('❌ Error fetching feed reels: $e');
       return [];
@@ -568,6 +698,119 @@ class ReelService {
     } catch (e) {
       debugPrint('❌ Error getting reel count: $e');
       return 0;
+    }
+  }
+
+  // ========================================
+  // COMMENTS
+  // ========================================
+
+  /// Add a comment to a reel
+  Future<bool> addComment({
+    required String reelId,
+    required String text,
+  }) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      debugPrint('💬 Adding comment to reel: $reelId');
+
+      await _supabase.from(_commentsTableName).insert({
+        'reel_id': reelId,
+        'user_id': user.id,
+        'text': text,
+      });
+
+      debugPrint('✅ Comment added successfully');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error adding comment: $e');
+      return false;
+    }
+  }
+
+  /// Get comments for a reel
+  Future<List<Map<String, dynamic>>> getComments(String reelId) async {
+    try {
+      debugPrint('📥 Fetching comments for reel: $reelId');
+
+      final response = await _supabase
+          .from(_commentsTableName)
+          .select('''
+            *,
+            users!reel_comments_user_id_fkey (
+              uid,
+              username,
+              photo_url,
+              full_name
+            )
+          ''')
+          .eq('reel_id', reelId)
+          .order('created_at', ascending: false);
+
+      debugPrint('✅ Fetched ${(response as List).length} comments');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('❌ Error fetching comments: $e');
+      return [];
+    }
+  }
+
+  /// Delete a comment
+  Future<bool> deleteComment(String commentId) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      debugPrint('🗑️ Deleting comment: $commentId');
+
+      await _supabase
+          .from(_commentsTableName)
+          .delete()
+          .eq('id', commentId)
+          .eq('user_id', user.id);
+
+      debugPrint('✅ Comment deleted successfully');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error deleting comment: $e');
+      return false;
+    }
+  }
+
+  // ========================================
+  // SHARES
+  // ========================================
+
+  /// Record a share for a reel
+  Future<bool> shareReel({
+    required String reelId,
+    required String sharedTo, // 'story', 'message', 'external'
+  }) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      debugPrint('↗️ Recording share for reel: $reelId');
+
+      await _supabase.from(_sharesTableName).insert({
+        'reel_id': reelId,
+        'user_id': user.id,
+        'shared_to': sharedTo,
+      });
+
+      debugPrint('✅ Share recorded successfully');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error recording share: $e');
+      return false;
     }
   }
 }
