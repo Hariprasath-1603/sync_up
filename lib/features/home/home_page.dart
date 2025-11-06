@@ -6,7 +6,7 @@ import 'models/post_model.dart';
 import 'widgets/custom_header.dart';
 import 'widgets/live_section.dart';
 import 'widgets/post_card.dart';
-import '../stories/widgets/dynamic_story_row.dart';
+import '../stories/widgets/square_story_row.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -113,7 +113,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ),
-                    const DynamicStoryRow(),
+                    const SquareStoryRow(),
                   ],
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),

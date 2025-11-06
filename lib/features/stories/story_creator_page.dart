@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:video_player/video_player.dart';
 import '../../core/theme.dart';
 import '../../core/services/story_service.dart';
 import '../../core/services/supabase_storage_service.dart';
@@ -23,6 +24,7 @@ class _StoryCreatorPageState extends State<StoryCreatorPage> {
   String? _selectedMediaType; // 'image' or 'video'
   bool _isUploading = false;
   double _uploadProgress = 0.0;
+  VideoPlayerController? _videoController;
 
   // Mood options
   final List<String> _moods = [
@@ -42,6 +44,7 @@ class _StoryCreatorPageState extends State<StoryCreatorPage> {
   @override
   void dispose() {
     _captionController.dispose();
+    _videoController?.dispose();
     super.dispose();
   }
 
@@ -54,10 +57,23 @@ class _StoryCreatorPageState extends State<StoryCreatorPage> {
         );
 
         if (video != null) {
+          // Dispose previous video controller
+          _videoController?.dispose();
+
+          // Initialize video player for preview
+          _videoController = VideoPlayerController.file(File(video.path))
+            ..initialize().then((_) {
+              setState(() {});
+              _videoController?.setLooping(true);
+              _videoController?.play();
+            });
+
           setState(() {
             _selectedMedia = File(video.path);
             _selectedMediaType = 'video';
           });
+
+          print('📹 Video selected: ${video.path}');
         }
       } else {
         final XFile? image = await _picker.pickImage(
@@ -72,6 +88,8 @@ class _StoryCreatorPageState extends State<StoryCreatorPage> {
             _selectedMedia = File(image.path);
             _selectedMediaType = 'image';
           });
+
+          print('🖼️ Image selected: ${image.path}');
         }
       }
     } catch (e) {
@@ -219,7 +237,6 @@ class _StoryCreatorPageState extends State<StoryCreatorPage> {
         caption: _captionController.text.trim().isEmpty
             ? null
             : _captionController.text.trim(),
-        mood: _selectedMood,
       );
 
       if (mounted) {
@@ -350,27 +367,75 @@ class _StoryCreatorPageState extends State<StoryCreatorPage> {
         // Preview image/video
         Positioned.fill(
           child: _selectedMediaType == 'video'
-              ? Container(
+              ? _videoController != null &&
+                        _videoController!.value.isInitialized
+                    ? FittedBox(
+                        fit: BoxFit.contain,
+                        child: SizedBox(
+                          width: _videoController!.value.size.width,
+                          height: _videoController!.value.size.height,
+                          child: VideoPlayer(_videoController!),
+                        ),
+                      )
+                    : Container(
+                        color: Colors.black,
+                        child: const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(color: Colors.white),
+                              SizedBox(height: 16),
+                              Text(
+                                'Loading video preview...',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+              : _selectedMedia != null
+              ? Image.file(
+                  _selectedMedia!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    print('❌ Error loading image: $error');
+                    return Container(
+                      color: Colors.black,
+                      child: const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              color: Colors.red,
+                              size: 64,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Error loading image',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                )
+              : Container(
                   color: Colors.black,
                   child: const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.play_circle_outline,
-                          size: 64,
-                          color: Colors.white,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'Video Selected',
-                          style: TextStyle(color: Colors.white, fontSize: 18),
-                        ),
-                      ],
+                    child: Text(
+                      'No media selected',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
-                )
-              : Image.file(_selectedMedia!, fit: BoxFit.contain),
+                ),
         ),
 
         // Bottom controls

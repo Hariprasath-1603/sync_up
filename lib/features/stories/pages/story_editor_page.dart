@@ -106,7 +106,6 @@ class _StoryEditorPageState extends State<StoryEditorPage> {
         caption: _captionController.text.trim().isEmpty
             ? null
             : _captionController.text.trim(),
-        mood: null,
       );
 
       setState(() => _uploadProgress = 1.0);

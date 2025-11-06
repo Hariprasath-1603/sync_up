@@ -431,8 +431,9 @@ class PostService {
       final updates = <String, dynamic>{
         'updated_at': DateTime.now().toIso8601String(),
       };
-      if (commentsEnabled != null)
+      if (commentsEnabled != null) {
         updates['comments_enabled'] = commentsEnabled;
+      }
       if (hideLikeCount != null) updates['hide_like_count'] = hideLikeCount;
       if (isPinned != null) updates['is_pinned'] = isPinned;
 

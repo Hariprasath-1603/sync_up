@@ -16,6 +16,7 @@
 /// - duration: INTEGER (video duration in seconds)
 /// - created_at: TIMESTAMP
 /// - updated_at: TIMESTAMP
+library;
 
 class ReelModel {
   final String id;

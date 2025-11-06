@@ -10,7 +10,6 @@ class StoryService {
     required String mediaUrl,
     required String mediaType, // 'image' or 'video'
     String? caption,
-    String? mood,
   }) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
@@ -26,7 +25,6 @@ class StoryService {
             'media_url': mediaUrl,
             'media_type': mediaType,
             'caption': caption,
-            'mood': mood,
             'views_count': 0,
             'created_at': DateTime.now().toIso8601String(),
             'expires_at': DateTime.now()
