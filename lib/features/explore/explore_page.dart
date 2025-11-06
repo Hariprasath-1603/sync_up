@@ -848,30 +848,9 @@ class _ExplorePageState extends State<ExplorePage>
   Widget _buildReelGridItem(Map<String, dynamic> reel, bool isDark, int index) {
     return GestureDetector(
       onTap: () {
-        // Navigate to reels page
-        final reelData = ReelData(
-          id: reel['id'] as String,
-          userId: reel['user_id'] as String? ?? '',
-          username: reel['username'] as String? ?? '@unknown',
-          profilePic: reel['avatarUrl'] as String? ?? '',
-          caption: reel['caption'] as String? ?? '',
-          musicName: reel['musicName'] as String? ?? '',
-          musicArtist: reel['musicArtist'] as String? ?? '',
-          videoUrl: reel['videoUrl'] as String,
-          likes: reel['likes'] as int? ?? 0,
-          comments: reel['comments'] as int? ?? 0,
-          shares: reel['shares'] as int? ?? 0,
-          views: reel['views'] as int? ?? 0,
-          isLiked: false,
-          isSaved: false,
-          isFollowing: false,
-        );
-
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ReelsPageNew(initialReel: reelData),
-          ),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (context) => const ReelsPageNew()));
       },
       child: Hero(
         tag: 'reel_${reel['id']}_$index',
@@ -1133,6 +1112,7 @@ class _ExplorePageState extends State<ExplorePage>
     );
   }
 
+  // ignore: unused_element
   Widget _buildGlassTabBar(bool isDark) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1358,29 +1338,9 @@ class _ExplorePageState extends State<ExplorePage>
           );
         } else if (type == 'reels') {
           // Navigate to reels page
-          final reel = ReelData(
-            id: item['id'] as String,
-            userId: item['user_id'] as String? ?? '',
-            username: item['username'] as String? ?? '@unknown',
-            profilePic: item['avatarUrl'] as String? ?? '',
-            caption: item['caption'] as String? ?? '',
-            musicName: item['musicName'] as String? ?? '',
-            musicArtist: item['musicArtist'] as String? ?? '',
-            videoUrl: item['videoUrl'] as String,
-            likes: item['likes'] as int? ?? 0,
-            comments: item['comments'] as int? ?? 0,
-            shares: item['shares'] as int? ?? 0,
-            views: item['views'] as int? ?? 0,
-            isLiked: false,
-            isSaved: false,
-            isFollowing: false,
-          );
-
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => ReelsPageNew(initialReel: reel),
-            ),
-          );
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (context) => const ReelsPageNew()));
         }
       },
       child: Hero(

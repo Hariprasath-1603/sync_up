@@ -403,7 +403,7 @@ class ReelService {
         throw Exception('User not logged in');
       }
 
-      debugPrint('📥 Fetching feed reels...');
+      debugPrint('📥 Fetching feed reels (excluding own reels)...');
 
       // Try with foreign key first
       try {
@@ -418,6 +418,7 @@ class ReelService {
                 full_name
               )
             ''')
+            .neq('user_id', user.id) // Exclude current user's reels
             .order('created_at', ascending: false)
             .range(offset, offset + limit - 1);
 
@@ -425,7 +426,7 @@ class ReelService {
             .map((json) => _parseReelWithUser(json))
             .toList();
 
-        debugPrint('✅ Fetched ${reels.length} feed reels');
+        debugPrint('✅ Fetched ${reels.length} feed reels (excluding own)');
         return reels;
       } catch (fkError) {
         debugPrint(
@@ -436,6 +437,7 @@ class ReelService {
         final reelsResponse = await _supabase
             .from(_tableName)
             .select('*')
+            .neq('user_id', user.id) // Exclude current user's reels
             .order('created_at', ascending: false)
             .range(offset, offset + limit - 1);
 
@@ -465,12 +467,140 @@ class ReelService {
           reels.add(_parseReelWithUser(reelJson));
         }
 
-        debugPrint('✅ Fetched ${reels.length} feed reels (fallback mode)');
+        debugPrint(
+          '✅ Fetched ${reels.length} feed reels (fallback mode, excluding own)',
+        );
         return reels;
       }
     } catch (e) {
       debugPrint('❌ Error fetching feed reels: $e');
       return [];
+    }
+  }
+
+  /// Fetch reels only from users the current user follows
+  Future<List<ReelModel>> fetchFollowingReels({
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      debugPrint('📥 Fetching following reels for ${user.id}...');
+
+      // Get list of followed user IDs
+      final followingResponse = await _supabase
+          .from('followers')
+          .select('following_id')
+          .eq('follower_id', user.id);
+
+      final followingIds = (followingResponse as List)
+          .map((row) => row['following_id'] as String)
+          .toList();
+
+      if (followingIds.isEmpty) {
+        debugPrint('ℹ️ User is not following anyone yet');
+        return [];
+      }
+
+      // Try fetching with join for user profile data
+      try {
+        final formattedIds = followingIds.map((id) => '"$id"').join(',');
+        final response = await _supabase
+            .from(_tableName)
+            .select('''
+              *,
+              users!reels_user_id_fkey (
+                uid,
+                username,
+                photo_url,
+                full_name
+              )
+            ''')
+            .filter('user_id', 'in', '($formattedIds)')
+            .order('created_at', ascending: false)
+            .range(offset, offset + limit - 1);
+
+        final reels = (response as List)
+            .map((json) => _parseReelWithUser(json))
+            .toList();
+
+        debugPrint('✅ Fetched ${reels.length} following reels');
+        return reels;
+      } catch (fkError) {
+        debugPrint(
+          '⚠️ Following fetch join failed, retrying without join: $fkError',
+        );
+
+        final formattedIds = followingIds.map((id) => '"$id"').join(',');
+        final response = await _supabase
+            .from(_tableName)
+            .select('*')
+            .filter('user_id', 'in', '($formattedIds)')
+            .order('created_at', ascending: false)
+            .range(offset, offset + limit - 1);
+
+        final reels = <ReelModel>[];
+        for (final reelJson in response as List) {
+          final userId = reelJson['user_id'] as String;
+          try {
+            final userResponse = await _supabase
+                .from('users')
+                .select('uid, username, photo_url, full_name')
+                .eq('uid', userId)
+                .single();
+
+            reelJson['users'] = userResponse;
+          } catch (e) {
+            debugPrint('⚠️ Could not fetch user $userId: $e');
+            reelJson['users'] = {
+              'uid': userId,
+              'username': 'Unknown',
+              'photo_url': null,
+              'full_name': 'Unknown User',
+            };
+          }
+
+          reels.add(_parseReelWithUser(reelJson));
+        }
+
+        debugPrint('✅ Fetched ${reels.length} following reels (fallback)');
+        return reels;
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching following reels: $e');
+      return [];
+    }
+  }
+
+  /// Fetch a single reel by ID (with user info)
+  Future<ReelModel?> fetchReelById(String reelId) async {
+    try {
+      final response = await _supabase
+          .from(_tableName)
+          .select('''
+            *,
+            users!reels_user_id_fkey (
+              uid,
+              username,
+              photo_url,
+              full_name
+            )
+          ''')
+          .eq('id', reelId)
+          .maybeSingle();
+
+      if (response == null) {
+        return null;
+      }
+
+      return _parseReelWithUser(response);
+    } catch (e) {
+      debugPrint('❌ Error fetching reel $reelId: $e');
+      return null;
     }
   }
 

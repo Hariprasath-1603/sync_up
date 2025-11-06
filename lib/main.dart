@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'core/theme.dart';
 import 'core/app_router.dart';
 import 'core/services/preferences_service.dart';
+import 'core/services/back_navigation_settings_service.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/post_provider.dart';
 import 'core/config/supabase_config.dart';
@@ -23,6 +24,9 @@ Future<void> main() async {
 
   // Initialize Shared Preferences
   await PreferencesService.init();
+
+  // Initialize Back Navigation Settings
+  await BackNavigationSettingsService.instance.initialize();
 
   runApp(const App());
 }

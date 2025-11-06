@@ -75,6 +75,10 @@ dependencies:
   visibility_detector: ^0.4.0+2
   # For sharing content
   share_plus: ^12.0.1
+  # For toast messages
+  fluttertoast: ^8.2.8
+  # For haptic feedback
+  vibration: ^2.0.0
 
 dev_dependencies:
   flutter_test:

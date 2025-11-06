@@ -155,6 +155,20 @@ class _ReelVideoPlayerState extends State<ReelVideoPlayer> {
       },
       child: GestureDetector(
         onTap: _isInitialized ? _togglePlayPause : null,
+        onLongPressStart: _isInitialized
+            ? (_) {
+                if (_controller.value.isPlaying) {
+                  _controller.pause();
+                }
+              }
+            : null,
+        onLongPressEnd: _isInitialized
+            ? (_) {
+                if (widget.isCurrentReel && !_controller.value.isPlaying) {
+                  _controller.play();
+                }
+              }
+            : null,
         child: Container(
           color: Colors.black,
           child: Stack(

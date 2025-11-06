@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:vibration/vibration.dart';
+import '../services/back_navigation_settings_service.dart';
 
 /// Handles back button behavior with double-tap to exit and smart navigation
 class BackButtonHandler {
@@ -16,22 +19,23 @@ class BackButtonHandler {
   ];
 
   /// Handles back button press with smart navigation
-  /// Returns true if the back press was handled, false otherwise
+  /// Returns true if the app should exit, false otherwise
   static Future<bool> handleBackPress(BuildContext context) async {
+    final settings = BackNavigationSettingsService.instance;
     final currentLocation = GoRouterState.of(context).uri.path;
 
     // Check if we're on a main screen
     if (_mainScreens.contains(currentLocation)) {
-      return await _handleMainScreenBack(context, currentLocation);
+      return await _handleMainScreenBack(context, currentLocation, settings);
     } else {
       // Secondary screen - just go back normally
       if (context.canPop()) {
         context.pop();
-        return true;
+        return false;
       } else {
         // If can't pop, go to home
         context.go('/home');
-        return true;
+        return false;
       }
     }
   }
@@ -40,40 +44,99 @@ class BackButtonHandler {
   static Future<bool> _handleMainScreenBack(
     BuildContext context,
     String currentLocation,
+    BackNavigationSettingsService settings,
   ) async {
-    // If not on home, go to home first
-    if (currentLocation != '/home') {
+    // If auto-return to home is enabled and not on home, go to home first
+    if (settings.autoReturnHomeEnabled && currentLocation != '/home') {
       context.go('/home');
-      _showNavigationSnackBar(context, 'Press back again to exit');
-      return true;
-    }
 
-    // On home screen - check for double tap
-    final now = DateTime.now();
+      // Vibrate if enabled
+      if (settings.vibrateOnBackEnabled) {
+        await _performVibration();
+      }
 
-    if (_lastBackPress == null ||
-        now.difference(_lastBackPress!) > _exitTimeGap) {
-      // First tap - show message
-      _lastBackPress = now;
-      _showExitSnackBar(context);
-      return true;
-    } else {
-      // Second tap within time gap - exit app
-      SystemNavigator.pop();
+      // Show toast if enabled
+      if (settings.showToastEnabled) {
+        _showToast('Returning to Home');
+      }
+
       return false;
     }
+
+    // On home screen - check for double tap if enabled
+    if (settings.doubleTapExitEnabled) {
+      final now = DateTime.now();
+
+      if (_lastBackPress == null ||
+          now.difference(_lastBackPress!) > _exitTimeGap) {
+        // First tap - show message
+        _lastBackPress = now;
+
+        // Vibrate if enabled
+        if (settings.vibrateOnBackEnabled) {
+          await _performVibration();
+        }
+
+        // Show toast if enabled
+        if (settings.showToastEnabled) {
+          _showExitToast();
+        }
+
+        return false;
+      } else {
+        // Second tap within time gap - exit app
+        SystemNavigator.pop();
+        return true;
+      }
+    } else {
+      // Double-tap disabled, exit immediately
+      SystemNavigator.pop();
+      return true;
+    }
   }
 
-  /// Shows snackbar for exit confirmation
-  static void _showExitSnackBar(BuildContext context) {
-    // Snackbar removed per user request
-    // Exit happens silently now
+  /// Performs haptic vibration feedback
+  static Future<void> _performVibration() async {
+    try {
+      // Check if device has vibration capability
+      final hasVibrator = await Vibration.hasVibrator();
+      if (hasVibrator == true) {
+        // Light haptic feedback (40ms)
+        await Vibration.vibrate(duration: 40);
+      } else {
+        // Fallback to system haptic feedback
+        HapticFeedback.lightImpact();
+      }
+    } catch (e) {
+      // Fallback to system haptic feedback
+      HapticFeedback.lightImpact();
+    }
   }
 
-  /// Shows snackbar for navigation to home
-  static void _showNavigationSnackBar(BuildContext context, String message) {
-    // Snackbar removed per user request
-    // Navigation happens silently now
+  /// Shows toast for exit confirmation
+  static void _showExitToast() {
+    Fluttertoast.showToast(
+      msg: "Press again to exit",
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      timeInSecForIosWeb: 2,
+      backgroundColor: Colors.black87,
+      textColor: Colors.white,
+      fontSize: 14.0,
+    );
+  }
+
+  /// Shows toast with custom message
+  static void _showToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      timeInSecForIosWeb: 1,
+      backgroundColor: Colors.black87,
+      textColor: Colors.white,
+      fontSize: 14.0,
+    );
   }
 
   /// Resets the back press timer (useful when navigating)

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
+import 'user_cache_service.dart';
 
 /// Simplified DatabaseService for Supabase
 /// TODO: This is a minimal implementation to make the app compile
@@ -63,16 +64,30 @@ class DatabaseService {
 
   Future<UserModel?> getUserByUid(String uid) async {
     try {
+      // Try fetching from Supabase first
       final data = await _supabase
           .from('users')
           .select()
           .eq('uid', uid)
           .maybeSingle();
 
-      return data != null ? UserModel.fromMap(data) : null;
-    } catch (e) {
-      print('Error getting user: $e');
+      if (data != null) {
+        final user = UserModel.fromMap(data);
+        // Cache the fresh data for offline access
+        await UserCacheService.cacheUser(user);
+        return user;
+      }
+
+      // No data from server, return null
       return null;
+    } catch (e) {
+      print('⚠️ Network error fetching user, trying cache: $e');
+      // Fallback to cached data on network error
+      final cachedUser = await UserCacheService.getCachedUser(uid);
+      if (cachedUser != null) {
+        print('📦 Loaded user from offline cache: ${cachedUser.username}');
+      }
+      return cachedUser;
     }
   }
 
@@ -84,9 +99,18 @@ class DatabaseService {
           .eq('username', username.toLowerCase().trim())
           .maybeSingle();
 
-      return data != null ? UserModel.fromMap(data) : null;
+      if (data != null) {
+        final user = UserModel.fromMap(data);
+        // Cache the fresh data for offline access
+        await UserCacheService.cacheUser(user);
+        return user;
+      }
+
+      return null;
     } catch (e) {
-      print('Error getting user by username: $e');
+      print('⚠️ Network error fetching user by username: $e');
+      // Note: Can't easily lookup by username in cache, would need secondary index
+      // For now, only uid-based lookups support offline mode
       return null;
     }
   }

@@ -1,5 +1,6 @@
 ﻿import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/scaffold_with_nav_bar.dart';
 import '../../core/theme.dart';
@@ -8,6 +9,11 @@ import '../../core/models/reel_model.dart';
 import '../profile/pages/widgets/floating_reactions.dart';
 import '../profile/other_user_profile_page.dart';
 import 'pages/upload_reel_page.dart';
+import 'widgets/creator_control_bar.dart';
+import 'widgets/creator_insights_sheet.dart';
+import 'widgets/dynamic_options_sheet.dart';
+import 'widgets/edit_reel_sheet.dart';
+import 'widgets/reel_video_player.dart';
 
 // Global key for accessing ReelsPageNew state from anywhere
 final GlobalKey<_ReelsPageNewState> reelsPageKey =
@@ -163,6 +169,8 @@ class _ReelsPageNewState extends State<ReelsPageNew>
   /// Fetch reels from database
   Future<void> _fetchReels() async {
     try {
+      debugPrint('🔍 _fetchReels called - isProfileMode: $_isProfileMode');
+
       if (mounted) {
         setState(() {
           if (_currentReels.isEmpty) {
@@ -172,6 +180,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
       }
 
       if (_isProfileMode) {
+        debugPrint('👤 Fetching profile reels...');
         final userId =
             widget.userId ?? Supabase.instance.client.auth.currentUser?.id;
         if (userId == null) {
@@ -217,6 +226,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
       }
 
       // Global feed mode
+      debugPrint('🌍 Fetching global feed reels...');
       final reels = await _reelService.fetchFeedReels(limit: 50);
 
       debugPrint('📱 Fetched ${reels.length} reels from database');
@@ -383,6 +393,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
       useRootNavigator: true,
       builder: (context) => CommentsModal(reel: reel),
     ).whenComplete(() => navVisibility?.value = true);
@@ -394,6 +405,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
       useRootNavigator: true,
       builder: (context) => ShareSheet(reel: reel),
     ).whenComplete(() => navVisibility?.value = true);
@@ -406,6 +418,7 @@ class _ReelsPageNewState extends State<ReelsPageNew>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
       useRootNavigator: true,
       builder: (context) => MusicReelsPage(musicName: reel.musicName),
     ).whenComplete(() => navVisibility?.value = true);
@@ -414,40 +427,47 @@ class _ReelsPageNewState extends State<ReelsPageNew>
   void _showMoreOptions(ReelData reel, int index) {
     final navVisibility = NavBarVisibilityScope.maybeOf(context);
     navVisibility?.value = false;
+
+    final isOwner = _isOwnReel(reel);
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
       useRootNavigator: true,
-      builder: (context) => MoreOptionsSheet(
-        reel: reel,
-        autoScroll: _autoScroll,
-        onAutoScrollChanged: (value) {
-          setState(() {
-            _autoScroll = value;
-          });
-        },
-        onSave: () {
-          Navigator.pop(context);
-          _toggleSave(index);
-        },
-        onReport: () {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Reel reported')));
-        },
-        onNotInterested: () {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Marked as not interested')),
-          );
-        },
-        onCopyLink: () {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Link copied to clipboard')),
-          );
-        },
+      isScrollControlled: true,
+      builder: (context) => DynamicOptionsSheet(
+        reel: _convertToReelModel(reel),
+        isOwner: isOwner,
+        // Creator options
+        onEdit: isOwner ? () => _handleEditReel(reel, index) : null,
+        onChangeCover: isOwner ? () => _handleChangeCover(reel, index) : null,
+        onEditPrivacy: isOwner ? () => _handleEditPrivacy(reel, index) : null,
+        onChangeCategory: isOwner
+            ? () => _handleChangeCategory(reel, index)
+            : null,
+        onTagPeople: isOwner ? () => _handleTagPeople(reel, index) : null,
+        onDelete: isOwner ? () => _handleDeleteReel(reel, index) : null,
+        onArchive: isOwner ? () => _handleArchiveReel(reel, index) : null,
+        onToggleComments: isOwner
+            ? () => _handleToggleComments(reel, index)
+            : null,
+        onToggleLikes: isOwner ? () => _handleToggleLikes(reel, index) : null,
+        onViewInsights: isOwner ? () => _handleViewInsights(reel) : null,
+        onHideFromExplore: isOwner
+            ? () => _handleHideFromExplore(reel, index)
+            : null,
+        // Viewer options
+        onReport: !isOwner ? () => _handleReport(reel) : null,
+        onWhyAmISeeingThis: !isOwner ? () => _handleWhyAmISeeingThis() : null,
+        onInterested: !isOwner ? () => _handleInterested(reel, index) : null,
+        onNotInterested: !isOwner
+            ? () => _handleNotInterested(reel, index)
+            : null,
+        // Shared options
+        onShare: () => _showShareSheet(reel),
+        onSave: () => _toggleSave(index),
+        onCopyLink: () => _handleCopyLink(reel),
       ),
     ).whenComplete(() => navVisibility?.value = true);
   }
@@ -468,6 +488,237 @@ class _ReelsPageNewState extends State<ReelsPageNew>
       return '${(views / 1000).toStringAsFixed(1)}K';
     }
     return views.toString();
+  }
+
+  /// Check if the current user owns this reel (Creator Mode)
+  bool _isOwnReel(ReelData reel) {
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    return currentUserId != null && reel.userId == currentUserId;
+  }
+
+  /// Convert ReelData to ReelModel for creator controls
+  ReelModel _convertToReelModel(ReelData reel) {
+    return ReelModel(
+      id: reel.id,
+      userId: reel.userId,
+      videoUrl: reel.videoUrl,
+      caption: reel.caption,
+      likesCount: reel.likes,
+      commentsCount: reel.comments,
+      viewsCount: reel.views,
+      sharesCount: reel.shares,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      username: reel.username,
+      userPhotoUrl: reel.profilePic,
+      isLiked: reel.isLiked,
+      isSaved: reel.isSaved,
+    );
+  }
+
+  // ==================== CREATOR MODE HANDLERS ====================
+
+  void _handleEditReel(ReelData reel, int index) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      isScrollControlled: true,
+      builder: (context) => EditReelSheet(
+        reel: _convertToReelModel(reel),
+        onEditCaption: () {
+          Navigator.pop(context);
+          refreshReels();
+        },
+        onChangeCover: () {
+          Navigator.pop(context);
+          _handleChangeCover(reel, index);
+        },
+      ),
+    );
+  }
+
+  void _handleChangeCover(ReelData reel, int index) {
+    _showSnackBar('Cover image change coming soon');
+    // TODO: Implement cover image picker & update
+  }
+
+  void _handleEditPrivacy(ReelData reel, int index) {
+    _showSnackBar('Privacy settings coming soon');
+    // TODO: Implement privacy selector (Public/Followers/Private)
+  }
+
+  void _handleChangeCategory(ReelData reel, int index) {
+    _showSnackBar('Category selection coming soon');
+    // TODO: Implement category picker
+  }
+
+  void _handleTagPeople(ReelData reel, int index) {
+    _showSnackBar('People tagging coming soon');
+    // TODO: Implement user tagging system
+  }
+
+  void _handleDeleteReel(ReelData reel, int index) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Reel?'),
+        content: const Text(
+          'This reel will be permanently deleted. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await ReelService().deleteReel(reel.id);
+                _showSnackBar('Reel deleted successfully', isError: false);
+                refreshReels();
+              } catch (e) {
+                _showSnackBar('Failed to delete reel: $e', isError: true);
+              }
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFDC2626),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleArchiveReel(ReelData reel, int index) {
+    _showSnackBar('Archive feature coming soon');
+    // TODO: Implement archive functionality
+  }
+
+  void _handleToggleComments(ReelData reel, int index) {
+    _showSnackBar('Comment toggle coming soon');
+    // TODO: Implement comment enable/disable
+  }
+
+  void _handleToggleLikes(ReelData reel, int index) {
+    _showSnackBar('Like visibility toggle coming soon');
+    // TODO: Implement like visibility toggle
+  }
+
+  void _handleViewInsights(ReelData reel) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      isScrollControlled: true,
+      builder: (context) =>
+          CreatorInsightsSheet(reel: _convertToReelModel(reel)),
+    );
+  }
+
+  void _handleHideFromExplore(ReelData reel, int index) {
+    _showSnackBar('Explore visibility control coming soon');
+    // TODO: Implement explore feed visibility toggle
+  }
+
+  // ==================== VIEWER MODE HANDLERS ====================
+
+  void _handleReport(ReelData reel) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Report Reel'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildReportOption('Violence or dangerous content'),
+            _buildReportOption('Hate speech or symbols'),
+            _buildReportOption('Nudity or sexual activity'),
+            _buildReportOption('Spam or misleading'),
+            _buildReportOption('Harassment or bullying'),
+            _buildReportOption('False information'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportOption(String text) {
+    return InkWell(
+      onTap: () {
+        Navigator.pop(context);
+        _showSnackBar(
+          'Report submitted. Thank you for keeping our community safe.',
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Text(text, style: const TextStyle(fontSize: 15)),
+      ),
+    );
+  }
+
+  void _handleWhyAmISeeingThis() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Why am I seeing this?'),
+        content: const Text(
+          'You\'re seeing this reel based on:\n\n'
+          '• Your interests and activity\n'
+          '• Accounts you follow\n'
+          '• Popular content in your area\n'
+          '• Videos you\'ve liked or shared',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleInterested(ReelData reel, int index) {
+    _showSnackBar(
+      'Thanks! We\'ll show you more content like this.',
+      isError: false,
+    );
+    // TODO: Send preference to recommendation algorithm
+  }
+
+  void _handleNotInterested(ReelData reel, int index) {
+    _showSnackBar('We\'ll show you less content like this.', isError: false);
+    // TODO: Send preference to recommendation algorithm
+  }
+
+  void _handleCopyLink(ReelData reel) {
+    final link = 'https://syncup.app/reel/${reel.id}';
+    Clipboard.setData(ClipboardData(text: link));
+    _showSnackBar('Link copied to clipboard', isError: false);
+  }
+
+  // ==================== UTILITY ====================
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? const Color(0xFFDC2626) : null,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -717,194 +968,197 @@ class _ReelsPageNewState extends State<ReelsPageNew>
               ),
             ),
 
-          // Top Bar with Following/For You Toggle - Modern Glass Effect
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Container(
-                margin: const EdgeInsets.all(12),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withOpacity(0.2),
-                      Colors.white.withOpacity(0.1),
+          // Top Bar with Following/For You Toggle - Modern Glass Effect (Hide in profile mode)
+          if (!_isProfileMode)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Container(
+                  margin: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withOpacity(0.2),
+                        Colors.white.withOpacity(0.1),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(50),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(50),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Tab Toggle with Glass Pills
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(40),
-                      ),
-                      child: Row(
-                        children: [
-                          GestureDetector(
-                            onTap: () => _switchTab(true),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: _isFollowingTab
-                                    ? LinearGradient(
-                                        colors: [
-                                          Colors.white.withOpacity(0.4),
-                                          Colors.white.withOpacity(0.2),
-                                        ],
-                                      )
-                                    : null,
-                                borderRadius: BorderRadius.circular(40),
-                                border: _isFollowingTab
-                                    ? Border.all(
-                                        color: Colors.white.withOpacity(0.4),
-                                        width: 1,
-                                      )
-                                    : null,
-                              ),
-                              child: Text(
-                                'Following',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: _isFollowingTab
-                                      ? FontWeight.bold
-                                      : FontWeight.w500,
-                                  shadows: const [
-                                    Shadow(
-                                      color: Colors.black45,
-                                      blurRadius: 4,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => _switchTab(false),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: !_isFollowingTab
-                                    ? LinearGradient(
-                                        colors: [
-                                          Colors.white.withOpacity(0.4),
-                                          Colors.white.withOpacity(0.2),
-                                        ],
-                                      )
-                                    : null,
-                                borderRadius: BorderRadius.circular(40),
-                                border: !_isFollowingTab
-                                    ? Border.all(
-                                        color: Colors.white.withOpacity(0.4),
-                                        width: 1,
-                                      )
-                                    : null,
-                              ),
-                              child: Text(
-                                'For You',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: !_isFollowingTab
-                                      ? FontWeight.bold
-                                      : FontWeight.w500,
-                                  shadows: const [
-                                    Shadow(
-                                      color: Colors.black45,
-                                      blurRadius: 4,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // View Count with Glass Effect
-                    if (_currentReels.isNotEmpty)
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Tab Toggle with Glass Pills
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.black.withOpacity(0.4),
-                              Colors.black.withOpacity(0.2),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                            width: 1,
-                          ),
+                          color: Colors.black.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(40),
                         ),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              Icons.visibility_rounded,
-                              color: Colors.white.withOpacity(0.9),
-                              size: 16,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _formatViewCount(
-                                _isFollowingTab
-                                    ? _followingReels[_currentReelIndex].views
-                                    : _forYouReels[_currentReelIndex].views,
+                            GestureDetector(
+                              onTap: () => _switchTab(true),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: _isFollowingTab
+                                      ? LinearGradient(
+                                          colors: [
+                                            Colors.white.withOpacity(0.4),
+                                            Colors.white.withOpacity(0.2),
+                                          ],
+                                        )
+                                      : null,
+                                  borderRadius: BorderRadius.circular(40),
+                                  border: _isFollowingTab
+                                      ? Border.all(
+                                          color: Colors.white.withOpacity(0.4),
+                                          width: 1,
+                                        )
+                                      : null,
+                                ),
+                                child: Text(
+                                  'Following',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: _isFollowingTab
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    shadows: const [
+                                      Shadow(
+                                        color: Colors.black45,
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                shadows: [
-                                  Shadow(color: Colors.black45, blurRadius: 4),
-                                ],
+                            ),
+                            GestureDetector(
+                              onTap: () => _switchTab(false),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: !_isFollowingTab
+                                      ? LinearGradient(
+                                          colors: [
+                                            Colors.white.withOpacity(0.4),
+                                            Colors.white.withOpacity(0.2),
+                                          ],
+                                        )
+                                      : null,
+                                  borderRadius: BorderRadius.circular(40),
+                                  border: !_isFollowingTab
+                                      ? Border.all(
+                                          color: Colors.white.withOpacity(0.4),
+                                          width: 1,
+                                        )
+                                      : null,
+                                ),
+                                child: Text(
+                                  'For You',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: !_isFollowingTab
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    shadows: const [
+                                      Shadow(
+                                        color: Colors.black45,
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                  ],
+
+                      // View Count with Glass Effect
+                      if (_currentReels.isNotEmpty &&
+                          _currentReelIndex < _currentReels.length)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.black.withOpacity(0.4),
+                                Colors.black.withOpacity(0.2),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.visibility_rounded,
+                                color: Colors.white.withOpacity(0.9),
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _formatViewCount(
+                                  _currentReels[_currentReelIndex].views,
+                                ),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black45,
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -956,24 +1210,9 @@ class _ReelsPageNewState extends State<ReelsPageNew>
           Stack(
             fit: StackFit.expand,
             children: [
-              Image.network(
-                reel.videoUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.blue.shade900,
-                          Colors.purple.shade900,
-                          Colors.pink.shade700,
-                        ],
-                      ),
-                    ),
-                  );
-                },
+              ReelVideoPlayer(
+                videoUrl: reel.videoUrl,
+                isCurrentReel: _currentReelIndex == index,
               ),
               // Bottom Gradient for Readability
               Positioned(
@@ -1001,6 +1240,58 @@ class _ReelsPageNewState extends State<ReelsPageNew>
           // Floating Hearts Animation (from bottom)
           if (_currentReelIndex == index)
             Positioned.fill(child: FloatingReactions(key: _reactionsKey)),
+
+          // "Your Reel" Indicator (for creator mode)
+          if (_isOwnReel(reel))
+            Positioned(
+              top: 60,
+              left: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      kPrimary.withOpacity(0.9),
+                      const Color(0xFF7C3AED).withOpacity(0.9),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.5),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kPrimary.withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.stars_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Your Reel',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           // 2x Speed Indicator (when long pressing)
           if (_isLongPressing && _currentReelIndex == index)
@@ -1175,6 +1466,27 @@ class _ReelsPageNewState extends State<ReelsPageNew>
                   color: Colors.white,
                   onTap: () => _showMoreOptions(reel, index),
                 ),
+
+                // Creator Mode Button (only for own reels)
+                if (_isOwnReel(reel)) ...[
+                  const SizedBox(height: 24),
+                  _buildActionButton(
+                    icon: Icons.edit_outlined,
+                    count: '',
+                    color: const Color(0xFF7C3AED), // Purple color
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        barrierColor: Colors.black54,
+                        isScrollControlled: true,
+                        builder: (context) => CreatorInsightsSheet(
+                          reel: _convertToReelModel(reel),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
             ),
           ),
@@ -1381,6 +1693,57 @@ class _ReelsPageNewState extends State<ReelsPageNew>
               ],
             ),
           ),
+
+          // Creator Control Bar (only show for own reels)
+          if (_isOwnReel(reel))
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: CreatorControlBar(
+                reel: _convertToReelModel(reel),
+                onDelete: () {
+                  // TODO: Implement delete reel
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Delete feature coming soon')),
+                  );
+                },
+                onEditCaption: () {
+                  // TODO: Implement edit caption
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Caption updated')),
+                  );
+                },
+                onChangeCover: () {
+                  // TODO: Implement change cover
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Change cover coming soon')),
+                  );
+                },
+                onToggleComments: () {
+                  // TODO: Implement toggle comments
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Comments toggled')),
+                  );
+                },
+                onToggleLikes: () {
+                  // TODO: Implement toggle likes visibility
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Likes visibility toggled')),
+                  );
+                },
+                onViewInsights: () {
+                  showModalBottomSheet(
+                    context: context,
+                    backgroundColor: Colors.transparent,
+                    barrierColor: Colors.black54,
+                    isScrollControlled: true,
+                    builder: (context) =>
+                        CreatorInsightsSheet(reel: _convertToReelModel(reel)),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );

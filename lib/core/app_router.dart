@@ -19,6 +19,7 @@ import '../features/explore/explore_page.dart';
 import '../features/reels/reels_page_new.dart';
 import '../features/chat/chat_page.dart';
 import '../features/splash/splash_screen.dart';
+import '../features/settings/back_navigation_settings_page.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -91,6 +92,12 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/change-username',
       builder: (context, state) => const ChangeUsernamePage(),
+    ),
+
+    // Settings pages (standalone, no nav bar)
+    GoRoute(
+      path: '/back-navigation-settings',
+      builder: (context, state) => const BackNavigationSettingsPage(),
     ),
 
     // ShellRoute for all pages that HAVE the navigation bar

@@ -17,7 +17,8 @@ import 'models/post_model.dart' as profile_post;
 import 'pages/post_viewer_instagram_style.dart';
 import 'pages/profile_photo_viewer.dart';
 import '../settings/settings_home_page.dart';
-import '../reels/pages/reel_feed_page.dart';
+import '../reels/reels_page_new.dart';
+import '../stories/pages/story_archive_page.dart';
 import 'widgets/unified_post_options_sheet.dart';
 import 'widgets/shimmer_loading_grid.dart';
 
@@ -249,11 +250,8 @@ class _MyProfilePageState extends State<MyProfilePage>
   Widget _buildGlassmorphicHeader(BuildContext context, bool isDark) {
     final authProvider = context.watch<AuthProvider>();
     final currentUser = authProvider.currentUser;
-    final coverUrl =
-        currentUser?.coverPhotoUrl ??
-        'https://picsum.photos/seed/cover/1200/400';
-    final avatarUrl =
-        currentUser?.photoURL ?? 'https://i.pravatar.cc/300?img=13';
+    final coverUrl = currentUser?.coverPhotoUrl;
+    final avatarUrl = currentUser?.photoURL;
     final displayName =
         currentUser?.displayName ?? currentUser?.username ?? 'Your Name';
     final heroTag =
@@ -275,30 +273,43 @@ class _MyProfilePageState extends State<MyProfilePage>
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Use CachedNetworkImage for smooth transitions
-                  CachedNetworkImage(
-                    imageUrl: coverUrl,
-                    fit: BoxFit.cover,
-                    fadeInDuration: const Duration(milliseconds: 300),
-                    fadeOutDuration: const Duration(milliseconds: 200),
-                    placeholder: (context, url) => Container(
+                  // Show cover photo if exists, otherwise show empty state
+                  if (coverUrl != null && coverUrl.isNotEmpty)
+                    CachedNetworkImage(
+                      imageUrl: coverUrl,
+                      fit: BoxFit.cover,
+                      fadeInDuration: const Duration(milliseconds: 300),
+                      fadeOutDuration: const Duration(milliseconds: 200),
+                      placeholder: (context, url) => Container(
+                        color: isDark ? Colors.grey[850] : Colors.grey[200],
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: isDark ? Colors.grey[800] : Colors.grey[300],
+                        child: Icon(
+                          Icons.image_not_supported_outlined,
+                          size: 48,
+                          color: isDark ? Colors.white24 : Colors.grey[400],
+                        ),
+                      ),
+                    )
+                  else
+                    // Empty cover photo state
+                    Container(
                       color: isDark ? Colors.grey[850] : Colors.grey[200],
                       child: Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
+                        child: Icon(
+                          Icons.add_photo_alternate_outlined,
+                          size: 48,
+                          color: isDark ? Colors.white24 : Colors.grey[400],
                         ),
                       ),
                     ),
-                    errorWidget: (context, url, error) => Container(
-                      color: isDark ? Colors.grey[800] : Colors.grey[300],
-                      child: Icon(
-                        Icons.image_not_supported_outlined,
-                        size: 48,
-                        color: isDark ? Colors.white24 : Colors.grey[400],
-                      ),
-                    ),
-                  ),
                   // Gradient overlay
                   Container(
                     decoration: BoxDecoration(
@@ -324,6 +335,19 @@ class _MyProfilePageState extends State<MyProfilePage>
             top: 16,
             left: 16,
             child: _buildGlassIconButton(Icons.edit, isDark, _editCoverPhoto),
+          ),
+          // Archive Button (Top Right, next to Settings)
+          Positioned(
+            top: 16,
+            right: 72, // Position next to settings button
+            child: _buildGlassIconButton(Icons.archive_rounded, isDark, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const StoryArchivePage(),
+                ),
+              );
+            }),
           ),
           // Settings Button (Top Right)
           Positioned(
@@ -369,47 +393,71 @@ class _MyProfilePageState extends State<MyProfilePage>
                     color: isDark ? kDarkBackground : Colors.white,
                   ),
                   child: GestureDetector(
-                    onTap: () => _openProfilePhotoViewer(context, avatarUrl),
+                    onTap: avatarUrl != null && avatarUrl.isNotEmpty
+                        ? () => _openProfilePhotoViewer(context, avatarUrl)
+                        : null,
                     child: Hero(
                       tag: heroTag,
                       child: ClipOval(
-                        child: CachedNetworkImage(
-                          imageUrl: avatarUrl,
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.cover,
-                          fadeInDuration: const Duration(milliseconds: 300),
-                          fadeOutDuration: const Duration(milliseconds: 200),
-                          placeholder: (context, url) => Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              color: kPrimary.withOpacity(0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  kPrimary,
+                        child: avatarUrl != null && avatarUrl.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: avatarUrl,
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                                fadeInDuration: const Duration(
+                                  milliseconds: 300,
+                                ),
+                                fadeOutDuration: const Duration(
+                                  milliseconds: 200,
+                                ),
+                                placeholder: (context, url) => Container(
+                                  width: 100,
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                    color: kPrimary.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        kPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  width: 100,
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                    color: kPrimary.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.person_rounded,
+                                    size: 50,
+                                    color: kPrimary,
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                width: 100,
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.grey[800]
+                                      : Colors.grey[300],
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.person_rounded,
+                                  size: 50,
+                                  color: isDark
+                                      ? Colors.white24
+                                      : Colors.grey[600],
                                 ),
                               ),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              color: kPrimary.withOpacity(0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.person_rounded,
-                              size: 50,
-                              color: kPrimary,
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                   ),
@@ -620,7 +668,11 @@ class _MyProfilePageState extends State<MyProfilePage>
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildStatItem(
-              (currentUser?.postsCount ?? 0).toString(),
+              context
+                  .watch<PostProvider>()
+                  .getUserPosts(currentUser?.uid ?? '')
+                  .length
+                  .toString(),
               'Posts',
               isDark,
               () {
@@ -773,8 +825,8 @@ class _MyProfilePageState extends State<MyProfilePage>
           .toList();
     }
 
-    // Combine user posts and reels
-    final totalItems = userPosts.length + _userReels.length;
+    // FIXED: Show ONLY posts (no reels mixed in)
+    final totalItems = userPosts.length;
 
     if (totalItems == 0) {
       return Center(
@@ -830,23 +882,9 @@ class _MyProfilePageState extends State<MyProfilePage>
         childAspectRatio: 0.75,
       ),
       itemBuilder: (context, index) {
-        // Show reels first, then posts
-        if (index < _userReels.length) {
-          // This is a reel
-          final reel = _userReels[index];
-          return _buildReelGridItem(context, reel, isDark);
-        } else {
-          // This is a post
-          final postIndex = index - _userReels.length;
-          final post = userPosts[postIndex];
-          return _buildPostGridItem(
-            context,
-            post,
-            userPosts,
-            postIndex,
-            isDark,
-          );
-        }
+        // FIXED: Show ONLY posts (no reels)
+        final post = userPosts[index];
+        return _buildPostGridItem(context, post, userPosts, index, isDark);
       },
     );
   }
@@ -859,11 +897,14 @@ class _MyProfilePageState extends State<MyProfilePage>
       onTap: () {
         // Navigate to reel feed page with all user reels starting from this one
         final index = _userReels.indexWhere((r) => r.id == reel.id);
+        final authProvider = context.read<AuthProvider>();
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => ReelFeedPage(
-              initialReels: _userReels,
+            builder: (context) => ReelsPageNew(
+              initialUserReels: _userReels,
               initialIndex: index >= 0 ? index : 0,
+              isOwnProfile: true,
+              userId: authProvider.currentUserId,
             ),
           ),
         );
@@ -1109,30 +1150,12 @@ class _MyProfilePageState extends State<MyProfilePage>
                       ),
                     ),
                     child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            post.isVideo
-                                ? Icons.videocam_rounded
-                                : Icons.image_not_supported_outlined,
-                            size: context.rIconSize(48),
-                            color: isDark ? Colors.white24 : Colors.grey[400],
-                          ),
-                          if (post.isVideo) ...[
-                            SizedBox(height: context.rSpacing(8)),
-                            Text(
-                              'Video',
-                              style: TextStyle(
-                                color: isDark
-                                    ? Colors.white24
-                                    : Colors.grey[400],
-                                fontSize: context.rFontSize(12),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ],
+                      child: Icon(
+                        post.isVideo
+                            ? Icons.videocam_rounded
+                            : Icons.image_not_supported_outlined,
+                        size: context.rIconSize(48),
+                        color: isDark ? Colors.white24 : Colors.grey[400],
                       ),
                     ),
                   ),
@@ -1334,10 +1357,15 @@ class _MyProfilePageState extends State<MyProfilePage>
         return GestureDetector(
           onTap: () {
             // Navigate to reel feed page starting from this reel
+            final authProvider = context.read<AuthProvider>();
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) =>
-                    ReelFeedPage(initialReels: _userReels, initialIndex: index),
+                builder: (context) => ReelsPageNew(
+                  initialUserReels: _userReels,
+                  initialIndex: index,
+                  isOwnProfile: true,
+                  userId: authProvider.currentUserId,
+                ),
               ),
             );
           },

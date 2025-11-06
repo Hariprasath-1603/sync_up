@@ -429,6 +429,7 @@ class _PostCardState extends State<PostCard> {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
+        barrierColor: Colors.black54,
         builder: (sheetContext) => _CommentsSheet(
           comments: _comments,
           onSubmit: (value) {
@@ -440,22 +441,7 @@ class _PostCardState extends State<PostCard> {
                   timestamp: DateTime.now(),
                   likes: 0,
                   isLiked: false,
-                  replies: _comments.isEmpty
-                      ? [
-                          _Comment(
-                            text: 'Great comment!',
-                            timestamp: DateTime.now().subtract(
-                              const Duration(minutes: 5),
-                            ),
-                          ),
-                          _Comment(
-                            text: 'I agree with this',
-                            timestamp: DateTime.now().subtract(
-                              const Duration(minutes: 10),
-                            ),
-                          ),
-                        ]
-                      : null,
+                  // REMOVED: No more nested replies
                 ),
               );
               _commentCount += 1;
@@ -475,9 +461,8 @@ class _PostCardState extends State<PostCard> {
     showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
-      backgroundColor:
-          Theme.of(context).bottomSheetTheme.backgroundColor ??
-          Theme.of(context).colorScheme.surface,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
       builder: (context) => _ShareSheet(
         imageUrl: post.imageUrl,
         userName: post.userName,
@@ -544,6 +529,7 @@ class _PostCardState extends State<PostCard> {
       backgroundColor:
           Theme.of(context).bottomSheetTheme.backgroundColor ??
           Theme.of(context).colorScheme.surface,
+      barrierColor: Colors.black54,
       builder: (context) =>
           _PostOptionsSheet(onDismissed: () => navVisibility?.value = true),
     ).whenComplete(() => navVisibility?.value = true);
@@ -660,14 +646,12 @@ class _Comment {
     required this.timestamp,
     this.likes = 0,
     this.isLiked = false,
-    List<_Comment>? replies,
-  }) : replies = replies ?? [];
+  });
 
   final String text;
   final DateTime timestamp;
   int likes;
   bool isLiked;
-  final List<_Comment> replies;
 }
 
 class _CommentsSheet extends StatefulWidget {
@@ -682,10 +666,6 @@ class _CommentsSheet extends StatefulWidget {
 
 class _CommentsSheetState extends State<_CommentsSheet> {
   late final TextEditingController _controller;
-  late final TextEditingController _replyController;
-  final Map<int, bool> _expandedReplies = {};
-  int? _replyingToIndex;
-  String? _replyingToUsername;
 
   List<_Comment> get comments => widget.comments;
 
@@ -693,47 +673,12 @@ class _CommentsSheetState extends State<_CommentsSheet> {
   void initState() {
     super.initState();
     _controller = TextEditingController();
-    _replyController = TextEditingController();
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _replyController.dispose();
     super.dispose();
-  }
-
-  void _startReply(int index) {
-    setState(() {
-      _replyingToIndex = index;
-      _replyingToUsername = 'User'; // In real app, get from comment data
-      _expandedReplies[index] = true; // Auto-expand to see where reply will go
-    });
-    // Focus on reply input
-    FocusScope.of(context).requestFocus(FocusNode());
-  }
-
-  void _cancelReply() {
-    setState(() {
-      _replyingToIndex = null;
-      _replyingToUsername = null;
-      _replyController.clear();
-    });
-  }
-
-  void _submitReply() {
-    if (_replyController.text.trim().isEmpty || _replyingToIndex == null) {
-      return;
-    }
-
-    setState(() {
-      comments[_replyingToIndex!].replies.add(
-        _Comment(text: _replyController.text.trim(), timestamp: DateTime.now()),
-      );
-      _replyController.clear();
-      _replyingToIndex = null;
-      _replyingToUsername = null;
-    });
   }
 
   @override
@@ -803,14 +748,6 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                                 : -1;
                           });
                         },
-                        onToggleReplies: () {
-                          setState(() {
-                            _expandedReplies[index] =
-                                !(_expandedReplies[index] ?? false);
-                          });
-                        },
-                        isExpanded: _expandedReplies[index] ?? false,
-                        onReply: () => _startReply(index),
                       ),
                     ),
             ),
@@ -819,101 +756,40 @@ class _CommentsSheetState extends State<_CommentsSheet> {
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                child: Row(
                   children: [
-                    // Show replying-to banner if replying
-                    if (_replyingToIndex != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          color: isDark
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _handleSubmit(context),
+                        maxLines: null,
+                        decoration: InputDecoration(
+                          hintText: 'Write a comment...',
+                          filled: true,
+                          fillColor: isDark
                               ? Colors.white.withOpacity(0.05)
                               : Colors.grey.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Replying to $_replyingToUsername',
-                                style: TextStyle(
-                                  color: isDark
-                                      ? Colors.grey
-                                      : Colors.grey.shade600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: _cancelReply,
-                              child: Icon(
-                                Icons.close,
-                                size: 18,
-                                color: isDark
-                                    ? Colors.grey
-                                    : Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          isDense: true,
                         ),
                       ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _replyingToIndex != null
-                                ? _replyController
-                                : _controller,
-                            textInputAction: TextInputAction.send,
-                            onSubmitted: (_) {
-                              if (_replyingToIndex != null) {
-                                _submitReply();
-                              } else {
-                                _handleSubmit(context);
-                              }
-                            },
-                            maxLines: null,
-                            decoration: InputDecoration(
-                              hintText: _replyingToIndex != null
-                                  ? 'Write a reply...'
-                                  : 'Write a comment...',
-                              filled: true,
-                              fillColor: isDark
-                                  ? Colors.white.withOpacity(0.05)
-                                  : Colors.grey.withOpacity(0.1),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(24),
-                                borderSide: BorderSide.none,
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton.filled(
-                          onPressed: () {
-                            if (_replyingToIndex != null) {
-                              _submitReply();
-                            } else {
-                              _handleSubmit(context);
-                            }
-                          },
-                          icon: const Icon(Icons.send_rounded),
-                          style: IconButton.styleFrom(
-                            backgroundColor: theme.colorScheme.primary,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ],
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filled(
+                      onPressed: () => _handleSubmit(context),
+                      icon: const Icon(Icons.send_rounded),
+                      style: IconButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: Colors.white,
+                      ),
                     ),
                   ],
                 ),
@@ -1111,19 +987,10 @@ class _SheetOption {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({
-    required this.comment,
-    required this.onLike,
-    required this.onToggleReplies,
-    required this.isExpanded,
-    required this.onReply,
-  });
+  const _CommentTile({required this.comment, required this.onLike});
 
   final _Comment comment;
   final VoidCallback onLike;
-  final VoidCallback onToggleReplies;
-  final VoidCallback onReply;
-  final bool isExpanded;
 
   String _getTimeAgo(DateTime timestamp) {
     final now = DateTime.now();
@@ -1230,27 +1097,6 @@ class _CommentTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        InkWell(
-                          onTap: onReply,
-                          borderRadius: BorderRadius.circular(4),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
-                            ),
-                            child: Text(
-                              'Reply',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: isDark
-                                    ? Colors.grey
-                                    : Colors.grey.shade600,
-                              ),
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ],
@@ -1258,109 +1104,6 @@ class _CommentTile extends StatelessWidget {
               ),
             ],
           ),
-          if (comment.replies.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.only(left: 42),
-              child: InkWell(
-                onTap: onToggleReplies,
-                borderRadius: BorderRadius.circular(4),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 4,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isExpanded
-                            ? Icons.keyboard_arrow_up
-                            : Icons.keyboard_arrow_down,
-                        size: 16,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        isExpanded
-                            ? 'Hide replies'
-                            : 'Show ${comment.replies.length} ${comment.replies.length == 1 ? 'reply' : 'replies'}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            if (isExpanded) ...[
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.only(left: 42),
-                child: Column(
-                  children: comment.replies
-                      .map(
-                        (reply) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              CircleAvatar(
-                                radius: 14,
-                                backgroundColor: theme.colorScheme.primary
-                                    .withOpacity(0.7),
-                                child: const Icon(
-                                  Icons.person,
-                                  size: 14,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Text(
-                                          'User',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          _getTimeAgo(reply.timestamp),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: isDark
-                                                ? Colors.grey
-                                                : Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      reply.text,
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ],
-          ],
         ],
       ),
     );

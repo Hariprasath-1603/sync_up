@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -10,6 +11,11 @@ import '../widgets/reel_info_overlay.dart';
 import '../widgets/reel_comments_sheet.dart';
 import '../../profile/other_user_profile_page.dart';
 
+final GlobalKey<_ReelFeedPageState> reelFeedPageKey =
+    GlobalKey<_ReelFeedPageState>();
+
+enum _FeedTab { forYou, following }
+
 /// Main reel feed page with vertical scrolling TikTok-style interface
 ///
 /// Supports two modes:
@@ -18,6 +24,7 @@ import '../../profile/other_user_profile_page.dart';
 class ReelFeedPage extends StatefulWidget {
   final List<ReelModel>? initialReels;
   final int? initialIndex;
+  final String? initialReelId;
 
   /// If true, shows profile reels mode with edit/delete controls
   final bool isOwnProfile;
@@ -29,6 +36,7 @@ class ReelFeedPage extends StatefulWidget {
     super.key,
     this.initialReels,
     this.initialIndex,
+    this.initialReelId,
     this.isOwnProfile = false,
     this.userId,
   });
@@ -47,13 +55,41 @@ class _ReelFeedPageState extends State<ReelFeedPage> {
   bool _isLoading = true;
   bool _hasMore = true;
   bool _isLoadingMore = false;
+  final Map<_FeedTab, List<ReelModel>> _feedCache = {
+    _FeedTab.forYou: <ReelModel>[],
+    _FeedTab.following: <ReelModel>[],
+  };
+  bool _hasMoreForYou = true;
+  bool _hasMoreFollowing = true;
+  bool _isLoadingMoreForYou = false;
+  bool _isLoadingMoreFollowing = false;
+  _FeedTab _activeTab = _FeedTab.forYou;
+  bool _initialReelHandled = false;
+  double _verticalDragDistance = 0;
+  static const double _profileDismissThreshold = 120;
 
   // Real-time subscription
   RealtimeChannel? _reelChannel;
 
+  bool get _isProfileMode => widget.isOwnProfile;
+
+  bool get _hasMoreCurrentFeed => _isProfileMode
+      ? _hasMore
+      : (_activeTab == _FeedTab.following ? _hasMoreFollowing : _hasMoreForYou);
+
+  bool get _isLoadingMoreCurrentFeed => _isProfileMode
+      ? _isLoadingMore
+      : (_activeTab == _FeedTab.following
+            ? _isLoadingMoreFollowing
+            : _isLoadingMoreForYou);
+
   @override
   void initState() {
     super.initState();
+
+    if (!_isProfileMode) {
+      _reels = _feedCache[_activeTab]!;
+    }
 
     // Set to fullscreen immersive mode
     SystemChrome.setEnabledSystemUIMode(
@@ -82,82 +118,198 @@ class _ReelFeedPageState extends State<ReelFeedPage> {
   }
 
   Future<void> _initializeReels() async {
-    if (widget.initialReels != null) {
-      setState(() {
-        _reels = widget.initialReels!;
-        _currentIndex = widget.initialIndex ?? 0;
-        _isLoading = false;
-      });
+    final initial = widget.initialReels;
+    if (initial != null && initial.isNotEmpty) {
+      final copied = List<ReelModel>.from(initial);
+      final int initialIndex = (widget.initialIndex ?? 0)
+          .clamp(0, copied.length - 1)
+          .toInt();
+      if (_isProfileMode) {
+        setState(() {
+          _reels = copied;
+          _currentIndex = initialIndex;
+          _isLoading = false;
+        });
+      } else {
+        final forYouList = _feedCache[_FeedTab.forYou]!;
+        forYouList
+          ..clear()
+          ..addAll(copied);
+        setState(() {
+          _reels = forYouList;
+          _currentIndex = initialIndex;
+          _isLoading = false;
+        });
 
-      if (_pageController.hasClients) {
-        _pageController.jumpToPage(_currentIndex);
+        // Eagerly prime following tab in background so it's ready when user switches
+        unawaited(_loadReels(feedTab: _FeedTab.following));
       }
 
-      // Check liked status for initial reels
-      _checkLikedStatus();
-    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(_currentIndex);
+        }
+        _maybeJumpToInitialReel();
+      });
+
+      if (_reels.isNotEmpty) {
+        _reelService.recordView(_reels[_currentIndex].id);
+      }
+
+      _checkLikedStatus(target: copied);
+      return;
+    }
+
+    if (_isProfileMode) {
       await _loadReels();
+    } else {
+      await _loadReels(feedTab: _activeTab);
     }
   }
 
-  Future<void> _loadReels({bool refresh = false}) async {
-    if (!refresh && _isLoadingMore) return;
+  Future<void> _loadReels({bool refresh = false, _FeedTab? feedTab}) async {
+    const limit = 10;
 
-    setState(() {
-      if (refresh) {
-        _isLoading = true;
-      } else {
-        _isLoadingMore = true;
-      }
-    });
+    if (_isProfileMode) {
+      if (!refresh && _isLoadingMore) return;
 
-    try {
-      final offset = refresh ? 0 : _reels.length;
-      final List<ReelModel> newReels;
+      setState(() {
+        if (refresh || _reels.isEmpty) {
+          _isLoading = true;
+        } else {
+          _isLoadingMore = true;
+        }
+      });
 
-      // Fetch reels based on mode
-      if (widget.isOwnProfile && widget.userId != null) {
-        // Profile mode: Fetch only user's reels
-        newReels = await _reelService.fetchUserReels(
-          userId: widget.userId!,
-          limit: 10,
+      try {
+        final userId =
+            widget.userId ?? Supabase.instance.client.auth.currentUser?.id;
+        if (userId == null) {
+          throw Exception('User not logged in');
+        }
+
+        final offset = refresh ? 0 : _reels.length;
+        final newReels = await _reelService.fetchUserReels(
+          userId: userId,
+          limit: limit,
           offset: offset,
         );
-      } else {
-        // Global feed mode: Fetch all reels
-        newReels = await _reelService.fetchFeedReels(limit: 10, offset: offset);
-      }
 
-      if (mounted) {
+        if (!mounted) return;
+
         setState(() {
           if (refresh) {
-            _reels = newReels;
+            _reels = List<ReelModel>.from(newReels);
             _currentIndex = 0;
           } else {
             _reels.addAll(newReels);
           }
 
-          _hasMore = newReels.length >= 10;
+          _hasMore = newReels.length >= limit;
           _isLoading = false;
           _isLoadingMore = false;
         });
 
-        // Check liked status for new reels
-        _checkLikedStatus();
+        await _checkLikedStatus(target: newReels);
+        _maybeJumpToInitialReel();
+        if ((refresh || offset == 0) && _reels.isNotEmpty) {
+          _reelService.recordView(_reels.first.id);
+        }
+      } catch (e) {
+        debugPrint('❌ Error loading profile reels: $e');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _isLoadingMore = false;
+          });
+        }
+      }
+      return;
+    }
+
+    final targetTab = feedTab ?? _activeTab;
+    final isFollowing = targetTab == _FeedTab.following;
+    final targetList = _feedCache[targetTab]!;
+
+    if (!refresh) {
+      if (isFollowing && _isLoadingMoreFollowing) return;
+      if (!isFollowing && _isLoadingMoreForYou) return;
+    }
+
+    setState(() {
+      if (refresh || targetList.isEmpty) {
+        _isLoading = true;
+      } else if (isFollowing) {
+        _isLoadingMoreFollowing = true;
+      } else {
+        _isLoadingMoreForYou = true;
+      }
+    });
+
+    try {
+      final offset = refresh ? 0 : targetList.length;
+      final newReels = isFollowing
+          ? await _reelService.fetchFollowingReels(limit: limit, offset: offset)
+          : await _reelService.fetchFeedReels(limit: limit, offset: offset);
+
+      if (!mounted) return;
+
+      setState(() {
+        if (refresh) {
+          targetList
+            ..clear()
+            ..addAll(newReels);
+          if (targetTab == _activeTab) {
+            _reels = targetList;
+            _currentIndex = 0;
+            if (_pageController.hasClients) {
+              _pageController.jumpToPage(0);
+            }
+          }
+        } else {
+          targetList.addAll(newReels);
+          if (targetTab == _activeTab) {
+            _reels = targetList;
+          }
+        }
+
+        if (isFollowing) {
+          _hasMoreFollowing = newReels.length >= limit;
+          _isLoadingMoreFollowing = false;
+        } else {
+          _hasMoreForYou = newReels.length >= limit;
+          _isLoadingMoreForYou = false;
+        }
+
+        _isLoading = false;
+      });
+
+      await _checkLikedStatus(target: newReels);
+      _maybeJumpToInitialReel();
+      if ((refresh || offset == 0) &&
+          targetTab == _activeTab &&
+          targetList.isNotEmpty) {
+        _reelService.recordView(targetList.first.id);
       }
     } catch (e) {
-      debugPrint('❌ Error loading reels: $e');
+      debugPrint('❌ Error loading feed reels: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _isLoadingMore = false;
+          if (isFollowing) {
+            _isLoadingMoreFollowing = false;
+          } else {
+            _isLoadingMoreForYou = false;
+          }
         });
       }
     }
   }
 
-  Future<void> _checkLikedStatus() async {
-    for (final reel in _reels) {
+  Future<void> _checkLikedStatus({List<ReelModel>? target}) async {
+    final reelsToCheck = target ?? _reels;
+    for (final reel in reelsToCheck) {
+      if (_likedReels.contains(reel.id)) continue;
       final isLiked = await _reelService.hasLikedReel(reel.id);
       if (isLiked && mounted) {
         setState(() {
@@ -187,17 +339,52 @@ class _ReelFeedPageState extends State<ReelFeedPage> {
     final updatedData = payload.newRecord;
     final reelId = updatedData['id'] as String;
 
-    // Find and update the reel in the list
-    final index = _reels.indexWhere((r) => r.id == reelId);
-    if (index != -1 && mounted) {
-      setState(() {
-        _reels[index] = _reels[index].copyWith(
-          likesCount: updatedData['likes_count'] as int?,
-          commentsCount: updatedData['comments_count'] as int?,
-          sharesCount: updatedData['shares_count'] as int?,
-          viewsCount: updatedData['views_count'] as int?,
+    if (!mounted) return;
+
+    setState(() {
+      _updateCachedReel(reelId, updatedData);
+    });
+  }
+
+  void _updateCachedReel(String reelId, Map<String, dynamic> updatedData) {
+    void updateList(List<ReelModel> list) {
+      final index = list.indexWhere((r) => r.id == reelId);
+      if (index != -1) {
+        list[index] = list[index].copyWith(
+          likesCount:
+              (updatedData['likes_count'] as int?) ?? list[index].likesCount,
+          commentsCount:
+              (updatedData['comments_count'] as int?) ??
+              list[index].commentsCount,
+          sharesCount:
+              (updatedData['shares_count'] as int?) ?? list[index].sharesCount,
+          viewsCount:
+              (updatedData['views_count'] as int?) ?? list[index].viewsCount,
         );
-      });
+      }
+    }
+
+    updateList(_reels);
+    if (!_isProfileMode) {
+      updateList(_feedCache[_FeedTab.forYou]!);
+      updateList(_feedCache[_FeedTab.following]!);
+      _reels = _feedCache[_activeTab]!;
+    }
+  }
+
+  void _replaceReel(ReelModel updated) {
+    void updateList(List<ReelModel> list) {
+      final index = list.indexWhere((r) => r.id == updated.id);
+      if (index != -1) {
+        list[index] = updated;
+      }
+    }
+
+    updateList(_reels);
+    if (!_isProfileMode) {
+      updateList(_feedCache[_FeedTab.forYou]!);
+      updateList(_feedCache[_FeedTab.following]!);
+      _reels = _feedCache[_activeTab]!;
     }
   }
 
@@ -215,8 +402,14 @@ class _ReelFeedPageState extends State<ReelFeedPage> {
       }
 
       // Load more reels when near the end
-      if (page >= _reels.length - 3 && _hasMore && !_isLoadingMore) {
-        _loadReels();
+      if (page >= _reels.length - 3 &&
+          _hasMoreCurrentFeed &&
+          !_isLoadingMoreCurrentFeed) {
+        if (_isProfileMode) {
+          _loadReels();
+        } else {
+          _loadReels(feedTab: _activeTab);
+        }
       }
     }
   }
@@ -226,19 +419,18 @@ class _ReelFeedPageState extends State<ReelFeedPage> {
 
     // Optimistic UI update
     setState(() {
+      final updated = reel.copyWith(
+        likesCount: isLiked ? reel.likesCount - 1 : reel.likesCount + 1,
+      );
+
       if (isLiked) {
         _likedReels.remove(reel.id);
-        reel = reel.copyWith(likesCount: reel.likesCount - 1);
       } else {
         _likedReels.add(reel.id);
-        reel = reel.copyWith(likesCount: reel.likesCount + 1);
       }
 
-      // Update in list
-      final index = _reels.indexWhere((r) => r.id == reel.id);
-      if (index != -1) {
-        _reels[index] = reel;
-      }
+      _replaceReel(updated);
+      reel = updated;
     });
 
     // Send to backend
@@ -251,16 +443,11 @@ class _ReelFeedPageState extends State<ReelFeedPage> {
       setState(() {
         if (isLiked) {
           _likedReels.add(reel.id);
-          reel = reel.copyWith(likesCount: reel.likesCount + 1);
         } else {
           _likedReels.remove(reel.id);
-          reel = reel.copyWith(likesCount: reel.likesCount - 1);
         }
 
-        final index = _reels.indexWhere((r) => r.id == reel.id);
-        if (index != -1) {
-          _reels[index] = reel;
-        }
+        _replaceReel(reel);
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -275,15 +462,11 @@ class _ReelFeedPageState extends State<ReelFeedPage> {
   Future<void> _openComments(ReelModel reel) async {
     await ReelCommentsSheet.show(context, reel.id);
 
-    // Refresh reel to update comment count
-    final updatedReels = await _reelService.fetchFeedReels(limit: 1, offset: 0);
-    if (updatedReels.isNotEmpty && mounted) {
-      final index = _reels.indexWhere((r) => r.id == reel.id);
-      if (index != -1) {
-        setState(() {
-          _reels[index] = updatedReels.first;
-        });
-      }
+    final updatedReel = await _reelService.fetchReelById(reel.id);
+    if (updatedReel != null && mounted) {
+      setState(() {
+        _replaceReel(updatedReel);
+      });
     }
   }
 
@@ -300,9 +483,10 @@ class _ReelFeedPageState extends State<ReelFeedPage> {
           final index = _reels.indexWhere((r) => r.id == reel.id);
           if (index != -1 && mounted) {
             setState(() {
-              _reels[index] = _reels[index].copyWith(
+              final updated = _reels[index].copyWith(
                 sharesCount: _reels[index].sharesCount + 1,
               );
+              _replaceReel(updated);
             });
           }
         },
@@ -478,7 +662,7 @@ class _ReelFeedPageState extends State<ReelFeedPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (_isLoading && _reels.isEmpty) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: Center(
@@ -490,145 +674,369 @@ class _ReelFeedPageState extends State<ReelFeedPage> {
     }
 
     if (_reels.isEmpty) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.video_library_outlined,
-                  size: 80,
-                  color: Colors.white54,
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'No reels available',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Be the first to create a reel!',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    // Navigate to create reel page
-                    // TODO: Implement navigation
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Create Reel'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
+      return _buildEmptyState(context);
+    }
+
+    Widget pageView = PageView.builder(
+      controller: _pageController,
+      scrollDirection: _isProfileMode ? Axis.horizontal : Axis.vertical,
+      itemCount: _reels.length + (_hasMoreCurrentFeed ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index >= _reels.length) {
+          return const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          );
+        }
+
+        final reel = _reels[index];
+        final isCurrentReel = index == _currentIndex;
+        final isLiked = _likedReels.contains(reel.id);
+
+        Widget videoPlayer = ReelVideoPlayer(
+          videoUrl: reel.videoUrl,
+          isCurrentReel: isCurrentReel,
+        );
+
+        if (_isProfileMode) {
+          videoPlayer = Hero(tag: 'reel_${reel.id}', child: videoPlayer);
+        }
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            videoPlayer,
+            GestureDetector(
+              onDoubleTap: () {
+                if (!isLiked) {
+                  _toggleLike(reel);
+                  _showLikeAnimation();
+                }
+              },
+              child: Container(color: Colors.transparent),
+            ),
+            ReelInfoOverlay(
+              reel: reel,
+              onUsernameTap: () => _navigateToProfile(reel.userId),
+            ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              top: 0,
+              child: widget.isOwnProfile
+                  ? _buildProfileModeControls(reel)
+                  : ReelActionButtons(
+                      reel: reel,
+                      isLiked: isLiked,
+                      onLikeTap: () => _toggleLike(reel),
+                      onCommentTap: () => _openComments(reel),
+                      onShareTap: () => _shareReel(reel),
+                      onProfileTap: () => _navigateToProfile(reel.userId),
                     ),
+            ),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: Colors.white,
+                    shadows: [Shadow(color: Colors.black, blurRadius: 8)],
                   ),
                 ),
-              ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (_isProfileMode) {
+      pageView = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onVerticalDragUpdate: _handleProfileVerticalDragUpdate,
+        onVerticalDragEnd: _handleProfileVerticalDragEnd,
+        child: pageView,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(children: [pageView, if (!_isProfileMode) _buildFeedTabs()]),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final headline = _isProfileMode ? 'No reels yet' : 'No reels available';
+    final subtitle = _isProfileMode
+        ? 'Create your first reel to showcase on your profile.'
+        : 'Be the first to create a reel!';
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.video_library_outlined,
+                size: 80,
+                color: Colors.white54,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                headline,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () {
+                  // TODO: Implement navigation to reel creation flow
+                },
+                icon: const Icon(Icons.add),
+                label: Text(_isProfileMode ? 'Create Reel' : 'Upload Reel'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeedTabs() {
+    final isFollowing = _activeTab == _FeedTab.following;
+    final hasCurrent = _currentIndex >= 0 && _currentIndex < _reels.length;
+    final viewsLabel = hasCurrent
+        ? _formatCount(_reels[_currentIndex].viewsCount)
+        : '0';
+
+    Widget buildTab(String label, _FeedTab tab, bool selected) {
+      return GestureDetector(
+        onTap: () => _switchFeed(tab),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: selected
+                ? LinearGradient(
+                    colors: [
+                      Colors.white.withOpacity(0.4),
+                      Colors.white.withOpacity(0.2),
+                    ],
+                  )
+                : null,
+            borderRadius: BorderRadius.circular(40),
+            border: selected
+                ? Border.all(color: Colors.white.withOpacity(0.4), width: 1)
+                : null,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+              shadows: const [Shadow(color: Colors.black45, blurRadius: 4)],
             ),
           ),
         ),
       );
     }
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: PageView.builder(
-        controller: _pageController,
-        scrollDirection: Axis.vertical,
-        itemCount: _reels.length + (_hasMore ? 1 : 0),
-        onPageChanged: (index) {
-          // This is handled by _onPageScroll listener
-        },
-        itemBuilder: (context, index) {
-          // Show loading indicator at the end
-          if (index >= _reels.length) {
-            return const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withOpacity(0.2),
+                  Colors.white.withOpacity(0.1),
+                ],
               ),
-            );
-          }
-
-          final reel = _reels[index];
-          final isCurrentReel = index == _currentIndex;
-          final isLiked = _likedReels.contains(reel.id);
-
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              // Video Player
-              ReelVideoPlayer(
-                videoUrl: reel.videoUrl,
-                isCurrentReel: isCurrentReel,
+              borderRadius: BorderRadius.circular(50),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.3),
+                width: 1.5,
               ),
-
-              // Double tap to like overlay
-              GestureDetector(
-                onDoubleTap: () {
-                  if (!isLiked) {
-                    _toggleLike(reel);
-                    _showLikeAnimation();
-                  }
-                },
-                child: Container(color: Colors.transparent),
-              ),
-
-              // Reel Info Overlay (bottom left)
-              ReelInfoOverlay(
-                reel: reel,
-                onUsernameTap: () => _navigateToProfile(reel.userId),
-              ),
-
-              // Action Buttons (right side) - conditional based on mode
-              Positioned(
-                right: 0,
-                bottom: 0,
-                top: 0,
-                child: widget.isOwnProfile
-                    ? _buildProfileModeControls(reel)
-                    : ReelActionButtons(
-                        reel: reel,
-                        isLiked: isLiked,
-                        onLikeTap: () => _toggleLike(reel),
-                        onCommentTap: () => _openComments(reel),
-                        onShareTap: () => _shareReel(reel),
-                        onProfileTap: () => _navigateToProfile(reel.userId),
-                      ),
-              ),
-
-              // Back button (top left)
-              SafeArea(
-                child: Positioned(
-                  top: 16,
-                  left: 16,
-                  child: IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: Colors.white,
-                      shadows: [Shadow(color: Colors.black, blurRadius: 8)],
-                    ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(40),
+                  ),
+                  child: Row(
+                    children: [
+                      buildTab('Following', _FeedTab.following, isFollowing),
+                      buildTab('For You', _FeedTab.forYou, !isFollowing),
+                    ],
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+                if (_reels.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.black.withOpacity(0.4),
+                          Colors.black.withOpacity(0.2),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.visibility_rounded,
+                          color: Colors.white.withOpacity(0.9),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          viewsLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(color: Colors.black45, blurRadius: 4),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
+  }
+
+  void _switchFeed(_FeedTab tab) {
+    if (_activeTab == tab) return;
+    final targetList = _feedCache[tab]!;
+    setState(() {
+      _activeTab = tab;
+      _reels = targetList;
+      _currentIndex = 0;
+      if (targetList.isEmpty) {
+        _isLoading = true;
+      }
+    });
+
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
+
+    if (targetList.isEmpty) {
+      _loadReels(feedTab: tab, refresh: true);
+    } else {
+      _reelService.recordView(targetList.first.id);
+    }
+  }
+
+  void _handleProfileVerticalDragUpdate(DragUpdateDetails details) {
+    if (!_isProfileMode) return;
+    if (details.delta.dy > 0) {
+      _verticalDragDistance += details.delta.dy;
+    } else {
+      _verticalDragDistance = 0;
+    }
+  }
+
+  void _handleProfileVerticalDragEnd(DragEndDetails details) {
+    if (!_isProfileMode) return;
+    if (_verticalDragDistance > _profileDismissThreshold) {
+      Navigator.of(context).maybePop();
+    }
+    _verticalDragDistance = 0;
+  }
+
+  void _maybeJumpToInitialReel() {
+    if (_initialReelHandled || widget.initialReelId == null) return;
+    final index = _reels.indexWhere((r) => r.id == widget.initialReelId);
+    if (index == -1) return;
+    _initialReelHandled = true;
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(index);
+    }
+    if (mounted) {
+      setState(() {
+        _currentIndex = index;
+      });
+    } else {
+      _currentIndex = index;
+    }
+    _reelService.recordView(_reels[index].id);
+  }
+
+  String _formatCount(int count) {
+    if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    }
+    if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    }
+    return count.toString();
+  }
+
+  Future<void> refreshReels({_FeedTab? tab}) async {
+    if (_isProfileMode) {
+      await _loadReels(refresh: true);
+    } else {
+      await _loadReels(refresh: true, feedTab: tab ?? _activeTab);
+    }
   }
 
   /// Build profile mode control buttons (edit, insights, archive, delete)

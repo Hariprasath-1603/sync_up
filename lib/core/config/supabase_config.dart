@@ -11,4 +11,5 @@ class SupabaseConfig {
   static const String coverPhotosBucket = 'profile-photos';
   static const String postsBucket = 'posts';
   static const String storiesBucket = 'stories';
+  static const String reelsBucket = 'reels';
 }

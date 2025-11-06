@@ -63,11 +63,11 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
                 valueListenable: _navIsVisible,
                 builder: (context, isVisible, _) {
                   return AnimatedSlide(
-                    duration: const Duration(milliseconds: 220),
+                    duration: const Duration(milliseconds: 300),
                     curve: Curves.easeOutCubic,
                     offset: isVisible ? Offset.zero : const Offset(0, 0.1),
                     child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 180),
+                      duration: const Duration(milliseconds: 300),
                       curve: Curves.easeInOut,
                       opacity: isVisible ? 1 : 0,
                       child: IgnorePointer(

@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/scaffold_with_nav_bar.dart';
 import '../../core/theme.dart';
 import '../../core/providers/post_provider.dart';
 import 'models/post_model.dart';
 import 'widgets/custom_header.dart';
-import 'widgets/stories_section_new.dart';
 import 'widgets/live_section.dart';
 import 'widgets/post_card.dart';
-import '../stories/storyverse_page.dart';
+import '../stories/widgets/dynamic_story_row.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,15 +17,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedTabIndex = 1; // 0 = Following, 1 = For You
-  bool _isStoryExperienceVisible = false;
-  StoryVerseStage _storyExperienceStage = StoryVerseStage.capture;
-  StoryVerseMode _storyCaptureMode = StoryVerseMode.photo;
-  StoryVerseStory? _storyToView;
-  ValueNotifier<bool>? _navVisibility;
-
-  // Stories data - Load from database
-  // TODO: Implement story loading service
-  final List<StoryVerseStory> _stories = [];
 
   @override
   void initState() {
@@ -37,7 +26,6 @@ class _HomePageState extends State<HomePage> {
       final postProvider = context.read<PostProvider>();
       postProvider.loadForYouPosts();
       postProvider.loadFollowingPosts();
-      // TODO: Load stories from database
     });
   }
 
@@ -48,53 +36,6 @@ class _HomePageState extends State<HomePage> {
       return '${(count / 1000).toStringAsFixed(1)}K';
     }
     return count.toString();
-  }
-
-  void _openStoryCapture(StoryVerseMode mode) {
-    setState(() {
-      _storyCaptureMode = mode;
-      _storyExperienceStage = StoryVerseStage.capture;
-      _storyToView = null;
-      _isStoryExperienceVisible = true;
-    });
-    _updateNavVisibility();
-  }
-
-  void _openStoryViewer(StoryVerseStory story) {
-    setState(() {
-      _storyExperienceStage = StoryVerseStage.viewer;
-      _storyToView = story;
-      _isStoryExperienceVisible = true;
-    });
-    _updateNavVisibility();
-  }
-
-  void _closeStoryExperience() {
-    setState(() {
-      _isStoryExperienceVisible = false;
-      _storyExperienceStage = StoryVerseStage.capture;
-      _storyToView = null;
-    });
-    _updateNavVisibility();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final notifier = NavBarVisibilityScope.maybeOf(context);
-    if (_navVisibility == notifier) return;
-    _navVisibility = notifier;
-    _updateNavVisibility();
-  }
-
-  void _updateNavVisibility() {
-    _navVisibility?.value = !_isStoryExperienceVisible;
-  }
-
-  @override
-  void dispose() {
-    _navVisibility?.value = true;
-    super.dispose();
   }
 
   @override
@@ -172,15 +113,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ),
-                    StoriesSection(
-                      stories: _stories,
-                      hasMyStory:
-                          false, // Change to true when user has active story
-                      myStoryImageUrl:
-                          null, // Set to user's story image when active
-                      onStartCapture: _openStoryCapture,
-                      onViewStory: _openStoryViewer,
-                    ),
+                    const DynamicStoryRow(),
                   ],
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -226,34 +159,6 @@ class _HomePageState extends State<HomePage> {
                     }),
                   const SizedBox(height: 100),
                 ],
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              ignoring: !_isStoryExperienceVisible,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 240),
-                child: _isStoryExperienceVisible
-                    ? StoryVerseExperience(
-                        key: ValueKey(
-                          _storyExperienceStage == StoryVerseStage.viewer
-                              ? 'viewer-${_storyToView?.id ?? 'none'}'
-                              : 'capture-${_storyCaptureMode.name}',
-                        ),
-                        initialStage: _storyExperienceStage,
-                        initialStory:
-                            _storyExperienceStage == StoryVerseStage.viewer
-                            ? _storyToView
-                            : null,
-                        feedStories: _stories,
-                        showEntryStage: false,
-                        initialMode: _storyCaptureMode,
-                        onClose: _closeStoryExperience,
-                        showInsightsButton:
-                            false, // Hide insights for others' stories
-                      )
-                    : const SizedBox.shrink(),
               ),
             ),
           ),

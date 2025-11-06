@@ -527,24 +527,18 @@ class ImagePickerService {
 
       // Get public URL
       final url = _supabase.storage.from(bucket).getPublicUrl(path);
-      final bustedUrl = '$url?v=${DateTime.now().millisecondsSinceEpoch}';
-      debugPrint('Public URL: $bustedUrl');
+      debugPrint('Public URL: $url');
 
       // Update users table (NOT profiles table)
       final fieldName = photoType == PhotoType.profile
           ? 'photo_url'
           : 'cover_photo_url';
 
-      debugPrint(
-        'Updating users table: $fieldName = $bustedUrl for uid: $userId',
-      );
-      await _supabase
-          .from('users')
-          .update({fieldName: bustedUrl})
-          .eq('uid', userId);
+      debugPrint('Updating users table: $fieldName = $url for uid: $userId');
+      await _supabase.from('users').update({fieldName: url}).eq('uid', userId);
 
       debugPrint('Database update successful');
-      return bustedUrl;
+      return url;
     } catch (e, stackTrace) {
       debugPrint('Error uploading to Supabase: $e');
       debugPrint('Stack trace: $stackTrace');

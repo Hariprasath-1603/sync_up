@@ -36,12 +36,8 @@ class SupabaseStorageService {
           .from(SupabaseConfig.profilePhotosBucket)
           .getPublicUrl(fileName);
 
-      // Add cache-busting parameter to force image reload
-      final cacheBustedUrl =
-          '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
-
-      print('DEBUG: Profile photo uploaded successfully: $cacheBustedUrl');
-      return cacheBustedUrl;
+      print('DEBUG: Profile photo uploaded successfully: $publicUrl');
+      return publicUrl;
     } catch (e) {
       print('ERROR: Supabase profile photo upload failed: $e');
       return null;
@@ -153,12 +149,8 @@ class SupabaseStorageService {
           .from(SupabaseConfig.coverPhotosBucket)
           .getPublicUrl(fileName);
 
-      // Add cache-busting parameter to force image reload
-      final cacheBustedUrl =
-          '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
-
-      print('DEBUG: Cover photo uploaded successfully: $cacheBustedUrl');
-      return cacheBustedUrl;
+      print('DEBUG: Cover photo uploaded successfully: $publicUrl');
+      return publicUrl;
     } catch (e) {
       print('ERROR: Supabase cover photo upload failed: $e');
       return null;
