@@ -3,6 +3,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.9.2-blue.svg)](https://flutter.dev)
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-green.svg)](https://supabase.com)
 [![License](https://img.shields.io/badge/License-Private-red.svg)]()
+[![Last Updated](https://img.shields.io/badge/Last%20Updated-January%202026-brightgreen.svg)]()
 
 A modern, feature-rich social media application built with Flutter, combining the best aspects of TikTok and Instagram. SyncUp offers an immersive video-sharing experience with reels, stories, posts, live streaming, and real-time messaging.
 
@@ -35,11 +36,14 @@ A modern, feature-rich social media application built with Flutter, combining th
 ### Current Status
 - ✅ Core architecture established
 - ✅ Supabase backend integration
-- 🔄 Actively migrating from Firebase to Supabase
+- ✅ Migration from Firebase to Supabase complete
 - ✅ Authentication system with PKCE flow
 - ✅ Reel creation and viewing system
-- ✅ Story creation and viewing system
+- ✅ Enhanced story viewer with gesture controls
+- ✅ Dynamic story row with real-time updates
 - ✅ User profiles and social features
+- ✅ Storage optimization for reels and stories
+- 🔄 Actively developing live streaming features
 
 ---
 
@@ -534,8 +538,8 @@ Private - All rights reserved
 ## 🔮 Roadmap
 
 ### In Progress
-- [ ] Complete Firebase → Supabase migration
-- [ ] Enhanced reel analytics
+- [x] Complete Firebase → Supabase migration
+- [x] Enhanced reel analytics
 - [ ] Live streaming features
 - [ ] Group messaging
 
