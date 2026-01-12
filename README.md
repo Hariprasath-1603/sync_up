@@ -2,6 +2,7 @@
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.9.2-blue.svg)](https://flutter.dev)
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-green.svg)](https://supabase.com)
+[![Dart](https://img.shields.io/badge/Dart-3.9.2-blue.svg)](https://dart.dev)
 [![License](https://img.shields.io/badge/License-Private-red.svg)]()
 [![Last Updated](https://img.shields.io/badge/Last%20Updated-January%202026-brightgreen.svg)]()
 

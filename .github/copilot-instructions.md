@@ -3,13 +3,15 @@
 ## Project Overview
 **SyncUp** is a Flutter 3.9.2 social media app (TikTok/Instagram hybrid) with Supabase backend. Feature-based architecture with core infrastructure separation.
 
+**Last Updated**: January 2026
+
 ## Critical Architectural Patterns
 
 ### 1. Supabase as Single Source of Truth
 - **Authentication**: `Supabase.instance.client.auth` with PKCE flow
 - **Database**: Direct table access via `.from('table_name')` queries (NOT Firestore)
 - **Storage**: Buckets defined in `lib/core/config/supabase_config.dart`
-- **Migration Status**: Actively migrating from Firebase → Supabase. Comments like "TODO: Firestore migration pending" indicate incomplete work.
+- **Migration Status**: ✅ Firebase to Supabase migration complete. All features now use Supabase exclusively.
 
 ```dart
 // CORRECT - Supabase query pattern
