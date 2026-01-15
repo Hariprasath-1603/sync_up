@@ -3,7 +3,31 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../services/database_service.dart';
 
-/// Provider for managing authentication state
+/// Authentication State Management Provider
+/// 
+/// Manages all authentication-related state and operations throughout the app.
+/// This provider is used app-wide via Provider package in main.dart.
+/// 
+/// Key Responsibilities:
+/// - Tracks current authenticated user and their data
+/// - Listens to Supabase auth state changes (login/logout)
+/// - Provides user profile information to all widgets
+/// - Manages follow/unfollow operations
+/// - Handles user data refresh and updates
+/// 
+/// State Properties:
+/// - [currentUser] - Currently logged in user's data from database
+/// - [isLoading] - Whether auth operations are in progress
+/// - [isAuthenticated] - Quick check if user is logged in
+/// - [error] - Last error message from auth operations
+/// 
+/// Usage:
+/// ```dart
+/// final authProvider = Provider.of<AuthProvider>(context);
+/// if (authProvider.isAuthenticated) {
+///   Text('Welcome ${authProvider.currentUser!.username}');
+/// }
+/// ```
 class AuthProvider extends ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
 
@@ -21,7 +45,22 @@ class AuthProvider extends ChangeNotifier {
     _initialize();
   }
 
-  /// Initialize auth state
+  /// Initialize authentication state and listeners
+  /// 
+  /// This method is called automatically when AuthProvider is created.
+  /// It sets up the entire authentication flow:
+  /// 
+  /// 1. Sets up a real-time listener for Supabase auth state changes
+  ///    - Automatically detects login/logout events
+  ///    - Fetches user data from database when user logs in
+  ///    - Clears user data when user logs out
+  /// 
+  /// 2. Checks if a user is already logged in (persisted session)
+  ///    - Supabase stores session in device storage
+  ///    - If session exists, loads user data immediately
+  /// 
+  /// This ensures the app always has the latest auth state without
+  /// requiring manual refresh or state management.
   Future<void> _initialize() async {
     _isLoading = true;
     notifyListeners();
@@ -59,12 +98,28 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Check if current user is following another user
+  /// 
+  /// Used throughout the app to show correct follow/unfollow button state.
+  /// Checks the local cached following list for instant UI updates.
+  /// 
+  /// Returns false if:
+  /// - No user is logged in
+  /// - The userId is not in the following list
   bool isFollowing(String userId) {
     if (_currentUser == null) return false;
     return _currentUser!.following.contains(userId);
   }
 
-  /// Follow a user
+  /// Follow a user and update local state
+  /// 
+  /// Performs a two-step operation:
+  /// 1. Updates the database (adds relationship in Supabase)
+  /// 2. Updates local cached state for instant UI feedback
+  /// 
+  /// This optimistic update pattern ensures the UI feels responsive
+  /// while the network request completes in the background.
+  /// 
+  /// Returns true if the operation succeeded, false otherwise.
   Future<bool> followUser(String userId) async {
     if (_currentUser == null) return false;
 

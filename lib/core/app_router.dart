@@ -1,3 +1,16 @@
+/// App Router Configuration
+/// Manages all navigation routes using GoRouter package
+/// 
+/// Route Structure:
+/// - /splash - Initial loading screen
+/// - /onboarding - First-time user experience
+/// - /signin, /signup - Authentication flows
+/// - / - Main app with bottom navigation (home, explore, reels, chat, profile)
+/// 
+/// Features:
+/// - Nested navigation for tab-based UI
+/// - Query parameter support for data passing
+/// - Deep linking capabilities
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'scaffold_with_nav_bar.dart';
@@ -21,6 +34,8 @@ import '../features/chat/chat_page.dart';
 import '../features/splash/splash_screen.dart';
 import '../features/settings/back_navigation_settings_page.dart';
 
+/// Root navigator key for managing app-wide navigation
+/// Used for navigation actions that need to bypass nested navigators
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(

@@ -1,14 +1,31 @@
+/// Theme Configuration for SyncUp
+/// Defines color schemes, typography, and component styles
+/// Supports both light and dark themes with Material 3 design
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// Brand colors
-const Color kPrimary = Color(0xFF4A6CF7); // Primary color
+// ============================================================================
+// BRAND COLORS
+// ============================================================================
+/// Primary brand color - used for CTAs, active states, and key UI elements
+const Color kPrimary = Color(0xFF4A6CF7);
+
+/// Light theme background color - subtle off-white for reduced eye strain
 const Color kLightBackground = Color(0xFFF6F7FB);
+
+/// Dark theme background color - deep dark for OLED displays
 const Color kDarkBackground = Color(0xFF0B0E13);
 
+// ============================================================================
+// LIGHT THEME
+// ============================================================================
+/// Builds the light theme configuration
+/// Uses Poppins font family for modern, clean typography
+/// Includes custom button styles with rounded corners
 ThemeData buildAppTheme() {
   final base = ThemeData(useMaterial3: true);
 
+  // Create color scheme from primary brand color
   final lightScheme = ColorScheme.fromSeed(
     seedColor: kPrimary,
     brightness: Brightness.light,

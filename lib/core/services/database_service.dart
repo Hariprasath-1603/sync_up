@@ -2,14 +2,56 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import 'user_cache_service.dart';
 
-/// Simplified DatabaseService for Supabase
-/// TODO: This is a minimal implementation to make the app compile
-/// Full Firestore to Supabase migration for complex features is pending
+/// Database Service - Supabase Data Access Layer
+/// 
+/// Centralized service for all database operations using Supabase.
+/// Provides a clean API for CRUD operations on users, posts, reels, and stories.
+/// 
+/// Key Features:
+/// - Username validation and availability checking
+/// - User CRUD operations (Create, Read, Update, Delete)
+/// - Follow/unfollow relationship management
+/// - Local caching integration via UserCacheService
+/// - Error handling and type-safe queries
+/// 
+/// Architecture:
+/// - Uses Supabase PostgreSQL as primary database
+/// - All queries use `.from('table_name')` pattern
+/// - Row Level Security (RLS) enforced at database level
+/// - Returns strongly-typed models instead of raw JSON
+/// 
+/// Note: This service replaces the previous Firestore implementation.
+/// Migration from Firebase to Supabase is now complete.
+/// 
+/// Usage Example:
+/// ```dart
+/// final dbService = DatabaseService();
+/// final user = await dbService.getUserByUid('user-id-123');
+/// if (user != null) {
+///   print('Found user: ${user.username}');
+/// }
+/// ```
 class DatabaseService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   // ==================== USERNAME VALIDATION ====================
+  // Usernames in SyncUp follow Instagram-style rules:
+  // - 3-30 characters long
+  // - Letters, numbers, dots, and underscores only
+  // - Must start with alphanumeric character
+  // - Cannot end with special characters
+  // - No consecutive dots or underscores
+  // All usernames are stored in lowercase for case-insensitive lookup
 
+  /// Check if a username is available for registration
+  /// 
+  /// Performs a case-insensitive database lookup to check if username exists.
+  /// Returns true if the username is available, false if taken or on error.
+  /// 
+  /// Implementation:
+  /// - Converts username to lowercase and trims whitespace
+  /// - Uses `.maybeSingle()` to get at most one result
+  /// - Returns true only if no matching user found
   Future<bool> isUsernameAvailable(String username) async {
     try {
       final result = await _supabase
@@ -24,6 +66,29 @@ class DatabaseService {
     }
   }
 
+  /// Validate username format according to SyncUp rules
+  /// 
+  /// Returns null if valid, or an error message string if invalid.
+  /// This method only checks format, not availability.
+  /// 
+  /// Validation Rules:
+  /// ✓ 3-30 characters in length
+  /// ✓ Letters, numbers, dots (.), and underscores (_) only
+  /// ✓ Must start with a letter or number
+  /// ✓ Cannot end with dot or underscore
+  /// ✓ No consecutive special characters (.. or __)
+  /// 
+  /// Use this before checking availability to fail fast on invalid formats.
+  /// 
+  /// Example:
+  /// ```dart
+  /// final error = validateUsernameFormat('user.name_123');
+  /// if (error != null) {
+  ///   showError(error); // Show validation error to user
+  /// } else {
+  ///   checkAvailability(); // Proceed to check if available
+  /// }
+  /// ```
   String? validateUsernameFormat(String username) {
     if (username.isEmpty) return 'Username cannot be empty';
     if (username.length < 3) return 'Username must be at least 3 characters';
