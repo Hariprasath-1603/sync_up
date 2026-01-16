@@ -1,3 +1,38 @@
+/// User Model - Core User Data Structure
+/// 
+/// Represents a user in the SyncUp social media application.
+/// This model maps to the 'users' table in Supabase and contains
+/// all user profile information, social metrics, and privacy settings.
+/// 
+/// Key Features:
+/// - Complete user profile data (bio, photos, contact info)
+/// - Social graph information (followers, following)
+/// - Privacy and notification settings
+/// - Activity tracking (last active, creation date)
+/// - Story availability status
+/// 
+/// Database Integration:
+/// - Primary key: uid (matches Supabase auth.users.id)
+/// - Username stored in lowercase for case-insensitive searches
+/// - Separate usernameDisplay field preserves original casing
+/// - Follow relationships stored as UID arrays
+/// 
+/// Privacy Settings:
+/// - [isPrivate]: Controls profile visibility and follow requests
+/// - [showActivityStatus]: Shows/hides "last active" timestamp
+/// - [allowMessagesFromEveryone]: DM permissions (everyone vs followers only)
+/// 
+/// Usage Example:
+/// ```dart
+/// final user = UserModel(
+///   uid: authUser.id,
+///   username: 'john_doe',
+///   email: 'john@example.com',
+///   createdAt: DateTime.now(),
+///   lastActive: DateTime.now(),
+/// );
+/// await databaseService.createUser(user);
+/// ```
 class UserModel {
   final String uid;
   final String username;
@@ -47,7 +82,27 @@ class UserModel {
     this.hasStories = false,
   });
 
-  // Convert UserModel to Map for Firestore
+  /// Convert UserModel to Map for Supabase Database
+  /// 
+  /// This method prepares the user data for storage in Supabase.
+  /// 
+  /// Special Handling:
+  /// - Username is stored in TWO fields:
+  ///   1. 'username': Lowercase version for case-insensitive searches and uniqueness
+  ///   2. 'usernameDisplay': Original casing for UI display
+  ///   
+  /// - Email is also normalized to lowercase for consistency
+  /// 
+  /// This dual-field approach allows:
+  /// - Fast case-insensitive username lookups in queries
+  /// - Preserving user's preferred username capitalization in UI
+  /// - Preventing duplicate usernames like "JohnDoe" and "johndoe"
+  /// 
+  /// Example:
+  /// ```dart
+  /// final userData = user.toMap();
+  /// await supabase.from('users').insert(userData);
+  /// ```
   Map<String, dynamic> toMap() {
     return {
       'uid': uid,
