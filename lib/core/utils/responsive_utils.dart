@@ -1,6 +1,55 @@
 import 'package:flutter/material.dart';
 
-/// Responsive utilities for consistent scaling across different screen sizes
+/// Responsive Design Utilities for Cross-Device Compatibility
+/// 
+/// Provides a comprehensive set of methods for building responsive UIs that
+/// adapt seamlessly across different screen sizes and device types.
+/// 
+/// Design Philosophy:
+/// - Uses a reference design size (375x812 - iPhone X dimensions)
+/// - Scales all dimensions proportionally based on actual screen size
+/// - Implements smart clamping for font sizes to maintain readability
+/// - Separates concerns: width, height, fonts, spacing, and radius
+/// 
+/// Key Features:
+/// 1. **Proportional Scaling**: All dimensions scale relative to design mockups
+/// 2. **Font Size Clamping**: Prevents text from becoming too small or large (0.85x - 1.3x)
+/// 3. **Device Detection**: Tablet and orientation detection utilities
+/// 4. **Type Safety**: Specific methods for different use cases
+/// 
+/// Usage Examples:
+/// ```dart
+/// // In your widget
+/// Container(
+///   width: ResponsiveUtils.width(context, 200),   // 200px in design
+///   height: ResponsiveUtils.height(context, 100),  // 100px in design
+///   padding: EdgeInsets.all(ResponsiveUtils.spacing(context, 16)),
+///   child: Text(
+///     'Hello',
+///     style: TextStyle(
+///       fontSize: ResponsiveUtils.fontSize(context, 18),
+///     ),
+///   ),
+/// )
+/// 
+/// // Responsive layouts
+/// if (ResponsiveUtils.isTablet(context)) {
+///   return TabletLayout();
+/// } else {
+///   return PhoneLayout();
+/// }
+/// ```
+/// 
+/// Design Reference:
+/// - Base Width: 375px (standard mobile)
+/// - Base Height: 812px (iPhone X/11/12/13 Pro)
+/// - Tablet Breakpoint: 600dp shortest side
+/// 
+/// Best Practices:
+/// - Always use these utilities instead of hardcoded pixel values
+/// - Test on multiple screen sizes (small phone, large phone, tablet)
+/// - Consider using spacing() for consistent padding/margins
+/// - Use isTablet() for layout variations rather than manual checks
 class ResponsiveUtils {
   /// Design reference width (based on a standard phone screen)
   static const double _designWidth = 375.0;

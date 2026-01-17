@@ -3,7 +3,59 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../scaffold_with_nav_bar.dart';
 
-/// Utility class for showing bottom sheets with automatic navbar hiding
+/// Bottom Sheet Utilities with Smart Navigation Bar Management
+/// 
+/// Provides an enhanced bottom sheet experience with automatic navbar hiding,
+/// optional blur effects, and smooth animations. This utility addresses the
+/// common issue of bottom sheets overlapping with bottom navigation bars.
+/// 
+/// Key Features:
+/// 1. **Automatic Navbar Management**: 
+///    - Hides navbar when sheet opens
+///    - Restores navbar when sheet closes (even on dismissal)
+///    - Works with NavBarVisibilityScope from scaffold_with_nav_bar.dart
+/// 
+/// 2. **Optional Blur Effect**: 
+///    - Background blur using BackdropFilter
+///    - Creates modern, iOS-style visual effect
+///    - Customizable blur intensity
+///    - Note: May impact performance on older devices
+/// 
+/// 3. **Haptic Feedback**: 
+///    - Subtle vibration when sheet opens
+///    - Improves user experience with tactile response
+/// 
+/// 4. **Error Handling**: 
+///    - Ensures navbar is restored even if bottom sheet throws error
+///    - Uses try-finally pattern for cleanup
+/// 
+/// Usage Example:
+/// ```dart
+/// // Simple usage
+/// await BottomSheetUtils.showAdaptiveBottomSheet(
+///   context: context,
+///   builder: (context) => MyBottomSheet(),
+/// );
+/// 
+/// // With blur effect and custom styling
+/// final result = await BottomSheetUtils.showAdaptiveBottomSheet<String>(
+///   context: context,
+///   builder: (context) => SelectionSheet(),
+///   withBlur: true,
+///   isScrollControlled: true,
+///   backgroundColor: Colors.transparent,
+/// );
+/// ```
+/// 
+/// Performance Considerations:
+/// - Blur effects use BackdropFilter which can be GPU-intensive
+/// - On low-end devices, consider disabling withBlur parameter
+/// - Test on target devices before enabling blur in production
+/// 
+/// Integration:
+/// - Requires NavBarVisibilityScope in widget tree
+/// - Works seamlessly with ScaffoldWithNavBar
+/// - Compatible with all standard showModalBottomSheet parameters
 class BottomSheetUtils {
   /// Shows a modal bottom sheet with automatic navbar hiding/showing
   ///
